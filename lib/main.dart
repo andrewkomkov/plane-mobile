@@ -39,26 +39,40 @@ class _PlaneAppState extends State<PlaneApp> {
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(
-          seedColor: Colors.black,
+          seedColor: const Color(0xFF3B82F6),
           brightness: Brightness.light,
         ),
         useMaterial3: true,
-        appBarTheme: const AppBarTheme(
-          centerTitle: false,
+        appBarTheme: const AppBarTheme(centerTitle: false, elevation: 0),
+        cardTheme: CardTheme(
           elevation: 0,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+            side: BorderSide(color: Colors.grey[200]!),
+          ),
         ),
       ),
+      darkTheme: ThemeData(
+        colorScheme: ColorScheme.fromSeed(
+          seedColor: const Color(0xFF3B82F6),
+          brightness: Brightness.dark,
+        ),
+        useMaterial3: true,
+        appBarTheme: const AppBarTheme(centerTitle: false, elevation: 0),
+        cardTheme: CardTheme(
+          elevation: 0,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+            side: BorderSide(color: Colors.grey[800]!),
+          ),
+        ),
+      ),
+      themeMode: ThemeMode.system,
       home: _checking
-          ? const Scaffold(
-              body: Center(child: CircularProgressIndicator()),
-            )
+          ? const Scaffold(body: Center(child: CircularProgressIndicator()))
           : _configured
-              ? HomeScreen(
-                  onLogout: () => setState(() => _configured = false),
-                )
-              : SetupScreen(
-                  onConfigured: () => setState(() => _configured = true),
-                ),
+              ? HomeScreen(onLogout: () => setState(() => _configured = false))
+              : SetupScreen(onConfigured: () => setState(() => _configured = true)),
     );
   }
 }
