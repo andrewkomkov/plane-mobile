@@ -10,7 +10,8 @@ class SearchService {
       queryParameters: {'search': query},
     );
     final data = response.data;
-    final list = data is Map ? (data['results'] ?? []) : data;
+    // Search returns {"issues": [...]} with minimal fields
+    final list = data is Map ? (data['issues'] ?? data['results'] ?? []) : data;
     return (list as List).map((e) => Issue.fromJson(e)).toList();
   }
 }
