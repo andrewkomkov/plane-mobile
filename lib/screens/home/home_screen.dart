@@ -5,7 +5,7 @@ import '../../services/project_service.dart';
 import '../../services/auth_service.dart';
 import '../../models/project.dart';
 import '../../models/user.dart';
-import '../issues/issue_list_screen.dart';
+import '../issues/issues_tab_screen.dart';
 import '../pages/page_list_screen.dart';
 import '../modules/module_list_screen.dart';
 import '../cycles/cycle_list_screen.dart';
@@ -229,7 +229,7 @@ class ProjectScreen extends StatelessWidget {
         ),
         body: TabBarView(
           children: [
-            IssueListScreen(
+            IssuesTabScreen(
                 workspaceSlug: workspaceSlug,
                 projectId: project.id,
                 projectIdentifier: project.identifier),
