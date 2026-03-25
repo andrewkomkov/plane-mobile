@@ -1,24 +1,37 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../config/theme.dart';
 import '../../services/module_service.dart';
+import '../../providers/data_providers.dart';
 import '../../models/module.dart';
+import '../../widgets/loading_state.dart';
+import '../../widgets/skeleton_loader.dart';
+import '../../widgets/property_chip.dart';
+import 'module_detail_screen.dart';
 
-class ModuleListScreen extends StatefulWidget {
+class ModuleListScreen extends ConsumerStatefulWidget {
   final String workspaceSlug;
   final String projectId;
 
-  const ModuleListScreen({super.key, required this.workspaceSlug, required this.projectId});
+  const ModuleListScreen(
+      {super.key,
+      required this.workspaceSlug,
+      required this.projectId});
 
   @override
-  State<ModuleListScreen> createState() => _ModuleListScreenState();
+  ConsumerState<ModuleListScreen> createState() =>
+      _ModuleListScreenState();
 }
 
-class _ModuleListScreenState extends State<ModuleListScreen>
+class _ModuleListScreenState extends ConsumerState<ModuleListScreen>
     with AutomaticKeepAliveClientMixin {
-  List<Module> _modules = [];
-  bool _loading = true;
+  bool _initialLoading = true;
+  String? _error;
 
   @override
   bool get wantKeepAlive => true;
+
+  DataCache get _cache => ref.read(dataCacheProvider);
 
   @override
   void initState() {
@@ -26,61 +39,275 @@ class _ModuleListScreenState extends State<ModuleListScreen>
     _load();
   }
 
+  List<Module> get _modules =>
+      _cache.getModules(widget.workspaceSlug, widget.projectId) ?? [];
+
   Future<void> _load() async {
-    setState(() => _loading = true);
+    setState(() => _error = null);
     try {
-      final modules = await ModuleService.getModules(widget.workspaceSlug, widget.projectId);
-      setState(() {
-        _modules = modules;
-        _loading = false;
-      });
+      await _cache.loadModules(widget.workspaceSlug, widget.projectId, force: true);
+      if (mounted) setState(() => _initialLoading = false);
     } catch (e) {
-      setState(() => _loading = false);
+      if (mounted) {
+        setState(() {
+          _error = e.toString();
+          _initialLoading = false;
+        });
+      }
     }
+  }
+
+  Color _statusColor(String? status) {
+    switch (status) {
+      case 'planned':
+        return PlaneTheme.low;
+      case 'in-progress':
+        return PlaneTheme.started;
+      case 'paused':
+        return PlaneTheme.medium;
+      case 'completed':
+        return PlaneTheme.completed;
+      case 'cancelled':
+        return PlaneTheme.cancelled;
+      default:
+        return PlaneTheme.backlog;
+    }
+  }
+
+  String _statusLabel(String? status) {
+    if (status == null || status.isEmpty) return 'Backlog';
+    return status
+        .split('-')
+        .map((w) => w[0].toUpperCase() + w.substring(1))
+        .join(' ');
+  }
+
+  void _showCreateModuleDialog() {
+    final nameController = TextEditingController();
+    final descController = TextEditingController();
+    String selectedStatus = 'planned';
+
+    showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialogState) => AlertDialog(
+          title: const Text('New module'),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(
+                  controller: nameController,
+                  decoration: const InputDecoration(
+                    labelText: 'Name',
+                    border: OutlineInputBorder(),
+                  ),
+                  autofocus: true,
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: descController,
+                  decoration: const InputDecoration(
+                    labelText: 'Description',
+                    border: OutlineInputBorder(),
+                  ),
+                  maxLines: 2,
+                ),
+                const SizedBox(height: 12),
+                DropdownButtonFormField<String>(
+                  initialValue: selectedStatus,
+                  decoration: const InputDecoration(
+                    labelText: 'Status',
+                    border: OutlineInputBorder(),
+                    contentPadding:
+                        EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  ),
+                  items: [
+                    'backlog',
+                    'planned',
+                    'in-progress',
+                    'paused',
+                    'completed',
+                    'cancelled',
+                  ]
+                      .map((s) =>
+                          DropdownMenuItem(value: s, child: Text(_statusLabel(s))))
+                      .toList(),
+                  onChanged: (v) =>
+                      setDialogState(() => selectedStatus = v ?? 'planned'),
+                  isExpanded: true,
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () async {
+                final name = nameController.text.trim();
+                if (name.isEmpty) return;
+                Navigator.pop(ctx);
+                try {
+                  await ModuleService.createModule(
+                    widget.workspaceSlug,
+                    widget.projectId,
+                    {
+                      'name': name,
+                      if (descController.text.trim().isNotEmpty)
+                        'description': descController.text.trim(),
+                      'status': selectedStatus,
+                    },
+                  );
+                  _cache.invalidateModules(widget.workspaceSlug, widget.projectId);
+                  _load();
+                } catch (e) {
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text('Failed to create module: $e')),
+                    );
+                  }
+                }
+              },
+              child: const Text('Create'),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     super.build(context);
-    if (_loading) return const Center(child: CircularProgressIndicator());
-    if (_modules.isEmpty) return const Center(child: Text('No modules'));
 
-    return RefreshIndicator(
-      onRefresh: _load,
-      child: ListView.builder(
-        itemCount: _modules.length,
-        itemBuilder: (ctx, i) {
-          final m = _modules[i];
-          return Card(
-            margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-            child: ListTile(
-              leading: const Icon(Icons.view_module),
-              title: Text(m.name, style: const TextStyle(fontWeight: FontWeight.w500)),
-              subtitle: Row(
-                children: [
-                  if (m.startDate != null) ...[
-                    Text(m.startDate!, style: TextStyle(fontSize: 11, color: Colors.grey[500])),
-                    if (m.targetDate != null)
-                      Text(' - ${m.targetDate!}',
-                          style: TextStyle(fontSize: 11, color: Colors.grey[500])),
-                  ],
-                  const Spacer(),
-                  Text('${m.completedIssues}/${m.totalIssues}',
-                      style: TextStyle(fontSize: 12, color: Colors.grey[600])),
-                ],
-              ),
-              trailing: SizedBox(
-                width: 40,
-                height: 40,
-                child: CircularProgressIndicator(
-                  value: m.progress,
-                  strokeWidth: 3,
-                  backgroundColor: Colors.grey[200],
+    if (_initialLoading && _modules.isEmpty) {
+      return const ProjectListSkeleton();
+    }
+    if (_error != null && _modules.isEmpty) {
+      return ErrorStateWidget(
+          message: 'Failed to load modules', onRetry: _load);
+    }
+    if (_modules.isEmpty) {
+      return const Center(
+        child: EmptyStateWidget(
+          message: 'No modules',
+          icon: Icons.view_module,
+        ),
+      );
+    }
+
+    return Scaffold(
+      body: RefreshIndicator(
+        onRefresh: _load,
+        child: ListView.builder(
+          itemCount: _modules.length,
+          itemBuilder: (ctx, i) {
+            final m = _modules[i];
+            return _ModuleCard(
+              module: m,
+              statusColor: _statusColor(m.status),
+              statusLabel: _statusLabel(m.status),
+              onTap: () async {
+                await Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => ModuleDetailScreen(
+                      workspaceSlug: widget.workspaceSlug,
+                      projectId: widget.projectId,
+                      module: m,
+                    ),
+                  ),
+                );
+                _cache.invalidateModules(widget.workspaceSlug, widget.projectId);
+                _load();
+              },
+            );
+          },
+        ),
+      ),
+    );
+  }
+}
+
+class _ModuleCard extends StatelessWidget {
+  final Module module;
+  final Color statusColor;
+  final String statusLabel;
+  final VoidCallback onTap;
+
+  const _ModuleCard({
+    required this.module,
+    required this.statusColor,
+    required this.statusLabel,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final secondary = theme.colorScheme.onSurfaceVariant;
+
+    return InkWell(
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(Icons.view_module, size: PlaneTheme.iconMedium, color: statusColor),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    module.name,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                        fontSize: PlaneTheme.fontBody, fontWeight: PlaneTheme.fontBodyWeight),
+                  ),
                 ),
+                const SizedBox(width: 8),
+                PropertyChip(
+                  icon: Icons.circle,
+                  iconColor: statusColor,
+                  label: statusLabel,
+                ),
+              ],
+            ),
+            const SizedBox(height: 6),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(2),
+              child: LinearProgressIndicator(
+                value: module.progress,
+                minHeight: 4,
+                backgroundColor:
+                    theme.colorScheme.outline.withValues(alpha: 0.3),
+                valueColor: AlwaysStoppedAnimation<Color>(statusColor),
               ),
             ),
-          );
-        },
+            const SizedBox(height: 4),
+            Row(
+              children: [
+                if (module.startDate != null || module.targetDate != null)
+                  Text(
+                    [module.startDate, module.targetDate]
+                        .where((d) => d != null)
+                        .join(' - '),
+                    style: TextStyle(fontSize: PlaneTheme.fontSmall, color: secondary),
+                  ),
+                const Spacer(),
+                Text(
+                  '${module.completedIssues}/${module.totalIssues}',
+                  style: TextStyle(fontSize: PlaneTheme.fontCaption, color: secondary),
+                ),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }

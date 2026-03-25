@@ -1,9 +1,13 @@
 import 'package:flutter/material.dart';
-import '../../services/page_service.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../providers/data_providers.dart';
 import '../../models/page.dart';
+import '../../widgets/loading_state.dart';
+import '../../widgets/skeleton_loader.dart';
+import '../../widgets/item_tile.dart';
 import 'page_detail_screen.dart';
 
-class PageListScreen extends StatefulWidget {
+class PageListScreen extends ConsumerStatefulWidget {
   final String workspaceSlug;
   final String projectId;
 
@@ -14,17 +18,21 @@ class PageListScreen extends StatefulWidget {
   });
 
   @override
-  State<PageListScreen> createState() => _PageListScreenState();
+  ConsumerState<PageListScreen> createState() => _PageListScreenState();
 }
 
-class _PageListScreenState extends State<PageListScreen>
+class _PageListScreenState extends ConsumerState<PageListScreen>
     with AutomaticKeepAliveClientMixin {
-  List<PlanePage> _pages = [];
-  bool _loading = true;
+  bool _initialLoading = true;
   String? _error;
 
   @override
   bool get wantKeepAlive => true;
+
+  DataCache get _cache => ref.read(dataCacheProvider);
+
+  List<PlanePage> get _pages =>
+      _cache.getPages(widget.workspaceSlug, widget.projectId) ?? [];
 
   @override
   void initState() {
@@ -33,57 +41,34 @@ class _PageListScreenState extends State<PageListScreen>
   }
 
   Future<void> _load() async {
-    setState(() {
-      _loading = true;
-      _error = null;
-    });
+    setState(() => _error = null);
     try {
-      final pages =
-          await PageService.getPages(widget.workspaceSlug, widget.projectId);
-      setState(() {
-        _pages = pages;
-        _loading = false;
-      });
+      await _cache.loadPages(widget.workspaceSlug, widget.projectId, force: true);
+      if (mounted) setState(() => _initialLoading = false);
     } catch (e) {
-      setState(() {
-        _error = e.toString();
-        _loading = false;
-      });
+      if (mounted) {
+        setState(() {
+          _error = e.toString();
+          _initialLoading = false;
+        });
+      }
     }
   }
 
   Future<void> _createPage() async {
-    final name = await showDialog<String>(
-      context: context,
-      builder: (ctx) {
-        final controller = TextEditingController();
-        return AlertDialog(
-          title: const Text('New Page'),
-          content: TextField(
-            controller: controller,
-            decoration: const InputDecoration(
-              labelText: 'Page name',
-              border: OutlineInputBorder(),
-            ),
-            autofocus: true,
-          ),
-          actions: [
-            TextButton(
-                onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
-            TextButton(
-                onPressed: () => Navigator.pop(ctx, controller.text.trim()),
-                child: const Text('Create')),
-          ],
-        );
-      },
+    final result = await Navigator.push<bool>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => PageEditScreen(
+          workspaceSlug: widget.workspaceSlug,
+          projectId: widget.projectId,
+          initialName: '',
+          initialHtml: '',
+        ),
+      ),
     );
-
-    if (name != null && name.isNotEmpty) {
-      await PageService.createPage(
-        widget.workspaceSlug,
-        widget.projectId,
-        {'name': name, 'description_html': '<p></p>'},
-      );
+    if (result == true) {
+      _cache.invalidatePages(widget.workspaceSlug, widget.projectId);
       _load();
     }
   }
@@ -91,38 +76,38 @@ class _PageListScreenState extends State<PageListScreen>
   @override
   Widget build(BuildContext context) {
     super.build(context);
-    if (_loading) return const Center(child: CircularProgressIndicator());
-    if (_error != null) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Text('Error: $_error'),
-            ElevatedButton(onPressed: _load, child: const Text('Retry')),
-          ],
-        ),
-      );
+    if (_initialLoading && _pages.isEmpty) {
+      return const ProjectListSkeleton();
+    }
+    if (_error != null && _pages.isEmpty) {
+      return ErrorStateWidget(message: 'Failed to load pages', onRetry: _load);
     }
 
     return Scaffold(
       body: RefreshIndicator(
         onRefresh: _load,
         child: _pages.isEmpty
-            ? const Center(child: Text('No pages'))
+            ? ListView(children: [
+                SizedBox(
+                    height: MediaQuery.of(context).size.height * 0.3),
+                const Center(
+                  child: EmptyStateWidget(
+                    message: 'No pages',
+                    icon: Icons.description_outlined,
+                    subtitle: 'Create a page to get started',
+                  ),
+                ),
+              ])
             : ListView.builder(
                 itemCount: _pages.length,
                 itemBuilder: (ctx, i) {
                   final page = _pages[i];
-                  return ListTile(
-                    leading: Icon(
-                      page.isLocked ? Icons.lock : Icons.description,
-                      color: Colors.grey[600],
-                    ),
-                    title: Text(page.name.isEmpty ? 'Untitled' : page.name),
-                    subtitle: Text(
-                      _formatDate(page.updatedAt),
-                      style: TextStyle(fontSize: 12, color: Colors.grey[500]),
-                    ),
+                  return ItemTile(
+                    icon: page.isLocked
+                        ? Icons.lock
+                        : Icons.description_outlined,
+                    title: page.name.isEmpty ? 'Untitled' : page.name,
+                    subtitle: _formatDate(page.updatedAt),
                     onTap: () async {
                       await Navigator.push(
                         context,
@@ -135,15 +120,12 @@ class _PageListScreenState extends State<PageListScreen>
                           ),
                         ),
                       );
+                      _cache.invalidatePages(widget.workspaceSlug, widget.projectId);
                       _load();
                     },
                   );
                 },
               ),
-      ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: _createPage,
-        child: const Icon(Icons.add),
       ),
     );
   }

@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'config/secure_storage.dart';
 import 'config/theme.dart';
+import 'providers/theme_provider.dart';
 import 'screens/setup/setup_screen.dart';
 import 'screens/home/home_screen.dart';
+import 'services/push_notification_service.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -11,17 +14,17 @@ void main() {
     statusBarColor: Colors.transparent,
     statusBarIconBrightness: Brightness.light,
   ));
-  runApp(const PlaneApp());
+  runApp(const ProviderScope(child: PlaneApp()));
 }
 
-class PlaneApp extends StatefulWidget {
+class PlaneApp extends ConsumerStatefulWidget {
   const PlaneApp({super.key});
 
   @override
-  State<PlaneApp> createState() => _PlaneAppState();
+  ConsumerState<PlaneApp> createState() => _PlaneAppState();
 }
 
-class _PlaneAppState extends State<PlaneApp> {
+class _PlaneAppState extends ConsumerState<PlaneApp> {
   bool _configured = false;
   bool _checking = true;
 
@@ -33,6 +36,10 @@ class _PlaneAppState extends State<PlaneApp> {
 
   Future<void> _checkConfig() async {
     final configured = await SecureStorage.isConfigured();
+    if (configured) {
+      // Initialize push notifications after auth is confirmed
+      PushNotificationService.initialize();
+    }
     setState(() {
       _configured = configured;
       _checking = false;
@@ -41,17 +48,23 @@ class _PlaneAppState extends State<PlaneApp> {
 
   @override
   Widget build(BuildContext context) {
+    final themeMode = ref.watch(themeModeProvider);
+
     return MaterialApp(
       title: 'Plane',
       debugShowCheckedModeBanner: false,
       theme: PlaneTheme.light(),
       darkTheme: PlaneTheme.dark(),
-      themeMode: ThemeMode.system,
+      themeMode: themeMode,
       home: _checking
           ? const Scaffold(body: Center(child: CircularProgressIndicator()))
           : _configured
               ? HomeScreen(onLogout: () => setState(() => _configured = false))
-              : SetupScreen(onConfigured: () => setState(() => _configured = true)),
+              : SetupScreen(
+                  onConfigured: () {
+                    PushNotificationService.initialize();
+                    setState(() => _configured = true);
+                  }),
     );
   }
 }

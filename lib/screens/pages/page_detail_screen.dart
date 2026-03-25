@@ -1,9 +1,13 @@
 import 'package:flutter/material.dart';
-import 'package:webview_flutter/webview_flutter.dart';
+import 'package:flutter_markdown/flutter_markdown.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../services/page_service.dart';
 import '../../models/page.dart';
+import '../../utils/html_to_markdown.dart';
+import '../../utils/markdown_to_html.dart';
+import '../../widgets/loading_state.dart';
 
-class PageDetailScreen extends StatefulWidget {
+class PageDetailScreen extends ConsumerStatefulWidget {
   final String workspaceSlug;
   final String projectId;
   final String pageId;
@@ -18,10 +22,11 @@ class PageDetailScreen extends StatefulWidget {
   });
 
   @override
-  State<PageDetailScreen> createState() => _PageDetailScreenState();
+  ConsumerState<PageDetailScreen> createState() =>
+      _PageDetailScreenState();
 }
 
-class _PageDetailScreenState extends State<PageDetailScreen> {
+class _PageDetailScreenState extends ConsumerState<PageDetailScreen> {
   PlanePage? _page;
   bool _loading = true;
 
@@ -64,48 +69,84 @@ class _PageDetailScreenState extends State<PageDetailScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return Scaffold(
       appBar: AppBar(
         title: Text(_page?.name ?? widget.pageName),
         actions: [
           if (_page != null && !_page!.isLocked)
-            IconButton(icon: const Icon(Icons.edit), onPressed: _editPage),
+            IconButton(
+                icon: const Icon(Icons.edit, size: 22),
+                onPressed: _editPage),
         ],
       ),
       body: _loading
-          ? const Center(child: CircularProgressIndicator())
-          : _page?.descriptionHtml != null && _page!.descriptionHtml!.isNotEmpty
-              ? WebViewWidget(
-                  controller: WebViewController()
-                    ..setBackgroundColor(Theme.of(context).scaffoldBackgroundColor)
-                    ..loadHtmlString(_wrapHtml(_page!.descriptionHtml!)),
+          ? const LoadingStateWidget()
+          : _page?.descriptionHtml != null &&
+                  _page!.descriptionHtml!.isNotEmpty
+              ? SingleChildScrollView(
+                  padding: const EdgeInsets.all(20),
+                  child: MarkdownBody(
+                    data: htmlToMarkdown(_page!.descriptionHtml!),
+                    styleSheet: MarkdownStyleSheet(
+                      p: TextStyle(
+                          fontSize: 15,
+                          height: 1.7,
+                          color: theme.colorScheme.onSurface),
+                      h1: TextStyle(
+                          fontSize: 22,
+                          fontWeight: FontWeight.w600,
+                          color: theme.colorScheme.onSurface),
+                      h2: TextStyle(
+                          fontSize: 19,
+                          fontWeight: FontWeight.w600,
+                          color: theme.colorScheme.onSurface),
+                      h3: TextStyle(
+                          fontSize: 17,
+                          fontWeight: FontWeight.w500,
+                          color: theme.colorScheme.onSurface),
+                      code: TextStyle(
+                        fontSize: 13,
+                        color: theme.colorScheme.primary,
+                        backgroundColor: theme.colorScheme.primary
+                            .withValues(alpha: 0.08),
+                      ),
+                      codeblockDecoration: BoxDecoration(
+                        color:
+                            theme.colorScheme.surfaceContainerHighest,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      codeblockPadding: const EdgeInsets.all(12),
+                      blockquoteDecoration: BoxDecoration(
+                        border: Border(
+                            left: BorderSide(
+                                color: theme.colorScheme.primary,
+                                width: 3)),
+                      ),
+                      blockquotePadding:
+                          const EdgeInsets.fromLTRB(12, 4, 0, 4),
+                      listBullet: TextStyle(
+                          fontSize: 15,
+                          color: theme.colorScheme.onSurface),
+                    ),
+                    selectable: true,
+                  ),
                 )
-              : const Center(child: Text('No content')),
+              : Center(
+                  child: Text('No content',
+                      style: TextStyle(
+                          fontSize: 15,
+                          color:
+                              theme.colorScheme.onSurfaceVariant)),
+                ),
     );
-  }
-
-  String _wrapHtml(String body) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final bg = isDark ? '#1a1a1a' : '#fff';
-    final fg = isDark ? '#e0e0e0' : '#333';
-    return '''
-<html><head>
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<style>
-body { font-family: -apple-system, sans-serif; padding: 16px; font-size: 15px; color: $fg; background: $bg; line-height: 1.6; }
-h1,h2,h3 { margin-top: 16px; }
-code { background: ${isDark ? '#333' : '#f0f0f0'}; padding: 2px 6px; border-radius: 4px; font-size: 13px; }
-pre { background: ${isDark ? '#333' : '#f0f0f0'}; padding: 12px; border-radius: 8px; overflow-x: auto; }
-ul,ol { padding-left: 20px; }
-</style>
-</head><body>$body</body></html>''';
   }
 }
 
 class PageEditScreen extends StatefulWidget {
   final String workspaceSlug;
   final String projectId;
-  final String pageId;
+  final String? pageId;
   final String initialName;
   final String initialHtml;
 
@@ -113,7 +154,7 @@ class PageEditScreen extends StatefulWidget {
     super.key,
     required this.workspaceSlug,
     required this.projectId,
-    required this.pageId,
+    this.pageId,
     required this.initialName,
     required this.initialHtml,
   });
@@ -124,83 +165,234 @@ class PageEditScreen extends StatefulWidget {
 
 class _PageEditScreenState extends State<PageEditScreen> {
   late TextEditingController _nameController;
-  late TextEditingController _htmlController;
+  late TextEditingController _contentController;
   bool _saving = false;
+  bool _preview = false;
 
   @override
   void initState() {
     super.initState();
     _nameController = TextEditingController(text: widget.initialName);
-    _htmlController = TextEditingController(text: widget.initialHtml);
+    final markdown = widget.initialHtml.isNotEmpty
+        ? htmlToMarkdown(widget.initialHtml)
+        : '';
+    _contentController = TextEditingController(text: markdown);
   }
 
   @override
   void dispose() {
     _nameController.dispose();
-    _htmlController.dispose();
+    _contentController.dispose();
     super.dispose();
+  }
+
+  void _insertFormatting(String prefix, String suffix) {
+    final text = _contentController.text;
+    final sel = _contentController.selection;
+    if (!sel.isValid) return;
+
+    final selected = sel.textInside(text);
+    final newText = '$prefix$selected$suffix';
+    _contentController.value = TextEditingValue(
+      text: text.replaceRange(sel.start, sel.end, newText),
+      selection: TextSelection.collapsed(
+        offset: sel.start + prefix.length + selected.length,
+      ),
+    );
+  }
+
+  void _insertPrefix(String prefix) {
+    final text = _contentController.text;
+    final sel = _contentController.selection;
+    if (!sel.isValid) return;
+
+    // Find start of current line
+    int lineStart = sel.start;
+    while (lineStart > 0 && text[lineStart - 1] != '\n') {
+      lineStart--;
+    }
+
+    _contentController.value = TextEditingValue(
+      text: text.replaceRange(lineStart, lineStart, prefix),
+      selection: TextSelection.collapsed(
+        offset: sel.start + prefix.length,
+      ),
+    );
   }
 
   Future<void> _save() async {
     setState(() => _saving = true);
     try {
-      await PageService.updatePage(
-        widget.workspaceSlug,
-        widget.projectId,
-        widget.pageId,
-        {
-          'name': _nameController.text.trim(),
-          'description_html': _htmlController.text.trim(),
-        },
-      );
+      final html = markdownToHtml(_contentController.text.trim());
+      if (widget.pageId != null) {
+        await PageService.updatePage(
+          widget.workspaceSlug,
+          widget.projectId,
+          widget.pageId!,
+          {
+            'name': _nameController.text.trim(),
+            'description_html': html,
+          },
+        );
+      } else {
+        await PageService.createPage(
+          widget.workspaceSlug,
+          widget.projectId,
+          {
+            'name': _nameController.text.trim(),
+            'description_html': html,
+          },
+        );
+      }
       if (mounted) Navigator.pop(context, true);
     } catch (e) {
       setState(() => _saving = false);
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('Error: $e')));
       }
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Edit Page'),
+        title: Text(widget.pageId != null ? 'Edit Page' : 'New Page'),
         actions: [
+          IconButton(
+            icon: Icon(_preview ? Icons.edit : Icons.preview, size: 22),
+            onPressed: () => setState(() => _preview = !_preview),
+            tooltip: _preview ? 'Edit' : 'Preview',
+          ),
           TextButton(
             onPressed: _saving ? null : _save,
             child: _saving
-                ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
+                ? const SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(strokeWidth: 2))
                 : const Text('Save'),
           ),
         ],
       ),
-      body: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          children: [
-            TextField(
+      body: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+            child: TextField(
               controller: _nameController,
-              decoration: const InputDecoration(labelText: 'Page name', border: OutlineInputBorder()),
+              decoration: const InputDecoration(
+                  hintText: 'Page name',
+                  border: InputBorder.none),
+              style: const TextStyle(
+                  fontSize: 20, fontWeight: FontWeight.w600),
             ),
-            const SizedBox(height: 16),
-            Expanded(
-              child: TextField(
-                controller: _htmlController,
-                decoration: const InputDecoration(
-                  labelText: 'Content (HTML)',
-                  border: OutlineInputBorder(),
-                  alignLabelWithHint: true,
-                ),
-                maxLines: null,
-                expands: true,
-                textAlignVertical: TextAlignVertical.top,
-              ),
-            ),
-          ],
+          ),
+          const Divider(),
+          if (!_preview) _buildToolbar(theme),
+          Expanded(
+            child: _preview
+                ? SingleChildScrollView(
+                    padding: const EdgeInsets.all(16),
+                    child: MarkdownBody(
+                      data: _contentController.text,
+                      selectable: true,
+                    ),
+                  )
+                : Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: TextField(
+                      controller: _contentController,
+                      decoration: const InputDecoration(
+                        hintText: 'Write in markdown...',
+                        border: InputBorder.none,
+                      ),
+                      maxLines: null,
+                      expands: true,
+                      textAlignVertical: TextAlignVertical.top,
+                      style: const TextStyle(fontSize: 15, height: 1.6),
+                    ),
+                  ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildToolbar(ThemeData theme) {
+    return Container(
+      height: 44,
+      decoration: BoxDecoration(
+        border: Border(
+          bottom: BorderSide(color: theme.colorScheme.outline, width: 0.5),
         ),
       ),
+      child: ListView(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 8),
+        children: [
+          _ToolbarButton(
+            icon: Icons.format_bold,
+            tooltip: 'Bold',
+            onTap: () => _insertFormatting('**', '**'),
+          ),
+          _ToolbarButton(
+            icon: Icons.format_italic,
+            tooltip: 'Italic',
+            onTap: () => _insertFormatting('*', '*'),
+          ),
+          _ToolbarButton(
+            icon: Icons.title,
+            tooltip: 'Heading',
+            onTap: () => _insertPrefix('## '),
+          ),
+          _ToolbarButton(
+            icon: Icons.format_list_bulleted,
+            tooltip: 'List',
+            onTap: () => _insertPrefix('- '),
+          ),
+          _ToolbarButton(
+            icon: Icons.code,
+            tooltip: 'Code',
+            onTap: () => _insertFormatting('`', '`'),
+          ),
+          _ToolbarButton(
+            icon: Icons.link,
+            tooltip: 'Link',
+            onTap: () => _insertFormatting('[', '](url)'),
+          ),
+          _ToolbarButton(
+            icon: Icons.format_quote,
+            tooltip: 'Quote',
+            onTap: () => _insertPrefix('> '),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ToolbarButton extends StatelessWidget {
+  final IconData icon;
+  final String tooltip;
+  final VoidCallback onTap;
+
+  const _ToolbarButton({
+    required this.icon,
+    required this.tooltip,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return IconButton(
+      icon: Icon(icon, size: 20),
+      tooltip: tooltip,
+      onPressed: onTap,
+      padding: const EdgeInsets.symmetric(horizontal: 8),
+      constraints: const BoxConstraints(minWidth: 36),
     );
   }
 }

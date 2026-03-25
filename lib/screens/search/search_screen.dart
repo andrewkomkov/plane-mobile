@@ -1,21 +1,38 @@
 import 'dart:async';
+import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import '../../config/theme.dart';
 import '../../services/search_service.dart';
-import '../../models/issue.dart';
+import '../../widgets/loading_state.dart';
+import '../../widgets/section_header.dart';
+import '../../widgets/item_tile.dart';
 
-class SearchScreen extends StatefulWidget {
+class SearchScreen extends ConsumerStatefulWidget {
   final String workspaceSlug;
-  const SearchScreen({super.key, required this.workspaceSlug});
+  final bool autoFocus;
+  const SearchScreen({super.key, required this.workspaceSlug, this.autoFocus = false});
 
   @override
-  State<SearchScreen> createState() => _SearchScreenState();
+  ConsumerState<SearchScreen> createState() => _SearchScreenState();
 }
 
-class _SearchScreenState extends State<SearchScreen> {
+class _SearchScreenState extends ConsumerState<SearchScreen> {
   final _controller = TextEditingController();
-  List<Issue> _results = [];
+  Map<String, List<Map<String, dynamic>>> _grouped = {};
   bool _loading = false;
   Timer? _debounce;
+  List<String> _recentSearches = [];
+
+  static const _storage = FlutterSecureStorage();
+  static const _recentKey = 'plane_recent_searches';
+
+  @override
+  void initState() {
+    super.initState();
+    _loadRecentSearches();
+  }
 
   @override
   void dispose() {
@@ -24,19 +41,50 @@ class _SearchScreenState extends State<SearchScreen> {
     super.dispose();
   }
 
+  Future<void> _loadRecentSearches() async {
+    try {
+      final data = await _storage.read(key: _recentKey);
+      if (data != null) {
+        _recentSearches = (jsonDecode(data) as List).cast<String>();
+        setState(() {});
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _saveRecentSearch(String query) async {
+    _recentSearches.remove(query);
+    _recentSearches.insert(0, query);
+    if (_recentSearches.length > 10) {
+      _recentSearches = _recentSearches.sublist(0, 10);
+    }
+    try {
+      await _storage.write(
+          key: _recentKey, value: jsonEncode(_recentSearches));
+    } catch (_) {}
+  }
+
   void _onChanged(String query) {
     _debounce?.cancel();
-    _debounce = Timer(const Duration(milliseconds: 400), () {
-      if (query.length >= 2) _search(query);
+    if (query.length < 2) {
+      setState(() {
+        _grouped = {};
+        _loading = false;
+      });
+      return;
+    }
+    _debounce = Timer(const Duration(milliseconds: 300), () {
+      _search(query);
     });
   }
 
   Future<void> _search(String query) async {
     setState(() => _loading = true);
     try {
-      final results = await SearchService.searchIssues(widget.workspaceSlug, query);
+      final results =
+          await SearchService.searchAll(widget.workspaceSlug, query);
+      _saveRecentSearch(query);
       setState(() {
-        _results = results;
+        _grouped = results;
         _loading = false;
       });
     } catch (e) {
@@ -44,42 +92,192 @@ class _SearchScreenState extends State<SearchScreen> {
     }
   }
 
+  String _sectionLabel(String key) {
+    switch (key) {
+      case 'issues':
+        return 'Issues';
+      case 'projects':
+        return 'Projects';
+      case 'pages':
+        return 'Pages';
+      case 'cycles':
+        return 'Cycles';
+      case 'modules':
+        return 'Modules';
+      default:
+        return key;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final showRecent =
+        _controller.text.length < 2 && _grouped.isEmpty && !_loading;
+
     return Scaffold(
       appBar: AppBar(
         title: TextField(
           controller: _controller,
-          autofocus: true,
+          autofocus: widget.autoFocus,
           decoration: const InputDecoration(
-            hintText: 'Search issues...',
+            hintText: 'Search across workspace...',
             border: InputBorder.none,
+            prefixIcon: Icon(Icons.search, size: 20),
           ),
           onChanged: _onChanged,
         ),
+        actions: [
+          if (_controller.text.isNotEmpty)
+            IconButton(
+              icon: const Icon(Icons.clear, size: 20),
+              onPressed: () {
+                _controller.clear();
+                setState(() {
+                  _grouped = {};
+                  _loading = false;
+                });
+              },
+            ),
+        ],
       ),
       body: _loading
-          ? const Center(child: CircularProgressIndicator())
-          : _results.isEmpty
-              ? Center(
-                  child: Text(
-                    _controller.text.length < 2
-                        ? 'Type to search'
-                        : 'No results',
-                    style: TextStyle(color: Colors.grey[500]),
-                  ),
-                )
-              : ListView.builder(
-                  itemCount: _results.length,
-                  itemBuilder: (ctx, i) {
-                    final issue = _results[i];
-                    return ListTile(
-                      title: Text(issue.name, maxLines: 2, overflow: TextOverflow.ellipsis),
-                      subtitle: Text('${issue.priority} | #${issue.sequenceId}',
-                          style: TextStyle(fontSize: 12, color: Colors.grey[500])),
-                    );
-                  },
-                ),
+          ? const LoadingStateWidget()
+          : showRecent
+              ? _buildRecent(theme)
+              : _grouped.isEmpty
+                  ? Center(
+                      child: Text(
+                        _controller.text.length < 2
+                            ? 'Type to search'
+                            : 'No results',
+                        style: TextStyle(color: Colors.grey[500]),
+                      ),
+                    )
+                  : _buildResults(theme),
+    );
+  }
+
+  Widget _buildRecent(ThemeData theme) {
+    if (_recentSearches.isEmpty) {
+      return const Center(
+        child: EmptyStateWidget(
+          message: 'Search issues, projects, pages and more',
+          icon: Icons.search,
+        ),
+      );
+    }
+    return ListView(
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
+          child: Row(
+            children: [
+              Text('Recent searches',
+                  style: TextStyle(
+                      fontSize: PlaneTheme.fontSection,
+                      fontWeight: PlaneTheme.fontSectionWeight,
+                      color: theme.colorScheme.onSurfaceVariant)),
+              const Spacer(),
+              GestureDetector(
+                onTap: () {
+                  setState(() => _recentSearches.clear());
+                  _storage.write(
+                      key: _recentKey, value: jsonEncode([]));
+                },
+                child: Text('Clear',
+                    style: TextStyle(
+                        fontSize: PlaneTheme.fontCaption, color: theme.colorScheme.primary)),
+              ),
+            ],
+          ),
+        ),
+        ..._recentSearches.map((q) => ItemTile(
+              icon: Icons.history,
+              title: q,
+              onTap: () {
+                _controller.text = q;
+                _search(q);
+              },
+            )),
+      ],
+    );
+  }
+
+  Widget _buildResults(ThemeData theme) {
+    final entries = _grouped.entries.toList();
+    return ListView.builder(
+      itemCount:
+          entries.fold<int>(0, (sum, e) => sum + 1 + e.value.length),
+      itemBuilder: (ctx, index) {
+        int current = 0;
+        for (final entry in entries) {
+          if (index == current) {
+            return SectionHeader(
+              label: _sectionLabel(entry.key),
+              count: entry.value.length,
+            );
+          }
+          current++;
+          final itemIndex = index - current;
+          if (itemIndex < entry.value.length) {
+            final item = entry.value[itemIndex];
+            return _SearchResultTile(
+              type: entry.key,
+              item: item,
+              onTap: () {},
+            );
+          }
+          current += entry.value.length;
+        }
+        return const SizedBox.shrink();
+      },
+    );
+  }
+}
+
+class _SearchResultTile extends StatelessWidget {
+  final String type;
+  final Map<String, dynamic> item;
+  final VoidCallback onTap;
+
+  const _SearchResultTile({
+    required this.type,
+    required this.item,
+    required this.onTap,
+  });
+
+  IconData _iconFor(String type) {
+    switch (type) {
+      case 'issues':
+        return Icons.radio_button_unchecked;
+      case 'projects':
+        return Icons.bolt_outlined;
+      case 'pages':
+        return Icons.description_outlined;
+      case 'cycles':
+        return Icons.loop;
+      case 'modules':
+        return Icons.view_module_outlined;
+      default:
+        return Icons.search;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final name = item['name'] ?? item['title'] ?? '';
+    final identifier = item['identifier'] ?? '';
+    final sequenceId = item['sequence_id'];
+    final subtitle = sequenceId != null && identifier.toString().isNotEmpty
+        ? '$identifier-$sequenceId'
+        : (item['description'] ?? '').toString();
+
+    return ItemTile(
+      icon: _iconFor(type),
+      title: name.toString(),
+      subtitle: subtitle.isNotEmpty ? subtitle : null,
+      onTap: onTap,
     );
   }
 }

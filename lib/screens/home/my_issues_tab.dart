@@ -1,0 +1,660 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../config/theme.dart';
+import '../../providers/data_providers.dart';
+import '../../models/issue.dart';
+import '../../models/state.dart';
+import '../../models/label.dart';
+import '../../models/member.dart';
+import '../../utils/issue_grouping.dart';
+import '../../widgets/filter_bar.dart';
+import '../../widgets/loading_state.dart';
+import '../../widgets/skeleton_loader.dart';
+import '../../widgets/screen_header.dart';
+import '../../widgets/section_header.dart';
+import '../../widgets/issue_tile.dart';
+import '../issues/issue_detail_screen.dart';
+import '../issues/issue_create_screen.dart';
+import '../../models/project.dart';
+
+class MyIssuesTab extends ConsumerStatefulWidget {
+  final String workspaceSlug;
+  final String? currentUserId;
+  const MyIssuesTab({super.key, required this.workspaceSlug, this.currentUserId});
+
+  @override
+  ConsumerState<MyIssuesTab> createState() => _MyIssuesTabState();
+}
+
+class _MyIssuesTabState extends ConsumerState<MyIssuesTab>
+    with AutomaticKeepAliveClientMixin {
+  List<Issue> _issues = [];
+  Map<String, IssueState> _allStates = {};
+  Map<String, String> _projectIdentifiers = {}; // project_id → identifier
+  List<Label> _allLabels = [];
+  List<Member> _allMembers = [];
+  bool _loading = true;
+  bool _loaded = false;
+  String? _error;
+  FilterState _filterState = const FilterState();
+
+  @override
+  bool get wantKeepAlive => true;
+
+  DataCache get _cache => ref.read(dataCacheProvider);
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  @override
+  void didUpdateWidget(MyIssuesTab old) {
+    super.didUpdateWidget(old);
+    if (old.workspaceSlug != widget.workspaceSlug) _load();
+  }
+
+  Future<void> _load() async {
+    if (widget.workspaceSlug.isEmpty) return;
+    if (!_loaded) {
+      setState(() {
+        _loading = true;
+        _error = null;
+      });
+    }
+    try {
+      // Get projects from shared cache
+      final cache = _cache;
+      await cache.loadProjects(widget.workspaceSlug);
+      final projects = cache.getProjects(widget.workspaceSlug) ?? [];
+      _projectIdentifiers = {for (final p in projects) p.id: p.identifier};
+
+      // Load issues from each project — show results progressively
+      final allIssues = <Issue>[];
+      final allStates = <String, IssueState>{};
+
+      final coreFutures = projects.map((p) async {
+        try {
+          await cache.loadProjectCoreData(widget.workspaceSlug, p.id);
+          final states = cache.getStates(widget.workspaceSlug, p.id) ?? {};
+          final issues = cache.getIssues(widget.workspaceSlug, p.id) ?? [];
+          allStates.addAll(states);
+          allIssues.addAll(issues);
+          if (mounted && _loading) {
+            setState(() {
+              _issues = List.from(allIssues);
+              _allStates = Map.from(allStates);
+              _loading = false;
+              _loaded = true;
+            });
+          }
+        } catch (_) {}
+      }).toList();
+
+      await Future.wait(coreFutures);
+
+      if (mounted) {
+        setState(() {
+          _issues = allIssues;
+          _allStates = allStates;
+          _loading = false;
+          _loaded = true;
+          _error = null;
+        });
+      }
+
+      _loadExtras(projects);
+    } catch (e) {
+      setState(() {
+        _error = e.toString();
+        _loading = false;
+      });
+    }
+  }
+
+  bool get _hasStateFilterForDone {
+    if (_filterState.selectedStates.isEmpty) return false;
+    return _filterState.selectedStates.any((stateId) {
+      final state = _allStates[stateId];
+      return state != null &&
+          (state.group == 'completed' || state.group == 'cancelled');
+    });
+  }
+
+  List<Issue> get _filteredAndSorted {
+    var result = _issues.toList();
+    if (_filterMode == 'assigned' && widget.currentUserId != null) {
+      result = result.where((i) => i.assignees.contains(widget.currentUserId)).toList();
+    } else if (_filterMode == 'created' && widget.currentUserId != null) {
+      result = result.where((i) => i.createdBy == widget.currentUserId).toList();
+    }
+    // 'all' mode: no user filtering — show all issues from all projects
+    result = applyFilters(result, _filterState);
+    if (_completedFilter == 'none') {
+      result = result.where((i) {
+        final group = _allStates[i.state]?.group ?? 'backlog';
+        return group != 'completed' && group != 'cancelled';
+      }).toList();
+    } else if (_completedFilter == 'week') {
+      final weekAgo = DateTime.now().subtract(const Duration(days: 7));
+      result = result.where((i) {
+        final group = _allStates[i.state]?.group ?? 'backlog';
+        if (group != 'completed' && group != 'cancelled') return true;
+        return i.updatedAt.isAfter(weekAgo);
+      }).toList();
+    }
+    if (!_showSubIssues) {
+      result = result.where((i) => i.parent == null).toList();
+    }
+    result = applySorting(result, _filterState.sortField,
+        _filterState.sortAscending);
+    return result;
+  }
+
+  Future<void> _loadExtras(List projects) async {
+    final cache = _cache;
+    final allLabels = <Label>[];
+    final allMembers = <Member>[];
+    final seenLabelIds = <String>{};
+    final seenMemberIds = <String>{};
+    for (final p in projects) {
+      try {
+        await cache.loadProjectExtras(widget.workspaceSlug, p.id);
+        for (final l in cache.getLabels(widget.workspaceSlug, p.id) ?? <Label>[]) {
+          if (seenLabelIds.add(l.id)) allLabels.add(l);
+        }
+        for (final m in cache.getMembers(widget.workspaceSlug, p.id) ?? <Member>[]) {
+          if (seenMemberIds.add(m.id)) allMembers.add(m);
+        }
+      } catch (_) {}
+    }
+    if (mounted) {
+      setState(() {
+        _allLabels = allLabels;
+        _allMembers = allMembers;
+      });
+    }
+  }
+
+  Map<String, List<Issue>> get _grouped {
+    return groupIssuesBy(
+      _filterState.groupBy,
+      _filteredAndSorted,
+      _allStates,
+      members: _allMembers,
+      labels: _allLabels,
+    );
+  }
+
+  Color _groupColor(String key) {
+    switch (_filterState.groupBy) {
+      case GroupByField.state:
+        return PlaneTheme.stateGroupColor(key);
+      case GroupByField.priority:
+        return PlaneTheme.priorityColor(key);
+      case GroupByField.assignee:
+      case GroupByField.label:
+        return Theme.of(context).colorScheme.primary;
+    }
+  }
+
+  String _filterMode = 'assigned';
+
+  void _createIssue() {
+    final cache = _cache;
+    final projects = cache.getProjects(widget.workspaceSlug) ?? [];
+    if (projects.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('No projects available')),
+      );
+      return;
+    }
+    if (projects.length == 1) {
+      _openCreateScreen(projects.first);
+      return;
+    }
+    // Show project picker
+    showModalBottomSheet(
+      context: context,
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Padding(
+              padding: EdgeInsets.all(16),
+              child: Text('Select project',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500)),
+            ),
+            ...projects.map((p) => ListTile(
+                  leading: const Icon(Icons.folder_outlined, size: 20),
+                  title: Text('${p.identifier} - ${p.name}',
+                      style: const TextStyle(fontSize: 14)),
+                  onTap: () {
+                    Navigator.pop(ctx);
+                    _openCreateScreen(p);
+                  },
+                )),
+            const SizedBox(height: 8),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _openCreateScreen(Project project) async {
+    final cache = _cache;
+    await cache.loadProjectCoreData(widget.workspaceSlug, project.id);
+    final states = cache.getStates(widget.workspaceSlug, project.id) ?? {};
+    if (!mounted) return;
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => IssueCreateScreen(
+          workspaceSlug: widget.workspaceSlug,
+          projectId: project.id,
+          states: states,
+        ),
+      ),
+    );
+    _load();
+  }
+
+  void _showOptionsMenu() {
+    showModalBottomSheet(
+      context: context,
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.tune, size: 20),
+              title: const Text('Display options', style: TextStyle(fontSize: PlaneTheme.fontBody)),
+              onTap: () {
+                Navigator.pop(ctx);
+                _showDisplayOptions();
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.refresh, size: 20),
+              title: const Text('Refresh', style: TextStyle(fontSize: PlaneTheme.fontBody)),
+              onTap: () {
+                Navigator.pop(ctx);
+                _load();
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  String _grouping = 'state';
+  String _ordering = 'created';
+  bool _sortNewest = true;
+  String _completedFilter = 'none';
+  bool _showSubIssues = true;
+  int _maxTitleLines = 1;
+  Set<String> _rowProperties = {'status', 'priority', 'id'};
+
+  void _showDisplayOptions() {
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setSheetState) {
+          final theme = Theme.of(ctx);
+          final secondary = theme.colorScheme.onSurfaceVariant;
+
+          Widget optionRow(String label, String value, VoidCallback onTap) {
+            return InkWell(
+              onTap: onTap,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+                child: Row(
+                  children: [
+                    Text(label, style: const TextStyle(fontSize: PlaneTheme.fontBody)),
+                    const Spacer(),
+                    Text(value, style: TextStyle(fontSize: PlaneTheme.fontBody, color: secondary)),
+                    const SizedBox(width: 4),
+                    Icon(Icons.unfold_more, size: PlaneTheme.iconMedium, color: secondary),
+                  ],
+                ),
+              ),
+            );
+          }
+
+          void cycleOption(String field, List<(String, String)> options, String current, Function(String) onChanged) {
+            final idx = options.indexWhere((o) => o.$1 == current);
+            final next = options[(idx + 1) % options.length];
+            onChanged(next.$1);
+          }
+
+          return SafeArea(
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const SizedBox(height: 12),
+                  Center(child: Container(width: 36, height: 4,
+                      decoration: BoxDecoration(color: secondary.withValues(alpha: 0.3),
+                          borderRadius: BorderRadius.circular(2)))),
+                  const SizedBox(height: 16),
+
+                  optionRow('Grouping', _grouping[0].toUpperCase() + _grouping.substring(1), () {
+                    setSheetState(() {
+                      cycleOption('grouping', [('state','Status'),('priority','Priority'),('assignee','Assignee'),('label','Label')],
+                          _grouping, (v) => _grouping = v);
+                    });
+                    setState(() {
+                      _filterState = FilterState(groupBy: {
+                        'state': GroupByField.state, 'priority': GroupByField.priority,
+                        'assignee': GroupByField.assignee, 'label': GroupByField.label,
+                      }[_grouping] ?? GroupByField.state);
+                    });
+                  }),
+
+                  optionRow('Ordering', _ordering[0].toUpperCase() + _ordering.substring(1), () {
+                    setSheetState(() {
+                      cycleOption('ordering', [('created','Created'),('updated','Updated'),('priority','Priority')],
+                          _ordering, (v) { _ordering = v; });
+                    });
+                    setState(() {
+                      _filterState = FilterState(
+                        groupBy: _filterState.groupBy,
+                        sortField: _ordering == 'updated' ? SortField.updatedAt : _ordering == 'priority' ? SortField.priority : SortField.createdAt,
+                        sortAscending: !_sortNewest,
+                      );
+                    });
+                  }),
+
+                  optionRow('Sort', _sortNewest ? 'Newest first' : 'Oldest first', () {
+                    setSheetState(() => _sortNewest = !_sortNewest);
+                    setState(() {
+                      _filterState = FilterState(
+                        groupBy: _filterState.groupBy,
+                        sortField: _filterState.sortField,
+                        sortAscending: !_sortNewest,
+                      );
+                    });
+                  }),
+
+                  const SizedBox(height: 8),
+
+                  optionRow('Completed issues', _completedFilter == 'none' ? 'None' : _completedFilter == 'week' ? 'Past week' : 'All', () {
+                    setSheetState(() {
+                      cycleOption('completed', [('none','None'),('week','Past week'),('all','All')],
+                          _completedFilter, (v) => _completedFilter = v);
+                    });
+                    setState(() {});
+                  }),
+
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 6),
+                    child: Row(
+                      children: [
+                        const Text('Show sub-issues', style: TextStyle(fontSize: PlaneTheme.fontBody)),
+                        const Spacer(),
+                        Switch(
+                          value: _showSubIssues,
+                          onChanged: (v) {
+                            setSheetState(() => _showSubIssues = v);
+                            setState(() {});
+                          },
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  optionRow('Maximum title length', '$_maxTitleLines line${_maxTitleLines > 1 ? 's' : ''}', () {
+                    setSheetState(() => _maxTitleLines = _maxTitleLines == 1 ? 2 : 1);
+                    setState(() {});
+                  }),
+
+                  const SizedBox(height: 12),
+
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 20),
+                    child: Row(
+                      children: [
+                        Text('Row properties', style: TextStyle(fontSize: PlaneTheme.fontSection, color: secondary)),
+                        const Spacer(),
+                        GestureDetector(
+                          onTap: () {
+                            setSheetState(() => _rowProperties = {'status', 'priority', 'id'});
+                            setState(() {});
+                          },
+                          child: Text('Reset', style: TextStyle(fontSize: PlaneTheme.fontSection, color: secondary)),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 20),
+                    child: Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        for (final prop in ['Status', 'Priority', 'Assignee', 'ID', 'Labels', 'Project', 'Due date', 'Cycle', 'Estimate'])
+                          _PropertyToggle(
+                            label: prop,
+                            selected: _rowProperties.contains(prop.toLowerCase().replaceAll(' ', '_')),
+                            onTap: () {
+                              final key = prop.toLowerCase().replaceAll(' ', '_');
+                              setSheetState(() {
+                                if (_rowProperties.contains(key)) {
+                                  _rowProperties.remove(key);
+                                } else {
+                                  _rowProperties.add(key);
+                                }
+                              });
+                              setState(() {});
+                            },
+                          ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                ],
+              ),
+            ),
+          );
+        },
+      ),
+    ).then((_) => setState(() {}));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    super.build(context);
+    final theme = Theme.of(context);
+    final secondary = theme.colorScheme.onSurfaceVariant;
+
+    return SafeArea(
+      bottom: false,
+      child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            ScreenHeader(
+              title: 'My issues',
+              actions: [
+                IconButton(
+                  icon: Icon(Icons.edit_square, size: 20, color: secondary),
+                  onPressed: _createIssue,
+                ),
+                IconButton(
+                  icon: Icon(Icons.more_horiz, size: 20, color: secondary),
+                  onPressed: () => _showOptionsMenu(),
+                ),
+              ],
+              subtitle: Row(
+                children: [
+                  _PillFilter(
+                    label: 'Assigned',
+                    selected: _filterMode == 'assigned',
+                    onTap: () => setState(() => _filterMode = 'assigned'),
+                  ),
+                  const SizedBox(width: 8),
+                  _PillFilter(
+                    label: 'Created',
+                    selected: _filterMode == 'created',
+                    onTap: () => setState(() => _filterMode = 'created'),
+                  ),
+                  const SizedBox(width: 8),
+                  _PillFilter(
+                    label: 'All',
+                    selected: _filterMode == 'all',
+                    onTap: () => setState(() => _filterMode = 'all'),
+                  ),
+                ],
+              ),
+            ),
+            // Issue list
+            Expanded(
+              child: _loading
+                  ? const IssueListSkeleton()
+                  : _error != null
+                      ? ErrorStateWidget(message: 'Failed to load', onRetry: _load)
+                      : RefreshIndicator(
+                          onRefresh: _load,
+                          child: _buildLinearList(),
+                        ),
+            ),
+          ],
+        ),
+    );
+  }
+
+  Widget _buildLinearList() {
+    final grouped = groupIssuesByStateGroup(_filteredAndSorted, _allStates);
+    if (grouped.isEmpty) {
+      return ListView(children: [
+        SizedBox(height: MediaQuery.of(context).size.height * 0.2),
+        const Center(
+          child: EmptyStateWidget(
+            message: 'No issues',
+            icon: Icons.check_circle_outline,
+            subtitle: 'All caught up',
+          ),
+        ),
+      ]);
+    }
+
+    final items = <Widget>[];
+    for (final entry in grouped.entries) {
+      items.add(SectionHeader(
+        label: groupLabel(entry.key),
+        color: PlaneTheme.stateGroupColor(entry.key),
+      ));
+      for (final issue in entry.value) {
+        final state = _allStates[issue.state];
+        items.add(IssueTile(
+          issue: issue,
+          state: state,
+          projectIdentifier: _projectIdentifiers[issue.project],
+          showPriority: _rowProperties.contains('priority'),
+          showState: _rowProperties.contains('status'),
+          showId: true,
+          showLabels: _rowProperties.contains('labels'),
+          showProject: _rowProperties.contains('project'),
+          showDueDate: _rowProperties.contains('due_date'),
+          showAssignee: _rowProperties.contains('assignee'),
+          maxTitleLines: _maxTitleLines,
+          onTap: () async {
+            if (issue.project == null) return;
+            await Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => IssueDetailScreen(
+                    workspaceSlug: widget.workspaceSlug,
+                    projectId: issue.project!,
+                    issueId: issue.id,
+                    states: _allStates,
+                  ),
+                ));
+            _load();
+          },
+        ));
+      }
+    }
+    items.add(const SizedBox(height: 100));
+
+    return ListView(children: items);
+  }
+}
+
+class _PropertyToggle extends StatelessWidget {
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+  const _PropertyToggle({required this.label, required this.selected, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+        decoration: BoxDecoration(
+          color: selected
+              ? (isDark ? Colors.white.withValues(alpha: 0.15) : Colors.black.withValues(alpha: 0.08))
+              : Colors.transparent,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(
+            color: selected
+                ? (isDark ? Colors.white.withValues(alpha: 0.2) : Colors.black.withValues(alpha: 0.15))
+                : (isDark ? Colors.white.withValues(alpha: 0.08) : Colors.black.withValues(alpha: 0.08)),
+          ),
+        ),
+        child: Text(label,
+            style: TextStyle(
+                fontSize: PlaneTheme.fontSection,
+                fontWeight: selected ? FontWeight.w500 : FontWeight.w400,
+                color: selected ? theme.colorScheme.onSurface : theme.colorScheme.onSurfaceVariant)),
+      ),
+    );
+  }
+}
+
+class _PillFilter extends StatelessWidget {
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+  const _PillFilter({required this.label, required this.selected, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        decoration: BoxDecoration(
+          color: selected
+              ? theme.colorScheme.primaryContainer
+              : Colors.transparent,
+          borderRadius: BorderRadius.circular(20),
+          border: selected
+              ? null
+              : Border.all(
+                  color: theme.colorScheme.outline.withValues(alpha: 0.40),
+                ),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            fontSize: 14,
+            fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
+            color: selected
+                ? theme.colorScheme.onPrimaryContainer
+                : theme.colorScheme.onSurfaceVariant,
+          ),
+        ),
+      ),
+    );
+  }
+}

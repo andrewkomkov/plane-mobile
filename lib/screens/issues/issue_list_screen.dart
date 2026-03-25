@@ -1,83 +1,167 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../config/theme.dart';
 import '../../services/issue_service.dart';
+import '../../services/view_service.dart';
 import '../../models/issue.dart';
+import '../../models/label.dart';
+import '../../models/member.dart';
 import '../../models/state.dart';
+import '../../utils/issue_grouping.dart';
+import '../../widgets/issue_tile.dart';
+import '../../widgets/section_header.dart';
+import '../../widgets/loading_state.dart';
+import '../../widgets/filter_bar.dart';
+import '../../widgets/display_options.dart';
+import '../../widgets/bottom_sheet_picker.dart';
 import 'issue_detail_screen.dart';
-import 'issue_create_screen.dart';
 
-class IssueListScreen extends StatefulWidget {
+
+class IssueListScreen extends ConsumerStatefulWidget {
   final String workspaceSlug;
   final String projectId;
   final String projectIdentifier;
+  // Data passed from parent (IssuesTabScreen) — no duplicate API calls
+  final List<Issue> issues;
+  final Map<String, IssueState> states;
+  final List<Label> labels;
+  final List<Member> members;
+  final Future<void> Function() onRefresh;
 
   const IssueListScreen({
     super.key,
     required this.workspaceSlug,
     required this.projectId,
     required this.projectIdentifier,
+    required this.issues,
+    required this.states,
+    required this.labels,
+    required this.members,
+    required this.onRefresh,
   });
 
   @override
-  State<IssueListScreen> createState() => _IssueListScreenState();
+  ConsumerState<IssueListScreen> createState() =>
+      _IssueListScreenState();
 }
 
-class _IssueListScreenState extends State<IssueListScreen>
+class _IssueListScreenState extends ConsumerState<IssueListScreen>
     with AutomaticKeepAliveClientMixin {
-  List<Issue> _issues = [];
-  Map<String, IssueState> _states = {};
-  bool _loading = true;
-  String? _error;
+  final DisplayState _display = DisplayState();
+  FilterState _filterState = const FilterState();
 
   @override
   bool get wantKeepAlive => true;
 
-  @override
-  void initState() {
-    super.initState();
-    _load();
-  }
+  List<Issue> get _issues => widget.issues;
+  Map<String, IssueState> get _states => widget.states;
+  List<Label> get _labels => widget.labels;
+  List<Member> get _members => widget.members;
 
-  Future<void> _load() async {
-    setState(() { _loading = true; _error = null; });
-    try {
-      final states = await IssueService.getStates(widget.workspaceSlug, widget.projectId);
-      final result = await IssueService.getIssues(widget.workspaceSlug, widget.projectId);
-      setState(() {
-        _states = {for (var s in states) s.id: s};
-        _issues = result['issues'] as List<Issue>;
-        _loading = false;
-      });
-    } catch (e) {
-      setState(() { _error = e.toString(); _loading = false; });
+  Future<void> _saveAsView() async {
+    final name = await showDialog<String>(
+      context: context,
+      builder: (ctx) {
+        final controller = TextEditingController();
+        return AlertDialog(
+          title: const Text('Save as View'),
+          content: TextField(
+            controller: controller,
+            decoration: const InputDecoration(
+              labelText: 'View name',
+              border: OutlineInputBorder(),
+            ),
+            autofocus: true,
+          ),
+          actions: [
+            TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text('Cancel')),
+            TextButton(
+                onPressed: () =>
+                    Navigator.pop(ctx, controller.text.trim()),
+                child: const Text('Save')),
+          ],
+        );
+      },
+    );
+    if (name != null && name.isNotEmpty) {
+      final queryData = <String, dynamic>{};
+      if (_filterState.selectedStates.isNotEmpty) {
+        queryData['state'] = _filterState.selectedStates.toList();
+      }
+      if (_filterState.selectedPriorities.isNotEmpty) {
+        queryData['priority'] =
+            _filterState.selectedPriorities.toList();
+      }
+      if (_filterState.selectedAssignees.isNotEmpty) {
+        queryData['assignees'] =
+            _filterState.selectedAssignees.toList();
+      }
+      if (_filterState.selectedLabels.isNotEmpty) {
+        queryData['label'] = _filterState.selectedLabels.toList();
+      }
+      try {
+        await ViewService.createView(
+          widget.workspaceSlug,
+          widget.projectId,
+          {'name': name, 'query_data': queryData},
+        );
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('View saved')));
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context)
+              .showSnackBar(SnackBar(content: Text('Error: $e')));
+        }
+      }
     }
   }
 
-  // Group issues by state group (like Linear)
+  List<Issue> get _filteredAndSorted {
+    var result = _issues.toList();
+    // Completed filter
+    if (_display.completedFilter == 'none') {
+      result = result.where((i) {
+        final group = _states[i.state]?.group ?? 'backlog';
+        return group != 'completed' && group != 'cancelled';
+      }).toList();
+    } else if (_display.completedFilter == 'week') {
+      final weekAgo = DateTime.now().subtract(const Duration(days: 7));
+      result = result.where((i) {
+        final group = _states[i.state]?.group ?? 'backlog';
+        if (group != 'completed' && group != 'cancelled') return true;
+        return i.updatedAt.isAfter(weekAgo);
+      }).toList();
+    }
+    if (!_display.showSubIssues) {
+      result = result.where((i) => i.parent == null).toList();
+    }
+    result = applySorting(result, _display.sortField, !_display.sortNewest);
+    return result;
+  }
+
   Map<String, List<Issue>> get _grouped {
-    final groups = <String, List<Issue>>{};
-    final order = ['started', 'unstarted', 'backlog', 'completed', 'cancelled'];
-    for (final g in order) {
-      groups[g] = [];
-    }
-    for (final issue in _issues) {
-      final state = _states[issue.state];
-      final group = state?.group ?? 'backlog';
-      groups.putIfAbsent(group, () => []);
-      groups[group]!.add(issue);
-    }
-    groups.removeWhere((_, v) => v.isEmpty);
-    return groups;
+    return groupIssuesBy(
+      _display.groupByField,
+      _filteredAndSorted,
+      _states,
+      members: _members,
+      labels: _labels,
+    );
   }
 
-  String _groupLabel(String group) {
-    switch (group) {
-      case 'started': return 'In Progress';
-      case 'unstarted': return 'Todo';
-      case 'backlog': return 'Backlog';
-      case 'completed': return 'Done';
-      case 'cancelled': return 'Cancelled';
-      default: return group;
+  Color _groupColor(String key) {
+    switch (_display.groupByField) {
+      case GroupByField.state:
+        return PlaneTheme.stateGroupColor(key);
+      case GroupByField.priority:
+        return PlaneTheme.priorityColor(key);
+      case GroupByField.assignee:
+      case GroupByField.label:
+        return Theme.of(context).colorScheme.primary;
     }
   }
 
@@ -86,182 +170,112 @@ class _IssueListScreenState extends State<IssueListScreen>
     super.build(context);
     final theme = Theme.of(context);
 
-    if (_loading) return const Center(child: CircularProgressIndicator());
-    if (_error != null) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Text('Error', style: TextStyle(color: theme.colorScheme.onSurfaceVariant)),
-            const SizedBox(height: 8),
-            TextButton(onPressed: _load, child: const Text('Retry')),
-          ],
-        ),
-      );
-    }
-
     final grouped = _grouped;
 
+    final secondary = theme.colorScheme.onSurfaceVariant;
     return Scaffold(
-      body: RefreshIndicator(
-        onRefresh: _load,
-        child: _issues.isEmpty
-            ? ListView(children: [
-                SizedBox(height: MediaQuery.of(context).size.height * 0.35),
-                Center(child: Text('No issues',
-                    style: TextStyle(color: theme.colorScheme.onSurfaceVariant))),
-              ])
-            : ListView.builder(
-                itemCount: grouped.entries.fold<int>(0,
-                    (sum, e) => sum + 1 + e.value.length), // headers + issues
-                itemBuilder: (ctx, index) {
-                  int current = 0;
-                  for (final entry in grouped.entries) {
-                    if (index == current) {
-                      // Group header
-                      return _GroupHeader(
-                        label: _groupLabel(entry.key),
-                        count: entry.value.length,
-                        color: PlaneTheme.stateGroupColor(entry.key),
-                      );
-                    }
-                    current++;
-                    final issueIndex = index - current;
-                    if (issueIndex < entry.value.length) {
-                      final issue = entry.value[issueIndex];
-                      final state = _states[issue.state];
-                      return _IssueRow(
-                        issue: issue,
-                        state: state,
-                        identifier: widget.projectIdentifier,
-                        onTap: () async {
-                          await Navigator.push(context, MaterialPageRoute(
-                            builder: (_) => IssueDetailScreen(
-                              workspaceSlug: widget.workspaceSlug,
-                              projectId: widget.projectId,
-                              issueId: issue.id,
-                              states: _states,
-                            ),
-                          ));
-                          _load();
-                        },
-                      );
-                    }
-                    current += entry.value.length;
-                  }
-                  return const SizedBox.shrink();
-                },
-              ),
-      ),
-      floatingActionButton: FloatingActionButton.small(
-        heroTag: 'create_issue',
-        onPressed: () async {
-          await Navigator.push(context, MaterialPageRoute(
-            builder: (_) => IssueCreateScreen(
-              workspaceSlug: widget.workspaceSlug,
-              projectId: widget.projectId,
-              states: _states,
-            ),
-          ));
-          _load();
-        },
-        child: const Icon(Icons.add, size: 20),
-      ),
-    );
-  }
-}
-
-class _GroupHeader extends StatelessWidget {
-  final String label;
-  final int count;
-  final Color color;
-
-  const _GroupHeader({required this.label, required this.count, required this.color});
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 20, 16, 4),
-      child: Row(
+      body: Column(
         children: [
-          Text(label,
-              style: TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w500,
-                color: color,
-              )),
-          const SizedBox(width: 6),
-          Text('$count',
-              style: TextStyle(
-                fontSize: 12,
-                color: Theme.of(context).colorScheme.onSurfaceVariant,
-              )),
+          // Minimal header: issue count + display options
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+            child: Row(
+              children: [
+                Text('${_filteredAndSorted.length} issues',
+                    style: TextStyle(fontSize: PlaneTheme.fontCaption, color: secondary)),
+                const Spacer(),
+                GestureDetector(
+                  onTap: () => showDisplayOptions(context, _display, () => setState(() {})),
+                  child: Icon(Icons.tune, size: PlaneTheme.iconMedium, color: secondary),
+                ),
+              ],
+            ),
+          ),
+          Expanded(
+            child: RefreshIndicator(
+              onRefresh: widget.onRefresh,
+              child: _filteredAndSorted.isEmpty
+                  ? ListView(children: [
+                      SizedBox(
+                          height: MediaQuery.of(context).size.height *
+                              0.25),
+                      Center(
+                        child: EmptyStateWidget(
+                          message: _filterState.hasActiveFilters
+                              ? 'No issues match filters'
+                              : 'No issues',
+                          icon: Icons.check_circle_outline,
+                          subtitle: _filterState.hasActiveFilters
+                              ? 'Try adjusting your filters'
+                              : null,
+                        ),
+                      ),
+                    ])
+                  : ListView.builder(
+                      itemCount: grouped.entries.fold<int>(
+                          0, (sum, e) => sum + 1 + e.value.length),
+                      itemBuilder: (ctx, index) {
+                        int current = 0;
+                        for (final entry in grouped.entries) {
+                          if (index == current) {
+                            final label = groupByLabel(
+                                _display.groupByField, entry.key);
+                            return SectionHeader(
+                              label: label,
+                              count: entry.value.length,
+                              color: _groupColor(entry.key),
+                            );
+                          }
+                          current++;
+                          final issueIndex = index - current;
+                          if (issueIndex < entry.value.length) {
+                            final issue = entry.value[issueIndex];
+                            final state = _states[issue.state];
+                            return IssueTile(
+                              issue: issue,
+                              state: state,
+                              projectIdentifier:
+                                  widget.projectIdentifier,
+                              showId: _display.rowProperties.contains('id'),
+                              showPriority: _display.rowProperties.contains('priority'),
+                              showState: _display.rowProperties.contains('status'),
+                              showLabels: _display.rowProperties.contains('labels'),
+                              showSubIssues: true,
+                              showAssignee: _display.rowProperties.contains('assignee'),
+                              showDueDate: _display.rowProperties.contains('due_date'),
+                              maxTitleLines: _display.maxTitleLines,
+                              allLabels: _labels,
+                              allMembers: _members,
+                              onTap: () async {
+                                await Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (_) =>
+                                          IssueDetailScreen(
+                                        workspaceSlug:
+                                            widget.workspaceSlug,
+                                        projectId:
+                                            widget.projectId,
+                                        issueId: issue.id,
+                                        projectIdentifier:
+                                            widget.projectIdentifier,
+                                        states: _states,
+                                      ),
+                                    ));
+                                widget.onRefresh();
+                              },
+                            );
+                          }
+                          current += entry.value.length;
+                        }
+                        return const SizedBox.shrink();
+                      },
+                    ),
+            ),
+          ),
         ],
       ),
     );
   }
 }
 
-class _IssueRow extends StatelessWidget {
-  final Issue issue;
-  final IssueState? state;
-  final String identifier;
-  final VoidCallback onTap;
-
-  const _IssueRow({
-    required this.issue,
-    this.state,
-    required this.identifier,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return InkWell(
-      onTap: onTap,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        child: Row(
-          children: [
-            // Priority icon
-            Icon(
-              PlaneTheme.priorityIcon(issue.priority),
-              size: 16,
-              color: PlaneTheme.priorityColor(issue.priority),
-            ),
-            const SizedBox(width: 10),
-            // State icon
-            Icon(
-              PlaneTheme.stateIcon(state?.group ?? 'backlog'),
-              size: 16,
-              color: state != null
-                  ? PlaneTheme.stateGroupColor(state!.group)
-                  : PlaneTheme.backlog,
-            ),
-            const SizedBox(width: 10),
-            // Issue identifier
-            Text(
-              '$identifier-${issue.sequenceId}',
-              style: TextStyle(
-                fontSize: 12,
-                color: theme.colorScheme.onSurfaceVariant,
-                fontWeight: FontWeight.w400,
-              ),
-            ),
-            const SizedBox(width: 10),
-            // Issue title
-            Expanded(
-              child: Text(
-                issue.name,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w400),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
