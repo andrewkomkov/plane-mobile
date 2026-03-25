@@ -1,20 +1,70 @@
 import 'package:flutter/material.dart';
 
 class PlaneTheme {
-  // Linear-inspired colors
-  static const _bgDark = Color(0xFF0A0A0A);
-  static const _surfaceDark = Color(0xFF141414);
-  static const _borderDark = Color(0xFF252525);
-  static const _textPrimaryDark = Color(0xFFF1F1F1);
-  static const _textSecondaryDark = Color(0xFF8A8A8A);
+  // ─── Design system colors (from mockup CSS) ───
+  static const background = Color(0xFF0A0A0A);
+  static const surface = Color(0xFF131313);
+  static const surfaceDim = Color(0xFF131313);
+  static const surfaceContainer = Color(0xFF201F1F);
+  static const surfaceContainerLow = Color(0xFF1C1B1B);
+  static const surfaceContainerHigh = Color(0xFF2A2A2A);
+  static const surfaceContainerHighest = Color(0xFF353534);
+  static const surfaceContainerLowest = Color(0xFF0E0E0E);
+  static const surfaceBright = Color(0xFF3A3939);
+  static const surfaceVariant = Color(0xFF353534);
 
+  static const onSurface = Color(0xFFE5E2E1);
+  static const onSurfaceVariant = Color(0xFFC6C5D5);
+  static const onBackground = Color(0xFFE5E2E1);
+  static const outline = Color(0xFF908F9E);
+  static const outlineVariant = Color(0xFF454652);
+
+  static const primaryContainer = Color(0xFF5E6AD2);
+  static const onPrimaryContainer = Color(0xFFFDFAFF);
+  static const primary = Color(0xFFBDC2FF);
+  static const inversePrimary = Color(0xFF4854BB);
+
+  static const errorColor = Color(0xFFFFB4AB);
+  static const errorContainer = Color(0xFF93000A);
+  static const tertiaryColor = Color(0xFFFFB867);
+  static const tertiaryContainer = Color(0xFFA56500);
+
+  static const secondaryColor = Color(0xFFC0C3F2);
+  static const secondaryContainer = Color(0xFF42466E);
+
+  // Convenience aliases matching old code
+  static const _accent = Color(0xFF5E6AD2);
+
+  // Light theme legacy colors
   static const _bgLight = Color(0xFFFFFFFF);
   static const _surfaceLight = Color(0xFFF8F8F8);
   static const _borderLight = Color(0xFFE8E8E8);
   static const _textPrimaryLight = Color(0xFF1A1A1A);
   static const _textSecondaryLight = Color(0xFF6B6B6B);
 
-  static const _accent = Color(0xFF5E6AD2);
+  // ─── Typography sizes (consistent across app) ───
+  /// Screen titles: "My issues", "Inbox", "Projects"
+  static const double fontTitle = 24;
+  static const FontWeight fontTitleWeight = FontWeight.w700;
+
+  /// Section headers: "In Progress", "Backlog", group labels
+  static const double fontSection = 13;
+  static const FontWeight fontSectionWeight = FontWeight.w600;
+
+  /// Issue/item names in lists
+  static const double fontBody = 15;
+  static const FontWeight fontBodyWeight = FontWeight.w500;
+
+  /// Secondary text: timestamps, IDs, subtitles
+  static const double fontCaption = 12;
+
+  /// Small chips, badges, pill labels
+  static const double fontSmall = 11;
+
+  /// Icon sizes
+  static const double iconSmall = 14;
+  static const double iconMedium = 16;
+  static const double iconLarge = 20;
 
   // Priority colors
   static const urgent = Color(0xFFEF4444);
@@ -72,15 +122,35 @@ class PlaneTheme {
     }
   }
 
+  // Light theme surface variants
+  static const _surfaceContainerLight = Color(0xFFF5F5F5);
+  static const _surfaceContainerLowLight = Color(0xFFF8F8F8);
+  static const _surfaceContainerHighLight = Color(0xFFEBEBEB);
+  static const _surfaceContainerHighestLight = Color(0xFFE0E0E0);
+  static const _outlineLight = Color(0xFFE0E0E0);
+  static const _outlineVariantLight = Color(0xFFD0D0D0);
+
   static ThemeData light() => ThemeData(
         brightness: Brightness.light,
         scaffoldBackgroundColor: _bgLight,
         colorScheme: ColorScheme.light(
           primary: _accent,
           surface: _surfaceLight,
+          surfaceContainerLowest: _bgLight,
+          surfaceContainerLow: _surfaceContainerLowLight,
+          surfaceContainer: _surfaceContainerLight,
+          surfaceContainerHigh: _surfaceContainerHighLight,
+          surfaceContainerHighest: _surfaceContainerHighestLight,
           onSurface: _textPrimaryLight,
-          outline: _borderLight,
           onSurfaceVariant: _textSecondaryLight,
+          outline: _outlineLight,
+          outlineVariant: _outlineVariantLight,
+          primaryContainer: _accent,
+          onPrimaryContainer: Colors.white,
+          error: const Color(0xFFBA1A1A),
+          errorContainer: const Color(0xFFFFDAD6),
+          secondary: const Color(0xFF5E6AD2),
+          secondaryContainer: const Color(0xFFDEE0FF),
         ),
         useMaterial3: true,
         fontFamily: 'Inter',
@@ -97,7 +167,7 @@ class PlaneTheme {
             color: _textPrimaryLight,
           ),
         ),
-        cardTheme: CardTheme(
+        cardTheme: CardThemeData(
           color: _bgLight,
           elevation: 0,
           margin: EdgeInsets.zero,
@@ -149,19 +219,31 @@ class PlaneTheme {
 
   static ThemeData dark() => ThemeData(
         brightness: Brightness.dark,
-        scaffoldBackgroundColor: _bgDark,
+        scaffoldBackgroundColor: background,
         colorScheme: ColorScheme.dark(
           primary: _accent,
-          surface: _surfaceDark,
-          onSurface: _textPrimaryDark,
-          outline: _borderDark,
-          onSurfaceVariant: _textSecondaryDark,
+          surface: surface,
+          surfaceContainerLowest: surfaceContainerLowest,
+          surfaceContainerLow: surfaceContainerLow,
+          surfaceContainer: surfaceContainer,
+          surfaceContainerHigh: surfaceContainerHigh,
+          surfaceContainerHighest: surfaceContainerHighest,
+          onSurface: onSurface,
+          onSurfaceVariant: onSurfaceVariant,
+          outline: outlineVariant,
+          outlineVariant: outlineVariant,
+          primaryContainer: primaryContainer,
+          onPrimaryContainer: onPrimaryContainer,
+          error: errorColor,
+          errorContainer: errorContainer,
+          secondary: secondaryColor,
+          secondaryContainer: secondaryContainer,
         ),
         useMaterial3: true,
         fontFamily: 'Inter',
         appBarTheme: const AppBarTheme(
-          backgroundColor: _bgDark,
-          foregroundColor: _textPrimaryDark,
+          backgroundColor: background,
+          foregroundColor: onSurface,
           elevation: 0,
           scrolledUnderElevation: 0,
           centerTitle: false,
@@ -169,40 +251,40 @@ class PlaneTheme {
             fontFamily: 'Inter',
             fontSize: 20,
             fontWeight: FontWeight.w600,
-            color: _textPrimaryDark,
+            color: onSurface,
           ),
         ),
-        cardTheme: CardTheme(
-          color: _surfaceDark,
+        cardTheme: CardThemeData(
+          color: surface,
           elevation: 0,
           margin: EdgeInsets.zero,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(8),
-            side: const BorderSide(color: _borderDark, width: 0.5),
+            side: const BorderSide(color: outlineVariant, width: 0.5),
           ),
         ),
         dividerTheme: const DividerThemeData(
-          color: _borderDark,
+          color: outlineVariant,
           thickness: 0.5,
           space: 0,
         ),
         chipTheme: ChipThemeData(
-          backgroundColor: _surfaceDark,
-          side: const BorderSide(color: _borderDark, width: 0.5),
+          backgroundColor: surface,
+          side: const BorderSide(color: outlineVariant, width: 0.5),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
-          labelStyle: const TextStyle(fontSize: 12, color: _textPrimaryDark),
+          labelStyle: const TextStyle(fontSize: 12, color: onSurface),
           padding: const EdgeInsets.symmetric(horizontal: 4),
         ),
         inputDecorationTheme: InputDecorationTheme(
           filled: true,
-          fillColor: _surfaceDark,
+          fillColor: surface,
           border: OutlineInputBorder(
             borderRadius: BorderRadius.circular(8),
-            borderSide: const BorderSide(color: _borderDark),
+            borderSide: const BorderSide(color: outlineVariant),
           ),
           enabledBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(8),
-            borderSide: const BorderSide(color: _borderDark),
+            borderSide: const BorderSide(color: outlineVariant),
           ),
           contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
           isDense: true,
@@ -214,9 +296,9 @@ class PlaneTheme {
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         ),
         bottomNavigationBarTheme: const BottomNavigationBarThemeData(
-          backgroundColor: _bgDark,
-          selectedItemColor: _textPrimaryDark,
-          unselectedItemColor: _textSecondaryDark,
+          backgroundColor: background,
+          selectedItemColor: onSurface,
+          unselectedItemColor: onSurfaceVariant,
           type: BottomNavigationBarType.fixed,
           elevation: 0,
         ),

@@ -7,6 +7,7 @@ class Project {
   final String? emoji;
   final int network;
   final int totalMembers;
+  final int totalIssues;
   final bool isMember;
   final DateTime createdAt;
 
@@ -19,6 +20,7 @@ class Project {
     this.emoji,
     required this.network,
     required this.totalMembers,
+    this.totalIssues = 0,
     required this.isMember,
     required this.createdAt,
   });
@@ -32,6 +34,7 @@ class Project {
         emoji: json['emoji'],
         network: json['network'] ?? 0,
         totalMembers: json['total_members'] ?? 0,
+        totalIssues: json['total_issues'] ?? 0,
         isMember: json['is_member'] ?? false,
         createdAt: DateTime.tryParse(json['created_at'] ?? '') ?? DateTime.now(),
       );

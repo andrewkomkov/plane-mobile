@@ -5,6 +5,8 @@ class Module {
   final String? status;
   final String? startDate;
   final String? targetDate;
+  final String? lead;
+  final List<String> members;
   final int totalIssues;
   final int completedIssues;
   final DateTime createdAt;
@@ -16,6 +18,8 @@ class Module {
     this.status,
     this.startDate,
     this.targetDate,
+    this.lead,
+    this.members = const [],
     required this.totalIssues,
     required this.completedIssues,
     required this.createdAt,
@@ -28,6 +32,11 @@ class Module {
         status: json['status'],
         startDate: json['start_date'],
         targetDate: json['target_date'],
+        lead: json['lead'],
+        members: (json['members'] as List?)
+                ?.map((e) => e.toString())
+                .toList() ??
+            [],
         totalIssues: json['total_issues'] ?? 0,
         completedIssues: json['completed_issues'] ?? 0,
         createdAt: DateTime.tryParse(json['created_at'] ?? '') ?? DateTime.now(),

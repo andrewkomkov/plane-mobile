@@ -9,4 +9,42 @@ class LabelService {
     final list = data is Map ? (data['results'] ?? []) : data;
     return (list as List).map((e) => Label.fromJson(e)).toList();
   }
+
+  static Future<Label> createLabel(
+    String workspaceSlug,
+    String projectId,
+    Map<String, dynamic> data,
+  ) async {
+    final dio = await ApiClient.getInstance();
+    final response = await dio.post(
+      '/workspaces/$workspaceSlug/projects/$projectId/labels/',
+      data: data,
+    );
+    return Label.fromJson(response.data);
+  }
+
+  static Future<Label> updateLabel(
+    String workspaceSlug,
+    String projectId,
+    String labelId,
+    Map<String, dynamic> data,
+  ) async {
+    final dio = await ApiClient.getInstance();
+    final response = await dio.patch(
+      '/workspaces/$workspaceSlug/projects/$projectId/labels/$labelId/',
+      data: data,
+    );
+    return Label.fromJson(response.data);
+  }
+
+  static Future<void> deleteLabel(
+    String workspaceSlug,
+    String projectId,
+    String labelId,
+  ) async {
+    final dio = await ApiClient.getInstance();
+    await dio.delete(
+      '/workspaces/$workspaceSlug/projects/$projectId/labels/$labelId/',
+    );
+  }
 }

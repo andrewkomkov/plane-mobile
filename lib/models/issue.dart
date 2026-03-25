@@ -12,6 +12,11 @@ class Issue {
   final DateTime createdAt;
   final DateTime updatedAt;
   final String? createdBy;
+  final String? project;
+  final String? startDate;
+  final String? targetDate;
+  final String? parent;
+  final int subIssuesCount;
 
   Issue({
     required this.id,
@@ -27,6 +32,11 @@ class Issue {
     required this.createdAt,
     required this.updatedAt,
     this.createdBy,
+    this.project,
+    this.startDate,
+    this.targetDate,
+    this.parent,
+    this.subIssuesCount = 0,
   });
 
   factory Issue.fromJson(Map<String, dynamic> json) => Issue(
@@ -51,6 +61,11 @@ class Issue {
         updatedAt:
             DateTime.tryParse(json['updated_at'] ?? '') ?? DateTime.now(),
         createdBy: json['created_by'],
+        project: json['project'],
+        startDate: json['start_date'],
+        targetDate: json['target_date'],
+        parent: json['parent'],
+        subIssuesCount: json['sub_issues_count'] ?? 0,
       );
 
   Map<String, dynamic> toCreateJson() => {
@@ -60,5 +75,15 @@ class Issue {
         'priority': priority,
         if (assignees.isNotEmpty) 'assignees': assignees,
         if (labels.isNotEmpty) 'labels': labels,
+        if (startDate != null) 'start_date': startDate,
+        if (targetDate != null) 'target_date': targetDate,
+        if (parent != null) 'parent': parent,
       };
+
+  bool get isOverdue {
+    if (targetDate == null) return false;
+    final target = DateTime.tryParse(targetDate!);
+    if (target == null) return false;
+    return DateTime.now().isAfter(target);
+  }
 }
