@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import '../../config/m3e/shapes.dart';
 import '../../widgets/m3e/loading_indicator.dart';
+import '../../widgets/m3e/text_field.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../services/search_service.dart';
 import '../../services/project_service.dart';
@@ -252,7 +253,7 @@ class _CommandPaletteBodyState
       decoration: BoxDecoration(
         color: theme.scaffoldBackgroundColor,
         borderRadius: const BorderRadius.vertical(
-            top: Radius.circular(16)),
+            top: Radius.circular(M3EShape.extraLargeIncreased)),
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -266,23 +267,20 @@ class _CommandPaletteBodyState
               decoration: BoxDecoration(
                 color: theme.colorScheme.onSurfaceVariant
                     .withValues(alpha: 0.3),
-                borderRadius: BorderRadius.circular(2),
+                borderRadius: BorderRadius.circular(M3EShape.full),
               ),
             ),
           ),
           // Search field
           Padding(
             padding: const EdgeInsets.all(12),
-            child: TextField(
+            child: M3ETextField(
+              label: 'Command or search',
+              hint: 'Type a command or search...',
+              compact: true,
+              prefixIcon: Icons.search,
               controller: _controller,
               autofocus: true,
-              decoration: InputDecoration(
-                hintText: 'Type a command or search...',
-                prefixIcon: const Icon(Icons.search, size: 20),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(M3EShape.large),
-                ),
-              ),
               onChanged: _onChanged,
             ),
           ),

@@ -25,34 +25,39 @@ class PropertyChip extends StatelessWidget {
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
 
+    final chip = Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(M3EShape.small),
+        border: Border.all(color: scheme.outlineVariant, width: 0.8),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 14, color: iconColor),
+          const SizedBox(width: 6),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w500,
+              color: scheme.onSurface,
+            ),
+          ),
+        ],
+      ),
+    );
+
     return M3EPressable(
       pressedScale: onTap == null ? 1.0 : 0.94,
       onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(M3EShape.small),
-          border: Border.all(
-            color: scheme.outlineVariant.withValues(alpha: 0.7),
-            width: 0.8,
-          ),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon, size: 14, color: iconColor),
-            const SizedBox(width: 6),
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w500,
-                color: scheme.onSurface,
-              ),
-            ),
-          ],
-        ),
-      ),
+      // The pill is ~28dp tall by design — it has to sit in a property row
+      // without dominating it. When it is tappable the hit area is padded out
+      // to 48dp instead, so the target is a fingertip even though the ink is
+      // not.
+      child: onTap == null
+          ? chip
+          : SizedBox(height: 48, child: Center(child: chip)),
     );
   }
 }

@@ -161,8 +161,16 @@ slightly. Never hard-code a radius -- use the token.
 - Everything is **flat** -- elevation 0 on every component theme. Separation
   comes from hairlines and surface steps, not shadows. The only shadow in the
   app is under the floating glass bars.
-- Card/input/chip border: 0.8px, `colorScheme.outlineVariant`
+- **One border treatment app-wide:** 0.8px, `colorScheme.outlineVariant`.
+  `colorScheme.outline` is not used for borders -- it is too heavy against the
+  near-black surfaces and was the source of the app looking unevenly outlined.
 - Divider: 0.5px, `colorScheme.outlineVariant`
+- Focused input outline: 1.6px, `colorScheme.primary`
+
+### Touch targets
+Nothing interactive is smaller than 48dp. Where a control must *look* smaller
+(a dense markdown toolbar, an inline chip action), `M3EIconButton` keeps the
+48dp target and shrinks only the drawn circle.
 
 ### Motion
 
@@ -222,6 +230,22 @@ HomeScreen (IndexedStack)
 ---
 
 ## Shared Components Catalog
+
+### M3EIconButton
+**Path:** `lib/widgets/m3e/icon_button.dart`
+**Props:** `icon`, `tooltip` (required), `onPressed`, `size`, `style`, `color`, `selected`
+**Sizes:** `extraSmall` 32/18, `small` 40/20, `medium` 48/22 (default), `large` 56/26 — container/icon in dp.
+**Styles:** `standard` (no fill until pressed), `filled` (tonal, for the one primary action), `outlined`.
+**Rules it enforces:** the touch target never drops below 48dp even when the visible circle is smaller, so dense toolbars stay thumb-usable; selected state morphs the corner from full-round toward `medium` as well as filling, so state does not depend on colour alone.
+**Why `tooltip` is required:** that string is also the accessibility label. An icon-only control without one is invisible to screen readers and to `tool/adb_drive.py`. Making it required is what stops the app regressing into anonymous icons.
+**Used by:** every icon-only control in the app. `M3EAppBarAction` is a thin naming wrapper over it.
+
+### M3ETextField
+**Path:** `lib/widgets/m3e/text_field.dart`
+**Props:** `label` (required), `hint`, `controller`, `onChanged`, `prefixIcon`, `suffix`, `compact`, plus the usual `obscureText`/`keyboardType`/`maxLines`
+**Layout:** filled on `surfaceContainerLow`, outline always visible at 0.8px `outlineVariant`, thickening to 1.6px `primary` on focus. `compact: true` single-line fields are stadium-shaped (search); everything else uses `M3EShape.large`.
+**Why the label is required:** Android drops a hint from the accessible name as soon as the field has content, so a hint-only field goes anonymous exactly when it holds data. `label` is published as semantics regardless of what is typed.
+**Used by:** every text input in the app.
 
 ### M3E component set
 **Path:** `lib/widgets/m3e/`

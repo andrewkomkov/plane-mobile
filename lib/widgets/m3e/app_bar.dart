@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
-import '../../config/m3e/motion.dart';
-import '../../config/m3e/shapes.dart';
+import 'icon_button.dart';
 
 /// Material 3 Expressive small top app bar.
 ///
@@ -72,52 +71,57 @@ class M3EAppBar extends StatelessWidget implements PreferredSizeWidget {
           children: [
             SizedBox(
               height: _barHeight,
-              child: Row(
-                children: [
-                  if (leading != null)
-                    leading!
-                  else if (canPop)
-                    M3EAppBarAction(
-                      icon: Icons.arrow_back,
-                      tooltip: 'Back',
-                      onPressed: () => Navigator.maybePop(context),
-                    )
-                  else
-                    const SizedBox(width: 20),
-                  Expanded(
-                    child: Padding(
-                      padding: EdgeInsets.only(left: canPop || leading != null ? 4 : 0),
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            title,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: theme.textTheme.headlineSmall,
-                          ),
-                          if (subtitle != null)
+              child: Padding(
+                // 4 either side, so the 48dp action circles sit the same
+                // distance from both screen edges.
+                padding: const EdgeInsets.symmetric(horizontal: 4),
+                child: Row(
+                  children: [
+                    if (leading != null)
+                      leading!
+                    else if (canPop)
+                      M3EAppBarAction(
+                        icon: Icons.arrow_back,
+                        tooltip: 'Back',
+                        onPressed: () => Navigator.maybePop(context),
+                      )
+                    else
+                      const SizedBox(width: 16),
+                    Expanded(
+                      child: Padding(
+                        padding: EdgeInsets.only(
+                            left: canPop || leading != null ? 4 : 0),
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
                             Text(
-                              subtitle!,
+                              title,
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
-                              style: theme.textTheme.bodySmall,
+                              style: theme.textTheme.headlineSmall,
                             ),
-                        ],
+                            if (subtitle != null)
+                              Text(
+                                subtitle!,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: theme.textTheme.bodySmall,
+                              ),
+                          ],
+                        ),
                       ),
                     ),
-                  ),
-                  if (actions != null) ...actions!,
-                  const SizedBox(width: 4),
-                ],
+                    if (actions != null) ...actions!,
+                  ],
+                ),
               ),
             ),
             if (bottom != null) bottom!,
             if (showDivider)
               Container(
                 height: _dividerHeight,
-                color: scheme.outlineVariant.withValues(alpha: 0.6),
+                color: scheme.outlineVariant,
               ),
           ],
         ),
@@ -126,10 +130,12 @@ class M3EAppBar extends StatelessWidget implements PreferredSizeWidget {
   }
 }
 
-/// Icon button for [M3EAppBar] rows, with M3E press physics.
+/// Icon button for [M3EAppBar] rows.
 ///
-/// Material's [IconButton] animates a ripple; M3E squeezes the target instead,
-/// which is the feedback the rest of this app now uses.
+/// Kept as a named type because fifteen screens spell their actions this way,
+/// but it is only a naming of intent now — the drawing is [M3EIconButton], so
+/// an app bar action is the same circle, at the same diameter, as every other
+/// icon-only control in the app.
 class M3EAppBarAction extends StatelessWidget {
   final IconData icon;
   final String tooltip;
@@ -150,26 +156,14 @@ class M3EAppBarAction extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    final foreground = color ??
-        (emphasized ? scheme.onPrimaryContainer : scheme.onSurfaceVariant);
-
-    return Tooltip(
-      message: tooltip,
-      child: M3EPressable(
-        pressedScale: 0.86,
-        onTap: onPressed,
-        child: Container(
-          width: 44,
-          height: 44,
-          margin: const EdgeInsets.symmetric(horizontal: 2),
-          decoration: BoxDecoration(
-            color: emphasized ? scheme.primaryContainer : Colors.transparent,
-            borderRadius: BorderRadius.circular(M3EShape.full),
-          ),
-          child: Icon(icon, size: 20, color: foreground),
-        ),
-      ),
+    return M3EIconButton(
+      icon: icon,
+      tooltip: tooltip,
+      onPressed: onPressed,
+      color: color,
+      style: emphasized
+          ? M3EIconButtonStyle.filled
+          : M3EIconButtonStyle.standard,
     );
   }
 }

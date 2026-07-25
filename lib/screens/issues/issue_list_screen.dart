@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../config/theme.dart';
+import '../../widgets/m3e/icon_button.dart';
+import '../../widgets/m3e/text_field.dart';
 import '../../services/issue_service.dart';
 import '../../services/view_service.dart';
 import '../../models/issue.dart';
@@ -65,12 +67,9 @@ class _IssueListScreenState extends ConsumerState<IssueListScreen>
         final controller = TextEditingController();
         return AlertDialog(
           title: const Text('Save as View'),
-          content: TextField(
+          content: M3ETextField(
+            label: 'View name',
             controller: controller,
-            decoration: const InputDecoration(
-              labelText: 'View name',
-              border: OutlineInputBorder(),
-            ),
             autofocus: true,
           ),
           actions: [
@@ -184,14 +183,13 @@ class _IssueListScreenState extends ConsumerState<IssueListScreen>
                 Text('${_filteredAndSorted.length} issues',
                     style: TextStyle(fontSize: PlaneTheme.fontCaption, color: secondary)),
                 const Spacer(),
-                Semantics(
-                  label: 'Display options',
-                  button: true,
-                  container: true,
-                  child: GestureDetector(
-                    onTap: () => showDisplayOptions(context, _display, () => setState(() {})),
-                    child: Icon(Icons.tune, size: PlaneTheme.iconMedium, color: secondary),
-                  ),
+                M3EIconButton(
+                  icon: Icons.tune,
+                  tooltip: 'Display options',
+                  size: M3EIconButtonSize.small,
+                  color: secondary,
+                  onPressed: () =>
+                      showDisplayOptions(context, _display, () => setState(() {})),
                 ),
               ],
             ),

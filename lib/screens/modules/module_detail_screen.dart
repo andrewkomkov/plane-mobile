@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
+import '../../config/m3e/shapes.dart';
 import '../../widgets/m3e/app_bar.dart';
+import '../../widgets/m3e/icon_button.dart';
+import '../../widgets/m3e/text_field.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../config/theme.dart';
 import '../../services/module_service.dart';
@@ -12,6 +15,29 @@ import '../../widgets/loading_state.dart';
 import '../../widgets/issue_tile.dart';
 import '../../widgets/property_chip.dart';
 import '../issues/issue_detail_screen.dart';
+
+/// The status dropdown's decoration, mirroring [M3ETextField] exactly.
+///
+/// A dropdown cannot be wrapped in [M3ETextField], so the one treatment is
+/// mirrored here instead — same corner, same 0.8 outline, same fill — and shared
+/// with the create dialog in `module_list_screen.dart` so the two forms match.
+InputDecoration moduleStatusFieldDecoration(BuildContext context) {
+  final scheme = Theme.of(context).colorScheme;
+  OutlineInputBorder border(Color color, double width) => OutlineInputBorder(
+        borderRadius: BorderRadius.circular(M3EShape.large),
+        borderSide: BorderSide(color: color, width: width),
+      );
+  return InputDecoration(
+    labelText: 'Status',
+    filled: true,
+    fillColor: scheme.surfaceContainerLow,
+    isDense: true,
+    contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+    border: border(scheme.outlineVariant, 0.8),
+    enabledBorder: border(scheme.outlineVariant, 0.8),
+    focusedBorder: border(scheme.primary, 1.6),
+  );
+}
 
 class ModuleDetailScreen extends ConsumerStatefulWidget {
   final String workspaceSlug;
@@ -227,31 +253,20 @@ class _ModuleDetailScreenState extends ConsumerState<ModuleDetailScreen> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                TextField(
+                M3ETextField(
+                  label: 'Name',
                   controller: nameController,
-                  decoration: const InputDecoration(
-                    labelText: 'Name',
-                    border: OutlineInputBorder(),
-                  ),
                 ),
                 const SizedBox(height: 12),
-                TextField(
+                M3ETextField(
+                  label: 'Description',
                   controller: descController,
-                  decoration: const InputDecoration(
-                    labelText: 'Description',
-                    border: OutlineInputBorder(),
-                  ),
                   maxLines: 2,
                 ),
                 const SizedBox(height: 12),
                 DropdownButtonFormField<String>(
                   initialValue: selectedStatus,
-                  decoration: const InputDecoration(
-                    labelText: 'Status',
-                    border: OutlineInputBorder(),
-                    contentPadding:
-                        EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                  ),
+                  decoration: moduleStatusFieldDecoration(ctx),
                   items: [
                     'backlog',
                     'planned',
@@ -446,13 +461,13 @@ class _ModuleDetailScreenState extends ConsumerState<ModuleDetailScreen> {
                               children: [
                                 Expanded(
                                   child: ClipRRect(
-                                    borderRadius: BorderRadius.circular(2),
+                                    borderRadius:
+                                        BorderRadius.circular(M3EShape.full),
                                     child: LinearProgressIndicator(
                                       value: mod.progress,
                                       minHeight: 6,
-                                      backgroundColor: theme
-                                          .colorScheme.outline
-                                          .withValues(alpha: 0.3),
+                                      backgroundColor:
+                                          theme.colorScheme.outlineVariant,
                                       valueColor:
                                           AlwaysStoppedAnimation<Color>(
                                               statusColor),
@@ -470,10 +485,15 @@ class _ModuleDetailScreenState extends ConsumerState<ModuleDetailScreen> {
                           ],
                         ),
                       ),
-                      const Divider(height: 1),
-                      // Issues header
+                      Divider(
+                          height: 0.5,
+                          thickness: 0.5,
+                          color: theme.colorScheme.outlineVariant),
+                      // Issues header. The trailing add button carries its own
+                      // 48dp target, so the row's vertical padding is trimmed
+                      // to keep the header the same optical height as before.
                       Padding(
-                        padding: const EdgeInsets.fromLTRB(20, 16, 20, 6),
+                        padding: const EdgeInsets.fromLTRB(20, 4, 12, 0),
                         child: Row(
                           children: [
                             Text('Issues',
@@ -486,18 +506,11 @@ class _ModuleDetailScreenState extends ConsumerState<ModuleDetailScreen> {
                                 style: TextStyle(
                                     fontSize: PlaneTheme.fontCaption, color: secondary)),
                             const Spacer(),
-                            // Icon-only control: without an explicit label it
-                            // reaches the accessibility tree — and therefore
-                            // `uiautomator dump` — as an unnamed node.
-                            Semantics(
-                              label: 'Add issues to module',
-                              button: true,
-                              container: true,
-                              child: GestureDetector(
-                                onTap: _showAddIssuesSheet,
-                                child: Icon(Icons.add,
-                                    size: PlaneTheme.iconLarge, color: secondary),
-                              ),
+                            M3EIconButton(
+                              icon: Icons.add,
+                              tooltip: 'Add issues to module',
+                              size: M3EIconButtonSize.small,
+                              onPressed: _showAddIssuesSheet,
                             ),
                           ],
                         ),

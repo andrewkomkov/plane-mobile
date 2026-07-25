@@ -2,6 +2,8 @@ import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import '../../config/m3e/shapes.dart';
 import '../../widgets/m3e/app_bar.dart';
+import '../../widgets/m3e/icon_button.dart';
+import '../../widgets/m3e/text_field.dart';
 import 'package:flutter/services.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
@@ -563,76 +565,46 @@ class _IssueDetailScreenState extends ConsumerState<IssueDetailScreen> {
               color: PlaneTheme.background.withValues(alpha: 0.80),
               border: Border(
                   top: BorderSide(
-                      color: PlaneTheme.outlineVariant.withValues(alpha: 0.10), width: 0.5)),
+                      color: theme.colorScheme.outlineVariant, width: 0.5)),
             ),
             child: SafeArea(
               top: false,
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-                decoration: BoxDecoration(
-                  color: PlaneTheme.surfaceContainer,
-                  borderRadius: BorderRadius.circular(M3EShape.full),
-                  border: Border.all(
-                    color: Colors.white.withValues(alpha: 0.05),
+              // The bar used to be a hand-rolled pill wrapped around a
+              // borderless field, which put two outlines around one input.
+              // The field carries its own now and the row just spaces it.
+              child: Row(
+                children: [
+                  CircleAvatar(
+                    radius: 14,
+                    backgroundColor: PlaneTheme.surfaceContainerHighest,
+                    child: Icon(Icons.person,
+                        size: 14, color: PlaneTheme.onSurfaceVariant),
                   ),
-                ),
-                child: Row(
-                  children: [
-                    // User avatar
-                    CircleAvatar(
-                      radius: 14,
-                      backgroundColor: PlaneTheme.surfaceContainerHighest,
-                      child: Icon(Icons.person, size: 14, color: PlaneTheme.onSurfaceVariant),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: M3ETextField(
+                      label: 'Comment',
+                      hint: 'Add a comment...',
+                      controller: _commentController,
+                      compact: true,
+                      maxLines: null,
                     ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: TextField(
-                        controller: _commentController,
-                        decoration: InputDecoration(
-                          hintText: 'Add a comment...',
-                          hintStyle: TextStyle(
-                            color: PlaneTheme.onSurfaceVariant.withValues(alpha: 0.50),
-                            fontSize: 14,
-                          ),
-                          border: InputBorder.none,
-                          enabledBorder: InputBorder.none,
-                          focusedBorder: InputBorder.none,
-                          filled: false,
-                          contentPadding: const EdgeInsets.symmetric(vertical: 8),
-                          isDense: true,
-                        ),
-                        style: const TextStyle(fontSize: 14, color: PlaneTheme.onSurface),
-                        maxLines: null,
-                      ),
-                    ),
-                    IconButton(
-                      onPressed: () {},
-                      tooltip: 'Attach file to comment',
-                      icon: Icon(Icons.attach_file, size: 18,
-                          color: PlaneTheme.onSurfaceVariant),
-                      visualDensity: VisualDensity.compact,
-                      padding: EdgeInsets.zero,
-                    ),
-                    Semantics(
-                      label: 'Add comment',
-                      button: true,
-                      container: true,
-                      child: GestureDetector(
-                        onTap: _addComment,
-                        child: Container(
-                          width: 30,
-                          height: 30,
-                          decoration: BoxDecoration(
-                            color: PlaneTheme.primaryContainer,
-                            shape: BoxShape.circle,
-                          ),
-                          child: const Icon(Icons.send, size: 14,
-                              color: PlaneTheme.onPrimaryContainer),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
+                  ),
+                  const SizedBox(width: 4),
+                  M3EIconButton(
+                    icon: Icons.attach_file,
+                    tooltip: 'Attach file to comment',
+                    size: M3EIconButtonSize.small,
+                    onPressed: () {},
+                  ),
+                  M3EIconButton(
+                    icon: Icons.send,
+                    tooltip: 'Add comment',
+                    size: M3EIconButtonSize.small,
+                    style: M3EIconButtonStyle.filled,
+                    onPressed: _addComment,
+                  ),
+                ],
               ),
             ),
           ),
@@ -659,14 +631,12 @@ class _IssueDetailScreenState extends ConsumerState<IssueDetailScreen> {
                   style: TextStyle(fontSize: 12, color: secondary)),
             ],
             const Spacer(),
-            Semantics(
-              label: 'Add sub-issue',
-              button: true,
-              container: true,
-              child: GestureDetector(
-                onTap: _addSubIssue,
-                child: Icon(Icons.add, size: 18, color: secondary),
-              ),
+            M3EIconButton(
+              icon: Icons.add,
+              tooltip: 'Add sub-issue',
+              size: M3EIconButtonSize.extraSmall,
+              color: secondary,
+              onPressed: _addSubIssue,
             ),
           ],
         ),
@@ -819,14 +789,12 @@ class _IssueDetailScreenState extends ConsumerState<IssueDetailScreen> {
                   style: TextStyle(fontSize: 12, color: secondary)),
             ],
             const Spacer(),
-            Semantics(
-              label: 'Add link',
-              button: true,
-              container: true,
-              child: GestureDetector(
-                onTap: _showAddLinkDialog,
-                child: Icon(Icons.add, size: 18, color: secondary),
-              ),
+            M3EIconButton(
+              icon: Icons.add,
+              tooltip: 'Add link',
+              size: M3EIconButtonSize.extraSmall,
+              color: secondary,
+              onPressed: _showAddLinkDialog,
             ),
           ],
         ),
@@ -891,21 +859,15 @@ class _IssueDetailScreenState extends ConsumerState<IssueDetailScreen> {
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            TextField(
+            M3ETextField(
+              label: 'Title',
               controller: titleController,
-              decoration: const InputDecoration(
-                labelText: 'Title',
-                border: OutlineInputBorder(),
-              ),
             ),
             const SizedBox(height: 12),
-            TextField(
+            M3ETextField(
+              label: 'URL',
+              hint: 'https://',
               controller: urlController,
-              decoration: const InputDecoration(
-                labelText: 'URL',
-                hintText: 'https://',
-                border: OutlineInputBorder(),
-              ),
               keyboardType: TextInputType.url,
             ),
           ],
@@ -1113,18 +1075,13 @@ class _IssueDetailScreenState extends ConsumerState<IssueDetailScreen> {
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              TextField(
+              M3ETextField(
+                label: 'Label name',
                 controller: nameController,
-                decoration: const InputDecoration(
-                  labelText: 'Label name',
-                  border: OutlineInputBorder(),
-                ),
                 autofocus: true,
               ),
               const SizedBox(height: 12),
               Wrap(
-                spacing: 8,
-                runSpacing: 8,
                 // A swatch is pure colour — the hex is the only stable name
                 // it has, and selection is otherwise only a border.
                 children: colors.map((c) => Semantics(
@@ -1134,15 +1091,24 @@ class _IssueDetailScreenState extends ConsumerState<IssueDetailScreen> {
                   container: true,
                   child: GestureDetector(
                     onTap: () => setDialogState(() => selectedColor = c),
-                    child: Container(
-                      width: 28,
-                      height: 28,
-                      decoration: BoxDecoration(
-                        color: _parseColor(c),
-                        shape: BoxShape.circle,
-                        border: selectedColor == c
-                            ? Border.all(color: Theme.of(ctx).colorScheme.onSurface, width: 2)
-                            : null,
+                    // 28dp circle, 48dp target: a swatch is still a control.
+                    child: SizedBox(
+                      width: 48,
+                      height: 48,
+                      child: Center(
+                        child: Container(
+                          width: 28,
+                          height: 28,
+                          decoration: BoxDecoration(
+                            color: _parseColor(c),
+                            shape: BoxShape.circle,
+                            border: selectedColor == c
+                                ? Border.all(
+                                    color: Theme.of(ctx).colorScheme.onSurface,
+                                    width: 2)
+                                : null,
+                          ),
+                        ),
                       ),
                     ),
                   ),
@@ -1424,7 +1390,7 @@ class _RelationChip extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(M3EShape.full),
-        border: Border.all(color: color.withValues(alpha: 0.3), width: 0.5),
+        border: Border.all(color: color.withValues(alpha: 0.3), width: 0.8),
         color: color.withValues(alpha: 0.05),
       ),
       child: Row(
@@ -1560,7 +1526,7 @@ class _LabelPill extends StatelessWidget {
         decoration: BoxDecoration(
           color: color.withValues(alpha: 0.15),
           borderRadius: BorderRadius.circular(M3EShape.full),
-          border: Border.all(color: color.withValues(alpha: 0.4), width: 0.5),
+          border: Border.all(color: color.withValues(alpha: 0.4), width: 0.8),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,

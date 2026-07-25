@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import '../../config/m3e/shapes.dart';
 import '../../widgets/m3e/loading_indicator.dart';
 import '../../widgets/m3e/app_bar.dart';
+import '../../widgets/m3e/icon_button.dart';
+import '../../widgets/m3e/text_field.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../config/theme.dart';
 import '../../models/project.dart';
@@ -123,20 +125,25 @@ class _ProjectSettingsScreenState
             content: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                TextField(
+                M3ETextField(
+                  label: 'State name',
                   controller: nameCtrl,
-                  decoration: const InputDecoration(
-                    labelText: 'State name',
-                    border: OutlineInputBorder(),
-                  ),
                   autofocus: true,
                 ),
                 const SizedBox(height: 12),
                 DropdownButtonFormField<String>(
                   initialValue: group,
-                  decoration: const InputDecoration(
+                  // The dropdown is not an M3ETextField, so it restates the
+                  // same outline rather than falling back to the stock one.
+                  decoration: InputDecoration(
                     labelText: 'Group',
-                    border: OutlineInputBorder(),
+                    border: OutlineInputBorder(
+                      borderRadius:
+                          BorderRadius.circular(M3EShape.large),
+                      borderSide: BorderSide(
+                          color: Theme.of(ctx).colorScheme.outlineVariant,
+                          width: 0.8),
+                    ),
                   ),
                   items: ['backlog', 'unstarted', 'started', 'completed', 'cancelled']
                       .map((g) => DropdownMenuItem(value: g, child: Text(g)))
@@ -223,12 +230,9 @@ class _ProjectSettingsScreenState
             content: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                TextField(
+                M3ETextField(
+                  label: 'Label name',
                   controller: nameCtrl,
-                  decoration: const InputDecoration(
-                    labelText: 'Label name',
-                    border: OutlineInputBorder(),
-                  ),
                   autofocus: true,
                 ),
                 const SizedBox(height: 12),
@@ -249,17 +253,25 @@ class _ProjectSettingsScreenState
                       container: true,
                       child: GestureDetector(
                         onTap: () => setDialogState(() => color = c),
-                        child: Container(
-                          width: 32,
-                          height: 32,
-                          decoration: BoxDecoration(
-                            color: _parseColor(c),
-                            shape: BoxShape.circle,
-                            border: color == c
-                                ? Border.all(
-                                    color: Theme.of(ctx).colorScheme.onSurface,
-                                    width: 2)
-                                : null,
+                        // 32dp circle, 48dp target: a swatch is a control.
+                        child: SizedBox(
+                          width: 48,
+                          height: 48,
+                          child: Center(
+                            child: Container(
+                              width: 32,
+                              height: 32,
+                              decoration: BoxDecoration(
+                                color: _parseColor(c),
+                                shape: BoxShape.circle,
+                                border: color == c
+                                    ? Border.all(
+                                        color:
+                                            Theme.of(ctx).colorScheme.onSurface,
+                                        width: 2)
+                                    : null,
+                              ),
+                            ),
                           ),
                         ),
                       ),
@@ -362,21 +374,14 @@ class _ProjectSettingsScreenState
                 // General section
                 _sectionHeader('General', theme),
                 const SizedBox(height: 12),
-                TextField(
+                M3ETextField(
+                  label: 'Project name',
                   controller: _nameController,
-                  decoration: const InputDecoration(
-                    labelText: 'Project name',
-                    border: OutlineInputBorder(),
-                  ),
                 ),
                 const SizedBox(height: 12),
-                TextField(
+                M3ETextField(
+                  label: 'Description',
                   controller: _descController,
-                  decoration: const InputDecoration(
-                    labelText: 'Description',
-                    border: OutlineInputBorder(),
-                    alignLabelWithHint: true,
-                  ),
                   maxLines: 3,
                 ),
                 const SizedBox(height: 12),
@@ -386,7 +391,7 @@ class _ProjectSettingsScreenState
                   decoration: BoxDecoration(
                     borderRadius: BorderRadius.circular(M3EShape.large),
                     border: Border.all(
-                        color: theme.colorScheme.outline, width: 0.5),
+                        color: theme.colorScheme.outlineVariant, width: 0.8),
                   ),
                   child: Row(
                     children: [
@@ -490,10 +495,10 @@ class _ProjectSettingsScreenState
                   children: [
                     _sectionHeader('States (${_states.length})', theme),
                     const Spacer(),
-                    IconButton(
-                      icon: const Icon(Icons.add,
-                          size: 20, semanticLabel: 'Add state'),
+                    M3EIconButton(
+                      icon: Icons.add,
                       tooltip: 'Add state',
+                      size: M3EIconButtonSize.small,
                       onPressed: _addState,
                     ),
                   ],
@@ -513,14 +518,13 @@ class _ProjectSettingsScreenState
                               fontSize: 12,
                               color:
                                   theme.colorScheme.onSurfaceVariant)),
-                      trailing: IconButton(
-                        // Named per state so repeated rows stay distinguishable
-                        // to external automation.
-                        icon: Icon(Icons.delete_outline,
-                            size: 18,
-                            color: Colors.grey[500],
-                            semanticLabel: 'Delete state ${s.name}'),
-                        tooltip: 'Delete state',
+                      // Named per state so repeated rows stay distinguishable
+                      // to external automation.
+                      trailing: M3EIconButton(
+                        icon: Icons.delete_outline,
+                        tooltip: 'Delete state ${s.name}',
+                        size: M3EIconButtonSize.small,
+                        color: theme.colorScheme.onSurfaceVariant,
                         onPressed: () => _deleteState(s),
                       ),
                     )),
@@ -531,10 +535,10 @@ class _ProjectSettingsScreenState
                   children: [
                     _sectionHeader('Labels (${_labels.length})', theme),
                     const Spacer(),
-                    IconButton(
-                      icon: const Icon(Icons.add,
-                          size: 20, semanticLabel: 'Add label'),
+                    M3EIconButton(
+                      icon: Icons.add,
                       tooltip: 'Add label',
+                      size: M3EIconButtonSize.small,
                       onPressed: _addLabel,
                     ),
                   ],

@@ -7,6 +7,8 @@ import '../project/project_screen.dart';
 import '../../widgets/loading_state.dart';
 import '../../widgets/skeleton_loader.dart';
 import '../../widgets/m3e/flexible_app_bar.dart';
+import '../../widgets/m3e/icon_button.dart';
+import '../../widgets/m3e/text_field.dart';
 import '../../widgets/section_header.dart';
 import '../../config/m3e/shapes.dart';
 import '../../config/m3e/motion.dart';
@@ -101,10 +103,9 @@ class _ProjectsTabState extends ConsumerState<ProjectsTab>
     return M3EFlexibleHeaderScaffold(
       title: 'Projects',
       actions: [
-        IconButton(
+        M3EIconButton(
+          icon: Icons.help_outline,
           tooltip: 'How to create a project',
-          icon: Icon(Icons.help_outline,
-              size: 20, color: theme.colorScheme.onSurfaceVariant),
           onPressed: () {
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(content: Text('Create projects in the web app')),
@@ -114,47 +115,12 @@ class _ProjectsTabState extends ConsumerState<ProjectsTab>
       ],
       // Search stays pinned under the title: it filters the whole list, so
       // scrolling it away would strand the user in filtered results.
-      bottom: Semantics(
+      bottom: M3ETextField(
         label: 'Search projects',
-        textField: true,
-        child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-        decoration: BoxDecoration(
-          color: theme.colorScheme.surfaceContainerLow,
-          borderRadius: BorderRadius.circular(M3EShape.full),
-          border: Border.all(
-            color: theme.colorScheme.outlineVariant.withValues(alpha: 0.7),
-            width: 0.8,
-          ),
-        ),
-        child: Row(
-          children: [
-            Icon(Icons.search,
-                size: 19, color: theme.colorScheme.onSurfaceVariant),
-            const SizedBox(width: 10),
-            Expanded(
-              child: TextField(
-                onChanged: (v) => setState(() => _searchQuery = v),
-                style: TextStyle(
-                    fontSize: 15, color: theme.colorScheme.onSurface),
-                decoration: InputDecoration(
-                  hintText: 'Search projects...',
-                  hintStyle: TextStyle(
-                    fontSize: 15,
-                    color: theme.colorScheme.onSurfaceVariant,
-                  ),
-                  border: InputBorder.none,
-                  enabledBorder: InputBorder.none,
-                  focusedBorder: InputBorder.none,
-                  filled: false,
-                  contentPadding: EdgeInsets.zero,
-                  isDense: true,
-                ),
-              ),
-            ),
-          ],
-        ),
-        ),
+        hint: 'Search projects...',
+        compact: true,
+        prefixIcon: Icons.search,
+        onChanged: (v) => setState(() => _searchQuery = v),
       ),
       body: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -245,7 +211,9 @@ class _ProjectsTabState extends ConsumerState<ProjectsTab>
                                         ),
                                       ),
                                       Icon(Icons.chevron_right,
-                                          size: 20, color: theme.colorScheme.outline),
+                                          size: 20,
+                                          color: theme
+                                              .colorScheme.onSurfaceVariant),
                                     ],
                                   ),
                                 ),

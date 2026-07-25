@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../config/m3e/shapes.dart';
+import '../../widgets/m3e/icon_button.dart';
 import '../../models/issue.dart';
 import '../../models/state.dart';
 import '../../widgets/issue_row.dart';
@@ -84,9 +85,9 @@ class _CalendarViewState extends State<CalendarView> {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              IconButton(
+              M3EIconButton(
+                icon: Icons.chevron_left,
                 tooltip: 'Previous month',
-                icon: const Icon(Icons.chevron_left, size: 20),
                 onPressed: () {
                   setState(() {
                     _currentMonth = DateTime(
@@ -100,9 +101,9 @@ class _CalendarViewState extends State<CalendarView> {
                 style: const TextStyle(
                     fontSize: 16, fontWeight: FontWeight.w600),
               ),
-              IconButton(
+              M3EIconButton(
+                icon: Icons.chevron_right,
                 tooltip: 'Next month',
-                icon: const Icon(Icons.chevron_right, size: 20),
                 onPressed: () {
                   setState(() {
                     _currentMonth = DateTime(
@@ -164,7 +165,7 @@ class _CalendarViewState extends State<CalendarView> {
               final dayNum = cellIndex - (startWeekday - 1) + 1;
 
               if (dayNum < 1 || dayNum > daysInMonth) {
-                return const Expanded(child: SizedBox(height: 44));
+                return const Expanded(child: SizedBox(height: 48));
               }
 
               final date = DateTime(
@@ -193,7 +194,9 @@ class _CalendarViewState extends State<CalendarView> {
                   child: GestureDetector(
                     onTap: () => setState(() => _selectedDay = date),
                     child: Container(
-                      height: 44,
+                      // A day cell is a tap target, so it holds the 48dp
+                      // minimum even though the number inside is small.
+                      height: 48,
                       decoration: BoxDecoration(
                         color: isSelected
                             ? theme.colorScheme.primary.withValues(alpha: 0.15)

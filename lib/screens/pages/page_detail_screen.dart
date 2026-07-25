@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import '../../widgets/m3e/app_bar.dart';
+import '../../widgets/m3e/icon_button.dart';
 import '../../widgets/m3e/loading_indicator.dart';
+import '../../widgets/m3e/text_field.dart';
 import '../../config/m3e/motion.dart';
 import '../../config/m3e/shapes.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
@@ -123,6 +125,8 @@ class _PageDetailScreenState extends ConsumerState<PageDetailScreen> {
                         borderRadius: BorderRadius.circular(M3EShape.large),
                       ),
                       codeblockPadding: const EdgeInsets.all(12),
+                      // Not chrome, so not on the 0.8 hairline rule: this is
+                      // the quote's typographic accent and has to read as one.
                       blockquoteDecoration: BoxDecoration(
                         border: Border(
                             left: BorderSide(
@@ -302,18 +306,16 @@ class _PageEditScreenState extends State<PageEditScreen> {
       ),
       body: Column(
         children: [
+          // Title and body are the same control at different heights: one
+          // outline, one corner, one fill. The title used to be a borderless
+          // 20pt line, which read as a heading rather than as something typable.
           Padding(
-            padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-            child: TextField(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+            child: M3ETextField(
+              label: 'Page name',
               controller: _nameController,
-              decoration: const InputDecoration(
-                  hintText: 'Page name',
-                  border: InputBorder.none),
-              style: const TextStyle(
-                  fontSize: 20, fontWeight: FontWeight.w600),
             ),
           ),
-          const Divider(),
           if (!_preview) _buildToolbar(theme),
           Expanded(
             child: _preview
@@ -324,18 +326,16 @@ class _PageEditScreenState extends State<PageEditScreen> {
                       selectable: true,
                     ),
                   )
-                : Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    child: TextField(
+                // The body grows with its content inside a scroll view rather
+                // than being stretched to the viewport: a field forced to fill
+                // the remaining height centres short text in the middle of it.
+                : SingleChildScrollView(
+                    padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+                    child: M3ETextField(
+                      label: 'Page content',
+                      hint: 'Write in markdown...',
                       controller: _contentController,
-                      decoration: const InputDecoration(
-                        hintText: 'Write in markdown...',
-                        border: InputBorder.none,
-                      ),
                       maxLines: null,
-                      expands: true,
-                      textAlignVertical: TextAlignVertical.top,
-                      style: const TextStyle(fontSize: 15, height: 1.6),
                     ),
                   ),
           ),
@@ -346,79 +346,63 @@ class _PageEditScreenState extends State<PageEditScreen> {
 
   Widget _buildToolbar(ThemeData theme) {
     return Container(
-      height: 44,
+      // 56 so each 40dp circle has room to breathe and still clears the 48dp
+      // touch minimum. At the old 44 the buttons were clipped by the row.
+      height: 56,
       decoration: BoxDecoration(
         border: Border(
-          bottom: BorderSide(color: theme.colorScheme.outline, width: 0.5),
+          bottom:
+              BorderSide(color: theme.colorScheme.outlineVariant, width: 0.5),
         ),
       ),
       child: ListView(
         scrollDirection: Axis.horizontal,
         padding: const EdgeInsets.symmetric(horizontal: 8),
         children: [
-          _ToolbarButton(
+          M3EIconButton(
             icon: Icons.format_bold,
             tooltip: 'Bold',
-            onTap: () => _insertFormatting('**', '**'),
+            size: M3EIconButtonSize.small,
+            onPressed: () => _insertFormatting('**', '**'),
           ),
-          _ToolbarButton(
+          M3EIconButton(
             icon: Icons.format_italic,
             tooltip: 'Italic',
-            onTap: () => _insertFormatting('*', '*'),
+            size: M3EIconButtonSize.small,
+            onPressed: () => _insertFormatting('*', '*'),
           ),
-          _ToolbarButton(
+          M3EIconButton(
             icon: Icons.title,
             tooltip: 'Heading',
-            onTap: () => _insertPrefix('## '),
+            size: M3EIconButtonSize.small,
+            onPressed: () => _insertPrefix('## '),
           ),
-          _ToolbarButton(
+          M3EIconButton(
             icon: Icons.format_list_bulleted,
             tooltip: 'List',
-            onTap: () => _insertPrefix('- '),
+            size: M3EIconButtonSize.small,
+            onPressed: () => _insertPrefix('- '),
           ),
-          _ToolbarButton(
+          M3EIconButton(
             icon: Icons.code,
             tooltip: 'Code',
-            onTap: () => _insertFormatting('`', '`'),
+            size: M3EIconButtonSize.small,
+            onPressed: () => _insertFormatting('`', '`'),
           ),
-          _ToolbarButton(
+          M3EIconButton(
             icon: Icons.link,
             tooltip: 'Link',
-            onTap: () => _insertFormatting('[', '](url)'),
+            size: M3EIconButtonSize.small,
+            onPressed: () => _insertFormatting('[', '](url)'),
           ),
-          _ToolbarButton(
+          M3EIconButton(
             icon: Icons.format_quote,
             tooltip: 'Quote',
-            onTap: () => _insertPrefix('> '),
+            size: M3EIconButtonSize.small,
+            onPressed: () => _insertPrefix('> '),
           ),
         ],
       ),
-    );
-  }
-}
-
-class _ToolbarButton extends StatelessWidget {
-  final IconData icon;
-  final String tooltip;
-  final VoidCallback onTap;
-
-  const _ToolbarButton({
-    required this.icon,
-    required this.tooltip,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return IconButton(
-      // A tooltip is exposed to Android as tooltipText, not as the node's
-      // content description, so the label has to ride on the icon itself for
-      // `uiautomator dump` to see it.
-      icon: Icon(icon, size: 20, semanticLabel: tooltip),
-      tooltip: tooltip,
-      onPressed: onTap,
-      padding: const EdgeInsets.symmetric(horizontal: 8),
-      constraints: const BoxConstraints(minWidth: 36),
     );
   }
 }

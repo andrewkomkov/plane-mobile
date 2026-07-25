@@ -3,6 +3,7 @@ import '../config/m3e/shapes.dart';
 import '../config/theme.dart';
 import '../utils/issue_grouping.dart';
 import 'filter_bar.dart';
+import 'm3e/chip.dart';
 
 /// Display options state — shared between My Issues and project issue lists
 class DisplayState {
@@ -53,7 +54,10 @@ Future<void> showDisplayOptions(BuildContext context, DisplayState ds, VoidCallb
         Widget optionRow(String label, String value, VoidCallback onTap) {
           return InkWell(
             onTap: onTap,
-            child: Padding(
+            // Padding alone leaves the row a couple of points short of 48.
+            child: Container(
+              constraints: const BoxConstraints(minHeight: 48),
+              alignment: Alignment.centerLeft,
               padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
               child: Row(
                 children: [
@@ -81,7 +85,8 @@ Future<void> showDisplayOptions(BuildContext context, DisplayState ds, VoidCallb
                         height: 4,
                         decoration: BoxDecoration(
                             color: secondary.withValues(alpha: 0.3),
-                            borderRadius: BorderRadius.circular(2)))),
+                            borderRadius:
+                                BorderRadius.circular(M3EShape.full)))),
                 const SizedBox(height: 16),
 
                 optionRow(
@@ -167,19 +172,18 @@ Future<void> showDisplayOptions(BuildContext context, DisplayState ds, VoidCallb
                           style: TextStyle(
                               fontSize: PlaneTheme.fontSection, color: secondary)),
                       const Spacer(),
-                      Semantics(
-                        label: 'Reset row properties',
-                        button: true,
-                        child: GestureDetector(
-                          onTap: () {
-                            setSheetState(
-                                () => ds.rowProperties = {'status', 'priority', 'id'});
-                            onChanged();
-                          },
-                          child: Text('Reset',
-                              style: TextStyle(
-                                  fontSize: PlaneTheme.fontSection, color: secondary)),
-                        ),
+                      // A TextButton rather than a tapped Text: it carries the
+                      // 48dp target and the label for free, which the bare
+                      // GestureDetector here did not.
+                      TextButton(
+                        onPressed: () {
+                          setSheetState(
+                              () => ds.rowProperties = {'status', 'priority', 'id'});
+                          onChanged();
+                        },
+                        child: Text('Reset',
+                            style: TextStyle(
+                                fontSize: PlaneTheme.fontSection, color: secondary)),
                       ),
                     ],
                   ),
@@ -202,7 +206,7 @@ Future<void> showDisplayOptions(BuildContext context, DisplayState ds, VoidCallb
                         'Cycle',
                         'Estimate'
                       ])
-                        _PropChip(
+                        M3EChip(
                           label: prop,
                           selected: ds.rowProperties
                               .contains(prop.toLowerCase().replaceAll(' ', '_')),
@@ -231,52 +235,3 @@ Future<void> showDisplayOptions(BuildContext context, DisplayState ds, VoidCallb
   );
 }
 
-class _PropChip extends StatelessWidget {
-  final String label;
-  final bool selected;
-  final VoidCallback onTap;
-  const _PropChip(
-      {required this.label, required this.selected, required this.onTap});
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
-    // The chip's own Text is its label; only the on/off state needs exposing,
-    // because it is otherwise carried by colour alone.
-    return Semantics(
-      button: true,
-      selected: selected,
-      child: GestureDetector(
-        onTap: onTap,
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
-          decoration: BoxDecoration(
-            color: selected
-                ? (isDark
-                    ? Colors.white.withValues(alpha: 0.15)
-                    : Colors.black.withValues(alpha: 0.08))
-                : Colors.transparent,
-            borderRadius: BorderRadius.circular(M3EShape.full),
-            border: Border.all(
-              color: selected
-                  ? (isDark
-                      ? Colors.white.withValues(alpha: 0.2)
-                      : Colors.black.withValues(alpha: 0.15))
-                  : (isDark
-                      ? Colors.white.withValues(alpha: 0.08)
-                      : Colors.black.withValues(alpha: 0.08)),
-            ),
-          ),
-          child: Text(label,
-              style: TextStyle(
-                  fontSize: PlaneTheme.fontSection,
-                  fontWeight: selected ? FontWeight.w500 : FontWeight.w400,
-                  color: selected
-                      ? theme.colorScheme.onSurface
-                      : theme.colorScheme.onSurfaceVariant)),
-        ),
-      ),
-    );
-  }
-}

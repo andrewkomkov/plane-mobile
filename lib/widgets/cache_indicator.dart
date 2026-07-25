@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import '../config/m3e/shapes.dart';
+import '../config/theme.dart';
 import 'm3e/loading_indicator.dart';
 
 class CacheIndicator extends StatelessWidget {
@@ -23,27 +25,28 @@ class CacheIndicator extends StatelessWidget {
         color: isRefreshing
             ? theme.colorScheme.primary.withValues(alpha: 0.1)
             : Colors.amber.withValues(alpha: 0.15),
-        borderRadius: BorderRadius.circular(4),
+        borderRadius: BorderRadius.circular(M3EShape.extraSmall),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
           if (isRefreshing) ...[
             M3ELoadingIndicator(
-              size: 10,
+              size: PlaneTheme.iconSmall,
               color: theme.colorScheme.primary,
             ),
             const SizedBox(width: 6),
             Text('Refreshing...',
                 style: TextStyle(
-                    fontSize: 10, color: theme.colorScheme.primary)),
+                    fontSize: PlaneTheme.fontSmall,
+                    color: theme.colorScheme.primary)),
           ] else ...[
             Icon(Icons.cloud_off,
-                size: 12, color: Colors.amber[700]),
-            const SizedBox(width: 4),
+                size: PlaneTheme.iconSmall, color: Colors.amber[700]),
+            const SizedBox(width: 6),
             Text('Cached data',
                 style: TextStyle(
-                    fontSize: 10, color: Colors.amber[700])),
+                    fontSize: PlaneTheme.fontSmall, color: Colors.amber[700])),
           ],
         ],
       ),

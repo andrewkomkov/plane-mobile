@@ -236,8 +236,8 @@ class _InboxTabState extends ConsumerState<InboxTab>
                   : ListView.separated(
                       padding: const EdgeInsets.only(bottom: 100),
                       itemCount: _notifications.length,
-                      separatorBuilder: (_, __) =>
-                          Divider(indent: 60, endIndent: 20, height: 0.5),
+                      separatorBuilder: (_, __) => const Divider(
+                          indent: 60, endIndent: 20, height: 0.5, thickness: 0.5),
                       itemBuilder: (ctx, i) {
                         final n = _notifications[i];
                         final isRead = n['read_at'] != null;
@@ -280,9 +280,13 @@ class _InboxTabState extends ConsumerState<InboxTab>
                           background: Container(
                             alignment: Alignment.centerRight,
                             padding: const EdgeInsets.only(right: 20),
-                            color: Colors.red.withValues(alpha: 0.20),
-                            child: const Icon(Icons.delete_outline,
-                                color: Colors.red, size: 22),
+                            color: Theme.of(context)
+                                .colorScheme
+                                .error
+                                .withValues(alpha: 0.20),
+                            child: Icon(Icons.delete_outline,
+                                color: Theme.of(context).colorScheme.error,
+                                size: 22),
                           ),
                           onDismissed: (_) => _dismiss(notificationId),
                           child: GestureDetector(

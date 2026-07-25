@@ -131,9 +131,7 @@ class AppNavBar extends StatelessWidget {
               top: Radius.circular(M3EShape.extraLargeIncreased),
             ),
             border: Border(
-              top: BorderSide(
-                color: scheme.outlineVariant.withValues(alpha: 0.4),
-              ),
+              top: BorderSide(color: scheme.outlineVariant, width: 0.5),
             ),
           ),
           child: SafeArea(
@@ -147,7 +145,7 @@ class AppNavBar extends StatelessWidget {
                     height: 4,
                     decoration: BoxDecoration(
                       color: scheme.onSurfaceVariant.withValues(alpha: 0.3),
-                      borderRadius: BorderRadius.circular(2),
+                      borderRadius: BorderRadius.circular(M3EShape.full),
                     ),
                   ),
                   const SizedBox(height: 20),
@@ -284,7 +282,7 @@ class _NavDestination extends StatelessWidget {
           children: [
             Icon(
               isActive ? item.activeIcon : item.icon,
-              size: 21,
+              size: 22,
               color: color,
             ),
             // Label appears only for the active destination — M3E's way of
@@ -385,7 +383,7 @@ class _OverflowTile extends StatelessWidget {
           children: [
             Icon(
               isActive ? item.activeIcon : item.icon,
-              size: 21,
+              size: 22,
               color: isActive ? scheme.primary : scheme.onSurfaceVariant,
             ),
             const SizedBox(width: 16),

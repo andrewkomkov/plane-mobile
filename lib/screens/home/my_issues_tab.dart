@@ -10,10 +10,12 @@ import '../../utils/issue_grouping.dart';
 import '../../widgets/filter_bar.dart';
 import '../../widgets/loading_state.dart';
 import '../../widgets/skeleton_loader.dart';
+import '../../config/m3e/shapes.dart';
 import '../../widgets/m3e/flexible_app_bar.dart';
 import '../../widgets/m3e/button_group.dart';
 import '../../widgets/m3e/chip.dart';
 import '../../widgets/m3e/fab_menu.dart';
+import '../../widgets/m3e/icon_button.dart';
 import '../../widgets/section_header.dart';
 import '../../widgets/issue_tile.dart';
 import '../issues/issue_detail_screen.dart';
@@ -342,7 +344,7 @@ class _MyIssuesTabState extends ConsumerState<MyIssuesTab>
                   const SizedBox(height: 12),
                   Center(child: Container(width: 36, height: 4,
                       decoration: BoxDecoration(color: secondary.withValues(alpha: 0.3),
-                          borderRadius: BorderRadius.circular(2)))),
+                          borderRadius: BorderRadius.circular(M3EShape.full)))),
                   const SizedBox(height: 16),
 
                   optionRow('Grouping', _grouping[0].toUpperCase() + _grouping.substring(1), () {
@@ -428,12 +430,21 @@ class _MyIssuesTabState extends ConsumerState<MyIssuesTab>
                       children: [
                         Text('Row properties', style: TextStyle(fontSize: PlaneTheme.fontSection, color: secondary)),
                         const Spacer(),
-                        GestureDetector(
-                          onTap: () {
+                        // A TextButton rather than a bare tap target: it
+                        // carries the 48dp minimum without extra layout.
+                        TextButton(
+                          onPressed: () {
                             setSheetState(() => _rowProperties = {'status', 'priority', 'id'});
                             setState(() {});
                           },
-                          child: Text('Reset', style: TextStyle(fontSize: PlaneTheme.fontSection, color: secondary)),
+                          style: TextButton.styleFrom(
+                            foregroundColor: secondary,
+                            minimumSize: const Size(48, 48),
+                            textStyle: const TextStyle(
+                                fontSize: PlaneTheme.fontSection,
+                                fontWeight: PlaneTheme.fontSectionWeight),
+                          ),
+                          child: const Text('Reset'),
                         ),
                       ],
                     ),
@@ -483,16 +494,14 @@ class _MyIssuesTabState extends ConsumerState<MyIssuesTab>
   @override
   Widget build(BuildContext context) {
     super.build(context);
-    final theme = Theme.of(context);
-    final secondary = theme.colorScheme.onSurfaceVariant;
 
     return M3EFlexibleHeaderScaffold(
       title: 'My issues',
       actions: [
-        IconButton(
+        M3EIconButton(
+          icon: Icons.more_horiz,
           tooltip: 'Open list options',
-          icon: Icon(Icons.more_horiz, size: 20, color: secondary),
-          onPressed: () => _showOptionsMenu(),
+          onPressed: _showOptionsMenu,
         ),
       ],
       // The three scopes are mutually exclusive and equally weighted — exactly

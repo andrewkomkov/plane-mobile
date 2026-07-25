@@ -30,7 +30,7 @@ class SpreadsheetView extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final secondary = theme.colorScheme.onSurfaceVariant;
-    final border = theme.colorScheme.outline;
+    final border = theme.colorScheme.outlineVariant;
 
     return Column(
       children: [
@@ -303,6 +303,10 @@ class _DataCell extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       width: width,
+      // Rows open the issue and the state/priority cells open pickers, so a
+      // row is never shorter than a fingertip.
+      constraints: const BoxConstraints(minHeight: 48),
+      alignment: Alignment.centerLeft,
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
       child: child,
     );

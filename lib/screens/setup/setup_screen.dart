@@ -2,6 +2,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import '../../config/m3e/shapes.dart';
 import '../../widgets/m3e/loading_indicator.dart';
+import '../../widgets/m3e/text_field.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import '../../config/secure_storage.dart';
 import '../../config/api_client.dart';
@@ -209,41 +210,88 @@ class _SetupScreenState extends State<SetupScreen> {
   Future<String?> _showWorkspacePicker(List<Map<String, dynamic>> workspaces) {
     return showModalBottomSheet<String>(
       context: context,
-      builder: (ctx) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Padding(
-              padding: EdgeInsets.all(16),
-              child: Text('Select Workspace',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600)),
-            ),
-            const Divider(height: 1),
-            ...workspaces.map((ws) {
-              final name = ws['name'] as String? ?? '';
-              final slug = ws['slug'] as String? ?? '';
-              return ListTile(
-                leading: CircleAvatar(
-                  radius: 18,
-                  backgroundColor: Theme.of(ctx).colorScheme.primary.withValues(alpha: 0.15),
-                  child: Text(name.isNotEmpty ? name[0].toUpperCase() : '?',
-                      style: TextStyle(color: Theme.of(ctx).colorScheme.primary, fontWeight: FontWeight.w600)),
-                ),
-                title: Text(name, style: const TextStyle(fontSize: 15)),
-                subtitle: Text(slug, style: TextStyle(fontSize: 13, color: Theme.of(ctx).colorScheme.onSurfaceVariant)),
-                onTap: () => Navigator.pop(ctx, slug),
-              );
-            }),
-            const SizedBox(height: 8),
-          ],
-        ),
-      ),
+      builder: (ctx) {
+        final theme = Theme.of(ctx);
+        final scheme = theme.colorScheme;
+        return SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Padding(
+                padding: const EdgeInsets.all(16),
+                child: Text('Select Workspace', style: theme.textTheme.titleLarge),
+              ),
+              const Divider(height: 1, thickness: 0.5),
+              ...workspaces.map((ws) {
+                final name = ws['name'] as String? ?? '';
+                final slug = ws['slug'] as String? ?? '';
+                return ListTile(
+                  leading: CircleAvatar(
+                    radius: 18,
+                    backgroundColor: scheme.primary.withValues(alpha: 0.15),
+                    child: Text(name.isNotEmpty ? name[0].toUpperCase() : '?',
+                        style: theme.textTheme.titleMedium
+                            ?.copyWith(color: scheme.primary)),
+                  ),
+                  title: Text(name, style: theme.textTheme.titleMedium),
+                  subtitle: Text(slug,
+                      style: theme.textTheme.bodySmall
+                          ?.copyWith(color: scheme.onSurfaceVariant)),
+                  onTap: () => Navigator.pop(ctx, slug),
+                );
+              }),
+              const SizedBox(height: 8),
+            ],
+          ),
+        );
+      },
     );
   }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+
+    // One corner token and one border weight for every control on this screen.
+    // The URL field and the Google button used to disagree on both, which is
+    // what made the form read as two unrelated pieces of UI.
+    final controlShape = M3EShape.border(M3EShape.large);
+    final controlSide = BorderSide(color: scheme.outlineVariant, width: 0.8);
+
+    // Filled actions take the container roles, not primary/onPrimary. In the
+    // dark scheme `primary` is the pale tone meant to be drawn *on* a dark
+    // surface — using it as a fill painted a near-white slab across the screen.
+    final ButtonStyle filledStyle = FilledButton.styleFrom(
+      backgroundColor: scheme.primaryContainer,
+      foregroundColor: scheme.onPrimaryContainer,
+      padding: const EdgeInsets.symmetric(vertical: 16),
+      shape: controlShape,
+    );
+
+    final ButtonStyle outlinedStyle = OutlinedButton.styleFrom(
+      padding: const EdgeInsets.symmetric(vertical: 16),
+      side: controlSide,
+      shape: controlShape,
+    );
+
+    Widget modeSwitch(List<(String, _AuthMode)> options) => Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            for (var i = 0; i < options.length; i++) ...[
+              if (i > 0)
+                Text('  |  ',
+                    style: TextStyle(color: scheme.onSurfaceVariant)),
+              TextButton(
+                onPressed: () => setState(() {
+                  _mode = options[i].$2;
+                  _error = null;
+                }),
+                child: Text(options[i].$1),
+              ),
+            ],
+          ],
+        );
 
     return Scaffold(
       body: SafeArea(
@@ -253,24 +301,24 @@ class _SetupScreenState extends State<SetupScreen> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               const SizedBox(height: 48),
-              Icon(Icons.flight_takeoff, size: 64, color: theme.colorScheme.onSurface),
+              Icon(Icons.flight_takeoff, size: 64, color: scheme.onSurface),
               const SizedBox(height: 16),
-              const Text('Plane', textAlign: TextAlign.center,
-                  style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold)),
+              Text('Plane',
+                  textAlign: TextAlign.center,
+                  style: theme.textTheme.headlineLarge),
               const SizedBox(height: 8),
-              Text('Connect to your self-hosted instance', textAlign: TextAlign.center,
-                  style: TextStyle(fontSize: 14, color: theme.colorScheme.onSurfaceVariant)),
+              Text('Connect to your self-hosted instance',
+                  textAlign: TextAlign.center,
+                  style: theme.textTheme.bodyMedium
+                      ?.copyWith(color: scheme.onSurfaceVariant)),
               const SizedBox(height: 32),
 
               // Instance URL
-              TextField(
+              M3ETextField(
+                label: 'Instance URL',
+                hint: 'https://plane.example.com',
                 controller: _urlController,
-                decoration: const InputDecoration(
-                  labelText: 'Instance URL',
-                  hintText: 'https://plane.example.com',
-                  border: OutlineInputBorder(),
-                  prefixIcon: Icon(Icons.link),
-                ),
+                prefixIcon: Icons.link,
                 keyboardType: TextInputType.url,
               ),
               const SizedBox(height: 24),
@@ -282,134 +330,99 @@ class _SetupScreenState extends State<SetupScreen> {
                   icon: _loading
                       ? const M3ELoadingIndicator(size: 18)
                       : const Icon(Icons.g_mobiledata, size: 24),
-                  label: Text(_loading ? 'Signing in...' : 'Sign in with Google',
-                      style: const TextStyle(fontSize: 16)),
-                  style: OutlinedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(M3EShape.full)),
-                  ),
+                  label:
+                      Text(_loading ? 'Signing in...' : 'Sign in with Google'),
+                  style: outlinedStyle,
                 ),
                 const SizedBox(height: 12),
                 Row(
                   children: [
-                    Expanded(child: Divider(color: theme.colorScheme.outline)),
+                    const Expanded(child: Divider(height: 1, thickness: 0.5)),
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 16),
-                      child: Text('or', style: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 13)),
+                      child: Text('or',
+                          style: theme.textTheme.bodySmall
+                              ?.copyWith(color: scheme.onSurfaceVariant)),
                     ),
-                    Expanded(child: Divider(color: theme.colorScheme.outline)),
+                    const Expanded(child: Divider(height: 1, thickness: 0.5)),
                   ],
                 ),
                 const SizedBox(height: 12),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    TextButton(
-                      onPressed: () => setState(() { _mode = _AuthMode.emailPassword; _error = null; }),
-                      child: const Text('Email / Password'),
-                    ),
-                    Text('  |  ', style: TextStyle(color: theme.colorScheme.outline)),
-                    TextButton(
-                      onPressed: () => setState(() { _mode = _AuthMode.apiKey; _error = null; }),
-                      child: const Text('API Key'),
-                    ),
-                  ],
-                ),
+                modeSwitch(const [
+                  ('Email / Password', _AuthMode.emailPassword),
+                  ('API Key', _AuthMode.apiKey),
+                ]),
               ],
 
               // Email/Password
               if (_mode == _AuthMode.emailPassword) ...[
-                TextField(
+                M3ETextField(
+                  label: 'Email',
                   controller: _emailController,
-                  decoration: const InputDecoration(
-                    labelText: 'Email', border: OutlineInputBorder(), prefixIcon: Icon(Icons.person_outline)),
+                  prefixIcon: Icons.person_outline,
                   keyboardType: TextInputType.emailAddress,
                 ),
                 const SizedBox(height: 16),
-                TextField(
+                M3ETextField(
+                  label: 'Password',
                   controller: _passwordController,
-                  decoration: const InputDecoration(
-                    labelText: 'Password', border: OutlineInputBorder(), prefixIcon: Icon(Icons.lock_outline)),
+                  prefixIcon: Icons.lock_outline,
                   obscureText: true,
                 ),
                 const SizedBox(height: 24),
-                ElevatedButton(
+                FilledButton(
                   onPressed: _loading ? null : _signInWithEmail,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: theme.colorScheme.primary,
-                    foregroundColor: theme.colorScheme.onPrimary,
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(M3EShape.full)),
-                  ),
+                  style: filledStyle,
                   child: _loading
-                      ? const M3ELoadingIndicator(size: 20, color: Colors.white)
-                      : const Text('Sign In', style: TextStyle(fontSize: 16)),
+                      ? M3ELoadingIndicator(
+                          size: 20, color: scheme.onPrimaryContainer)
+                      : const Text('Sign In'),
                 ),
                 const SizedBox(height: 12),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    TextButton(
-                      onPressed: () => setState(() { _mode = _AuthMode.google; _error = null; }),
-                      child: const Text('Google'),
-                    ),
-                    Text('  |  ', style: TextStyle(color: theme.colorScheme.outline)),
-                    TextButton(
-                      onPressed: () => setState(() { _mode = _AuthMode.apiKey; _error = null; }),
-                      child: const Text('API Key'),
-                    ),
-                  ],
-                ),
+                modeSwitch(const [
+                  ('Google', _AuthMode.google),
+                  ('API Key', _AuthMode.apiKey),
+                ]),
               ],
 
               // API Key
               if (_mode == _AuthMode.apiKey) ...[
-                TextField(
+                M3ETextField(
+                  label: 'API Key',
+                  hint: 'plane_api_...',
                   controller: _apiKeyController,
-                  decoration: const InputDecoration(
-                    labelText: 'API Key', hintText: 'plane_api_...', border: OutlineInputBorder(), prefixIcon: Icon(Icons.key)),
+                  prefixIcon: Icons.key,
                   obscureText: true,
                 ),
                 const SizedBox(height: 16),
-                TextField(
+                M3ETextField(
+                  label: 'Workspace slug',
+                  hint: 'my-workspace',
                   controller: _workspaceController,
-                  decoration: const InputDecoration(
-                    labelText: 'Workspace slug', hintText: 'my-workspace', border: OutlineInputBorder(), prefixIcon: Icon(Icons.workspaces)),
+                  prefixIcon: Icons.workspaces,
                 ),
                 const SizedBox(height: 24),
-                ElevatedButton(
+                FilledButton(
                   onPressed: _loading ? null : _connectWithApiKey,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: theme.colorScheme.primary,
-                    foregroundColor: theme.colorScheme.onPrimary,
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(M3EShape.full)),
-                  ),
+                  style: filledStyle,
                   child: _loading
-                      ? const M3ELoadingIndicator(size: 20, color: Colors.white)
-                      : const Text('Connect', style: TextStyle(fontSize: 16)),
+                      ? M3ELoadingIndicator(
+                          size: 20, color: scheme.onPrimaryContainer)
+                      : const Text('Connect'),
                 ),
                 const SizedBox(height: 12),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    TextButton(
-                      onPressed: () => setState(() { _mode = _AuthMode.google; _error = null; }),
-                      child: const Text('Google'),
-                    ),
-                    Text('  |  ', style: TextStyle(color: theme.colorScheme.outline)),
-                    TextButton(
-                      onPressed: () => setState(() { _mode = _AuthMode.emailPassword; _error = null; }),
-                      child: const Text('Email / Password'),
-                    ),
-                  ],
-                ),
+                modeSwitch(const [
+                  ('Google', _AuthMode.google),
+                  ('Email / Password', _AuthMode.emailPassword),
+                ]),
               ],
 
               if (_error != null) ...[
                 const SizedBox(height: 16),
-                Text(_error!, textAlign: TextAlign.center,
-                    style: const TextStyle(color: Colors.red, fontSize: 13)),
+                Text(_error!,
+                    textAlign: TextAlign.center,
+                    style: theme.textTheme.bodySmall
+                        ?.copyWith(color: scheme.error)),
               ],
             ],
           ),

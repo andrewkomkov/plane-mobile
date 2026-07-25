@@ -2,6 +2,7 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import '../../config/m3e/motion.dart';
 import '../../config/m3e/shapes.dart';
+import 'icon_button.dart';
 
 /// Frosted container used by the floating bottom bars.
 ///
@@ -26,7 +27,7 @@ class M3EGlassContainer extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
-    final radius = BorderRadius.circular(height / 2);
+    final radius = BorderRadius.circular(M3EShape.full);
 
     return ClipRRect(
       borderRadius: radius,
@@ -41,10 +42,13 @@ class M3EGlassContainer extends StatelessWidget {
                 : Colors.white.withValues(alpha: 0.86),
             borderRadius: radius,
             border: Border.all(
+              // Not outlineVariant: the rim is a specular highlight on glass,
+              // so it has to be lighter than the blur behind it, not a fixed
+              // scheme colour.
               color: isDark
                   ? Colors.white.withValues(alpha: 0.11)
                   : Colors.black.withValues(alpha: 0.06),
-              width: 0.5,
+              width: 0.8,
             ),
             boxShadow: [
               BoxShadow(
@@ -95,8 +99,6 @@ class M3EFloatingToolbar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-
     return M3ESpringBuilder(
       value: visible ? 0 : 1,
       spring: M3EMotion.defaultSpatial,
@@ -112,28 +114,13 @@ class M3EFloatingToolbar extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             children: [
               for (final action in actions)
-                M3EPressable(
-                  pressedScale: 0.88,
-                  onTap: action.onPressed,
-                  semanticLabel: action.tooltip,
-                  child: Container(
-                    width: 44,
-                    height: 44,
-                    margin: const EdgeInsets.symmetric(horizontal: 2),
-                    decoration: BoxDecoration(
-                      color: action.isPrimary
-                          ? scheme.primaryContainer
-                          : Colors.transparent,
-                      borderRadius: BorderRadius.circular(M3EShape.full),
-                    ),
-                    child: Icon(
-                      action.icon,
-                      size: 20,
-                      color: action.isPrimary
-                          ? scheme.onPrimaryContainer
-                          : scheme.onSurfaceVariant,
-                    ),
-                  ),
+                M3EIconButton(
+                  icon: action.icon,
+                  tooltip: action.tooltip,
+                  onPressed: action.onPressed,
+                  style: action.isPrimary
+                      ? M3EIconButtonStyle.filled
+                      : M3EIconButtonStyle.standard,
                 ),
             ],
           ),

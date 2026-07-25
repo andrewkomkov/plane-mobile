@@ -5,8 +5,8 @@ import '../../config/m3e/shapes.dart';
 /// Material 3 Expressive filter/assist chip.
 ///
 /// Selection changes *shape* as well as colour: a selected chip pulls its
-/// corners in from full-round toward the medium step. That gives the state a
-/// second, non-colour channel, which survives both themes and colour-blind
+/// corners in from the largeIncreased step down to small. That gives the state
+/// a second, non-colour channel, which survives both themes and colour-blind
 /// users far better than a tint alone.
 class M3EChip extends StatelessWidget {
   final String label;
@@ -42,9 +42,11 @@ class M3EChip extends StatelessWidget {
         ? accent.withValues(alpha: 0.16)
         : Colors.transparent;
     final foreground = selected ? accent : scheme.onSurfaceVariant;
+    // Selected borrows the accent so the outline agrees with the fill; at rest
+    // it is the one neutral outline every bordered surface in the app uses.
     final borderColor = selected
         ? accent.withValues(alpha: 0.4)
-        : scheme.outlineVariant.withValues(alpha: 0.7);
+        : scheme.outlineVariant;
 
     return M3EPressable(
       pressedScale: 0.94,
@@ -54,7 +56,8 @@ class M3EChip extends StatelessWidget {
         value: selected ? 1 : 0,
         spring: M3EMotion.fastSpatial,
         builder: (context, t, _) {
-          final corner = 18 - (18 - M3EShape.small) * t.clamp(0.0, 1.0);
+          const rest = M3EShape.largeIncreased;
+          final corner = rest - (rest - M3EShape.small) * t.clamp(0.0, 1.0);
           return AnimatedContainer(
             duration: const Duration(milliseconds: 160),
             curve: Easing.standard,
@@ -71,7 +74,7 @@ class M3EChip extends StatelessWidget {
               mainAxisSize: MainAxisSize.min,
               children: [
                 if (icon != null) ...[
-                  Icon(icon, size: dense ? 13 : 15, color: foreground),
+                  Icon(icon, size: dense ? 14 : 16, color: foreground),
                   SizedBox(width: dense ? 5 : 6),
                 ],
                 Text(

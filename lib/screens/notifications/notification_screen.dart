@@ -311,7 +311,7 @@ class _NotificationScreenState extends ConsumerState<NotificationScreen> {
                 : theme.colorScheme.primary.withValues(alpha: 0.04),
             border: Border(
               bottom: BorderSide(
-                  color: theme.colorScheme.outline, width: 0.3),
+                  color: theme.colorScheme.outlineVariant, width: 0.5),
             ),
           ),
           child: Row(

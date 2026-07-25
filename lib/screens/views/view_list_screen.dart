@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../widgets/m3e/icon_button.dart';
+import '../../widgets/m3e/text_field.dart';
 import '../../services/view_service.dart';
 import '../../models/view.dart';
 import '../../widgets/loading_state.dart';
@@ -62,12 +64,9 @@ class _ViewListScreenState extends ConsumerState<ViewListScreen>
         final controller = TextEditingController();
         return AlertDialog(
           title: const Text('New View'),
-          content: TextField(
+          content: M3ETextField(
+            label: 'View name',
             controller: controller,
-            decoration: const InputDecoration(
-              labelText: 'View name',
-              border: OutlineInputBorder(),
-            ),
             autofocus: true,
           ),
           actions: [
@@ -158,25 +157,24 @@ class _ViewListScreenState extends ConsumerState<ViewListScreen>
                 itemCount: _views.length,
                 itemBuilder: (ctx, i) {
                   final view = _views[i];
+                  final secondary =
+                      Theme.of(ctx).colorScheme.onSurfaceVariant;
                   return ListTile(
-                    leading: Icon(Icons.view_list_outlined,
-                        color: Colors.grey[600]),
+                    leading:
+                        Icon(Icons.view_list_outlined, color: secondary),
                     title: Text(view.name),
                     subtitle: Text(
                       view.description ?? timeAgoShort(view.updatedAt),
-                      style: TextStyle(
-                          fontSize: 12, color: Colors.grey[500]),
+                      style: TextStyle(fontSize: 12, color: secondary),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
-                    trailing: IconButton(
-                      // Named per view so repeated rows stay distinguishable
-                      // to external automation.
-                      icon: Icon(Icons.delete_outline,
-                          size: 20,
-                          color: Colors.grey[500],
-                          semanticLabel: 'Delete view ${view.name}'),
-                      tooltip: 'Delete view',
+                    // Named per view so repeated rows stay distinguishable to
+                    // external automation.
+                    trailing: M3EIconButton(
+                      icon: Icons.delete_outline,
+                      tooltip: 'Delete view ${view.name}',
+                      size: M3EIconButtonSize.small,
                       onPressed: () => _deleteView(view),
                     ),
                     onTap: () async {

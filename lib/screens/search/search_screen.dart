@@ -1,13 +1,13 @@
 import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/material.dart';
-import '../../config/m3e/motion.dart';
-import '../../config/m3e/shapes.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import '../../config/theme.dart';
 import '../../services/search_service.dart';
 import '../../widgets/loading_state.dart';
+import '../../widgets/m3e/icon_button.dart';
+import '../../widgets/m3e/text_field.dart';
 import '../../widgets/section_header.dart';
 import '../../widgets/item_tile.dart';
 
@@ -118,67 +118,36 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
         _controller.text.length < 2 && _grouped.isEmpty && !_loading;
 
     return Scaffold(
-      // Search is its own surface: the field replaces the title outright and
-      // sits in a stadium container, matching the Projects tab search.
+      // Search is its own surface: the field replaces the title outright. It is
+      // the same M3ETextField the Projects tab uses, so the two are identical.
       appBar: PreferredSize(
-        preferredSize: const Size.fromHeight(64),
+        preferredSize: const Size.fromHeight(72),
         child: SafeArea(
           bottom: false,
           child: Padding(
             padding: const EdgeInsets.fromLTRB(16, 6, 16, 8),
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 14),
-              decoration: BoxDecoration(
-                color: theme.colorScheme.surfaceContainerLow,
-                borderRadius: BorderRadius.circular(M3EShape.full),
-                border: Border.all(
-                  color: theme.colorScheme.outlineVariant.withValues(alpha: 0.7),
-                  width: 0.8,
-                ),
-              ),
-              child: Row(
-                children: [
-                  Icon(Icons.search,
-                      size: 19, color: theme.colorScheme.onSurfaceVariant),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: TextField(
-                      controller: _controller,
-                      autofocus: widget.autoFocus,
-                      style: TextStyle(
-                          fontSize: 15, color: theme.colorScheme.onSurface),
-                      decoration: InputDecoration(
-                        hintText: 'Search across workspace...',
-                        hintStyle: TextStyle(
-                          fontSize: 15,
-                          color: theme.colorScheme.onSurfaceVariant,
-                        ),
-                        border: InputBorder.none,
-                        enabledBorder: InputBorder.none,
-                        focusedBorder: InputBorder.none,
-                        filled: false,
-                        contentPadding: EdgeInsets.zero,
-                        isDense: true,
-                      ),
-                      onChanged: _onChanged,
-                    ),
-                  ),
-                  if (_controller.text.isNotEmpty)
-                    M3EPressable(
-                      pressedScale: 0.86,
-                      semanticLabel: 'Clear search',
-                      onTap: () {
+            child: M3ETextField(
+              label: 'Search across workspace',
+              hint: 'Search across workspace...',
+              compact: true,
+              prefixIcon: Icons.search,
+              controller: _controller,
+              autofocus: widget.autoFocus,
+              onChanged: _onChanged,
+              suffix: _controller.text.isEmpty
+                  ? null
+                  : M3EIconButton(
+                      icon: Icons.clear,
+                      tooltip: 'Clear search',
+                      size: M3EIconButtonSize.small,
+                      onPressed: () {
                         _controller.clear();
                         setState(() {
                           _grouped = {};
                           _loading = false;
                         });
                       },
-                      child: Icon(Icons.clear,
-                          size: 19, color: theme.colorScheme.onSurfaceVariant),
                     ),
-                ],
-              ),
             ),
           ),
         ),
@@ -193,7 +162,8 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                         _controller.text.length < 2
                             ? 'Type to search'
                             : 'No results',
-                        style: TextStyle(color: Colors.grey[500]),
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                            color: theme.colorScheme.onSurfaceVariant),
                       ),
                     )
                   : _buildResults(theme),
@@ -222,19 +192,23 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                       color: theme.colorScheme.onSurfaceVariant)),
               const Spacer(),
               // Bare "Clear" collides with the field's clear button, so this
-              // one spells out what it clears.
+              // one spells out what it clears. A TextButton rather than a bare
+              // tap target: it carries the 48dp minimum on its own.
               Semantics(
                 label: 'Clear recent searches',
                 button: true,
-                child: GestureDetector(
-                  onTap: () {
+                child: TextButton(
+                  onPressed: () {
                     setState(() => _recentSearches.clear());
                     _storage.write(
                         key: _recentKey, value: jsonEncode([]));
                   },
-                  child: Text('Clear',
-                      style: TextStyle(
-                          fontSize: PlaneTheme.fontCaption, color: theme.colorScheme.primary)),
+                  style: TextButton.styleFrom(
+                    foregroundColor: theme.colorScheme.primary,
+                    minimumSize: const Size(48, 48),
+                    textStyle: theme.textTheme.labelMedium,
+                  ),
+                  child: const Text('Clear'),
                 ),
               ),
             ],

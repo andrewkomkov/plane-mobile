@@ -140,8 +140,13 @@ class _ViewDetailScreenState extends ConsumerState<ViewDetailScreen> {
                       : ListView.separated(
                           padding: const EdgeInsets.only(bottom: 20),
                           itemCount: _issues.length,
-                          separatorBuilder: (_, __) => const Divider(
-                              indent: 16, endIndent: 16, height: 0.5),
+                          separatorBuilder: (ctx, __) => Divider(
+                              indent: 16,
+                              endIndent: 16,
+                              height: 0.5,
+                              thickness: 0.5,
+                              color:
+                                  Theme.of(ctx).colorScheme.outlineVariant),
                           itemBuilder: (ctx, i) {
                             final issue = _issues[i];
                             final state = _states[issue.state];

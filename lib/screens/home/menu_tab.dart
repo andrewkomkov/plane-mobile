@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../config/m3e/shapes.dart';
 import '../../widgets/m3e/loading_indicator.dart';
 import '../../widgets/m3e/app_bar.dart';
+import '../../widgets/m3e/icon_button.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../config/secure_storage.dart';
 import '../../config/api_client.dart';
@@ -184,21 +185,17 @@ class _MenuTabState extends ConsumerState<MenuTab> {
                     ),
                   ),
                   const Spacer(),
-                  IconButton(
+                  M3EIconButton(
+                    icon: Icons.edit_square,
                     tooltip: 'New issue',
-                    icon: Icon(Icons.edit_square,
-                        size: 20, color: theme.colorScheme.onSurfaceVariant),
                     onPressed: () {},
                   ),
                 ],
               ),
             ),
-            Padding(
-              padding: const EdgeInsets.only(top: 12),
-              child: Container(
-                height: 0.5,
-                color: theme.colorScheme.outline.withValues(alpha: 0.30),
-              ),
+            const Padding(
+              padding: EdgeInsets.only(top: 12),
+              child: Divider(height: 0.5, thickness: 0.5),
             ),
             Expanded(
               child: ListView(
@@ -212,8 +209,8 @@ class _MenuTabState extends ConsumerState<MenuTab> {
                         color: theme.colorScheme.surfaceContainerLow,
                         borderRadius: BorderRadius.circular(M3EShape.large),
                         border: Border.all(
-                          color: theme.colorScheme.outline.withValues(alpha: 0.15),
-                          width: 0.5,
+                          color: theme.colorScheme.outlineVariant,
+                          width: 0.8,
                         ),
                       ),
                       child: Row(
@@ -413,28 +410,23 @@ class _MenuGroup extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
     return Container(
       decoration: BoxDecoration(
         color: theme.colorScheme.surfaceContainerLow,
         borderRadius: BorderRadius.circular(M3EShape.large),
         border: Border.all(
-          color: theme.colorScheme.outline.withValues(alpha: 0.15),
-          width: 0.5,
+          color: theme.colorScheme.outlineVariant,
+          width: 0.8,
         ),
       ),
       child: Column(
         children: [
           for (int i = 0; i < children.length; i++) ...[
             children[i],
+            // One divider treatment from the scheme, rather than a black or
+            // white wash picked per brightness.
             if (i < children.length - 1)
-              Container(
-                margin: const EdgeInsets.symmetric(horizontal: 16),
-                height: 0.5,
-                color: isDark
-                    ? Colors.white.withValues(alpha: 0.05)
-                    : Colors.black.withValues(alpha: 0.06),
-              ),
+              const Divider(height: 0.5, thickness: 0.5, indent: 16, endIndent: 16),
           ],
         ],
       ),
@@ -489,7 +481,7 @@ class _MenuRow extends StatelessWidget {
               trailing!
             else
               Icon(Icons.chevron_right,
-                  size: 18, color: theme.colorScheme.outline),
+                  size: 18, color: theme.colorScheme.onSurfaceVariant),
           ],
         ),
       ),

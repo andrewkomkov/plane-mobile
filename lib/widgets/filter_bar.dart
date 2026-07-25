@@ -83,7 +83,9 @@ class FilterBar extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return SizedBox(
-      height: 40,
+      // Chips are stretched to the bar's height by the horizontal ListView, so
+      // this is also their touch target — hence 48 rather than a tidier 40.
+      height: 48,
       child: ListView(
         scrollDirection: Axis.horizontal,
         padding: const EdgeInsets.symmetric(horizontal: 12),
@@ -263,7 +265,7 @@ class FilterBar extends StatelessWidget {
                       });
                     },
                     secondary: Icon(PlaneTheme.stateIcon(s.group),
-                        color: PlaneTheme.stateGroupColor(s.group), size: 18),
+                        color: PlaneTheme.stateGroupColor(s.group), size: PlaneTheme.iconLarge),
                     title:
                         Text(s.name, style: const TextStyle(fontSize: PlaneTheme.fontBody)),
                     controlAffinity: ListTileControlAffinity.trailing,
@@ -303,7 +305,7 @@ class FilterBar extends StatelessWidget {
                       });
                     },
                     secondary: Icon(PlaneTheme.priorityIcon(p),
-                        color: PlaneTheme.priorityColor(p), size: 18),
+                        color: PlaneTheme.priorityColor(p), size: PlaneTheme.iconLarge),
                     title: Text(p[0].toUpperCase() + p.substring(1),
                         style: const TextStyle(fontSize: PlaneTheme.fontBody)),
                     controlAffinity: ListTileControlAffinity.trailing,
@@ -436,11 +438,11 @@ class FilterBar extends StatelessWidget {
                       TextStyle(fontSize: PlaneTheme.fontBody, fontWeight: FontWeight.w500)),
             ),
             ListTile(
-              leading: const Icon(Icons.calendar_today, size: 20),
+              leading: const Icon(Icons.calendar_today, size: PlaneTheme.iconLarge),
               title: const Text('Created at',
                   style: TextStyle(fontSize: PlaneTheme.fontBody)),
               trailing: filterState.sortField == SortField.createdAt
-                  ? const Icon(Icons.check, size: 18)
+                  ? const Icon(Icons.check, size: PlaneTheme.iconLarge)
                   : null,
               onTap: () {
                 Navigator.pop(ctx);
@@ -452,11 +454,11 @@ class FilterBar extends StatelessWidget {
               },
             ),
             ListTile(
-              leading: const Icon(Icons.update, size: 20),
+              leading: const Icon(Icons.update, size: PlaneTheme.iconLarge),
               title: const Text('Updated at',
                   style: TextStyle(fontSize: PlaneTheme.fontBody)),
               trailing: filterState.sortField == SortField.updatedAt
-                  ? const Icon(Icons.check, size: 18)
+                  ? const Icon(Icons.check, size: PlaneTheme.iconLarge)
                   : null,
               onTap: () {
                 Navigator.pop(ctx);
@@ -468,11 +470,11 @@ class FilterBar extends StatelessWidget {
               },
             ),
             ListTile(
-              leading: const Icon(Icons.flag_outlined, size: 20),
+              leading: const Icon(Icons.flag_outlined, size: PlaneTheme.iconLarge),
               title: const Text('Priority',
                   style: TextStyle(fontSize: PlaneTheme.fontBody)),
               trailing: filterState.sortField == SortField.priority
-                  ? const Icon(Icons.check, size: 18)
+                  ? const Icon(Icons.check, size: PlaneTheme.iconLarge)
                   : null,
               onTap: () {
                 Navigator.pop(ctx);
@@ -503,11 +505,11 @@ class FilterBar extends StatelessWidget {
                       TextStyle(fontSize: PlaneTheme.fontBody, fontWeight: FontWeight.w500)),
             ),
             ListTile(
-              leading: const Icon(Icons.circle_outlined, size: 20),
+              leading: const Icon(Icons.circle_outlined, size: PlaneTheme.iconLarge),
               title:
                   const Text('State', style: TextStyle(fontSize: PlaneTheme.fontBody)),
               trailing: filterState.groupBy == GroupByField.state
-                  ? const Icon(Icons.check, size: 18)
+                  ? const Icon(Icons.check, size: PlaneTheme.iconLarge)
                   : null,
               onTap: () {
                 Navigator.pop(ctx);
@@ -516,11 +518,11 @@ class FilterBar extends StatelessWidget {
               },
             ),
             ListTile(
-              leading: const Icon(Icons.flag_outlined, size: 20),
+              leading: const Icon(Icons.flag_outlined, size: PlaneTheme.iconLarge),
               title:
                   const Text('Priority', style: TextStyle(fontSize: PlaneTheme.fontBody)),
               trailing: filterState.groupBy == GroupByField.priority
-                  ? const Icon(Icons.check, size: 18)
+                  ? const Icon(Icons.check, size: PlaneTheme.iconLarge)
                   : null,
               onTap: () {
                 Navigator.pop(ctx);
@@ -529,11 +531,11 @@ class FilterBar extends StatelessWidget {
               },
             ),
             ListTile(
-              leading: const Icon(Icons.person_outline, size: 20),
+              leading: const Icon(Icons.person_outline, size: PlaneTheme.iconLarge),
               title:
                   const Text('Assignee', style: TextStyle(fontSize: PlaneTheme.fontBody)),
               trailing: filterState.groupBy == GroupByField.assignee
-                  ? const Icon(Icons.check, size: 18)
+                  ? const Icon(Icons.check, size: PlaneTheme.iconLarge)
                   : null,
               onTap: () {
                 Navigator.pop(ctx);
@@ -542,11 +544,11 @@ class FilterBar extends StatelessWidget {
               },
             ),
             ListTile(
-              leading: const Icon(Icons.label_outline, size: 20),
+              leading: const Icon(Icons.label_outline, size: PlaneTheme.iconLarge),
               title:
                   const Text('Label', style: TextStyle(fontSize: PlaneTheme.fontBody)),
               trailing: filterState.groupBy == GroupByField.label
-                  ? const Icon(Icons.check, size: 18)
+                  ? const Icon(Icons.check, size: PlaneTheme.iconLarge)
                   : null,
               onTap: () {
                 Navigator.pop(ctx);

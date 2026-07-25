@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../config/m3e/shapes.dart';
 import '../../widgets/m3e/loading_indicator.dart';
 import '../../widgets/m3e/app_bar.dart';
+import '../../widgets/m3e/text_field.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../models/user.dart';
 import '../../services/auth_service.dart';
@@ -115,14 +116,17 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                     fontSize: 12,
                     color: theme.colorScheme.onSurfaceVariant)),
             const SizedBox(height: 4),
+            // Read-only, but it sits in the same form as the editable field
+            // below, so it borrows that field's outline, corner and fill rather
+            // than inventing a third box treatment.
             Container(
               padding: const EdgeInsets.symmetric(
-                  horizontal: 12, vertical: 12),
+                  horizontal: 16, vertical: 16),
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(M3EShape.large),
                 border: Border.all(
-                    color: theme.colorScheme.outline, width: 0.5),
-                color: theme.colorScheme.surface,
+                    color: theme.colorScheme.outlineVariant, width: 0.8),
+                color: theme.colorScheme.surfaceContainerLow,
               ),
               child: Text(_user!.email,
                   style: TextStyle(
@@ -132,23 +136,11 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
             const SizedBox(height: 16),
           ],
 
-          // Display name
-          Text('Display name',
-              style: TextStyle(
-                  fontSize: 12,
-                  color: theme.colorScheme.onSurfaceVariant)),
-          const SizedBox(height: 4),
-          // The field's name lives in the caption above it, not in the
-          // decoration, so the input node itself would be anonymous.
-          Semantics(
+          // The caption above is gone: M3ETextField publishes its own visible
+          // label and semantics, so a second copy would just read twice.
+          M3ETextField(
             label: 'Display name',
-            container: true,
-            child: TextField(
-              controller: _nameController,
-              decoration: const InputDecoration(
-                border: OutlineInputBorder(),
-              ),
-            ),
+            controller: _nameController,
           ),
           const SizedBox(height: 12),
           SizedBox(
@@ -156,11 +148,11 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
             child: FilledButton(
               onPressed: _saving ? null : _saveDisplayName,
               child: _saving
+                  // Box matches the indicator: at 16 it clipped an 18dp shape.
                   ? const SizedBox(
-                      width: 16,
-                      height: 16,
-                      child:
-                          M3ELoadingIndicator(size: 18))
+                      width: 18,
+                      height: 18,
+                      child: M3ELoadingIndicator(size: 18))
                   : const Text('Save'),
             ),
           ),

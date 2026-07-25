@@ -114,12 +114,7 @@ class IssueTile extends StatelessWidget {
                           if (showId && projectIdentifier != null) ...[
                             Text(
                               '$projectIdentifier-${issue.sequenceId}',
-                              style: TextStyle(
-                                fontSize: PlaneTheme.fontSmall,
-                                fontWeight: FontWeight.w500,
-                                color: theme.colorScheme.onSurfaceVariant,
-                                letterSpacing: 0.5,
-                              ),
+                              style: _identifierStyle(theme),
                             ),
                           ],
                           if (showPriority) ...[
@@ -181,7 +176,7 @@ class IssueTile extends StatelessWidget {
                     // Sub-issues count
                     if (showSubIssues && issue.subIssuesCount > 0) ...[
                       Icon(Icons.subdirectory_arrow_right,
-                          size: PlaneTheme.fontCaption, color: secondary),
+                          size: PlaneTheme.iconSmall, color: secondary),
                       const SizedBox(width: 2),
                       Text('${issue.subIssuesCount}',
                           style: TextStyle(
@@ -196,13 +191,13 @@ class IssueTile extends StatelessWidget {
                     ],
                     if (showDueDate && issue.targetDate != null && !issue.isOverdue) ...[
                       Icon(Icons.calendar_today,
-                          size: PlaneTheme.fontCaption, color: secondary),
+                          size: PlaneTheme.iconSmall, color: secondary),
                       const SizedBox(width: 8),
                     ],
                     // Project icon
                     if (showProject && issue.project != null) ...[
                       Icon(Icons.folder_outlined,
-                          size: PlaneTheme.fontCaption, color: secondary),
+                          size: PlaneTheme.iconSmall, color: secondary),
                       const SizedBox(width: 8),
                     ],
                     // Assignee avatars
@@ -279,12 +274,7 @@ class IssueTile extends StatelessWidget {
                       if (showId && projectIdentifier != null) ...[
                         Text(
                           '$projectIdentifier-${issue.sequenceId}',
-                          style: TextStyle(
-                            fontSize: PlaneTheme.fontCaption + 2,
-                            fontWeight: FontWeight.w500,
-                            fontFamily: 'monospace',
-                            color: theme.colorScheme.onSurfaceVariant,
-                          ),
+                          style: _identifierStyle(theme),
                         ),
                         const SizedBox(width: 8),
                       ],
@@ -327,17 +317,13 @@ class IssueTile extends StatelessWidget {
                       ),
                       if (timeAgo != null) ...[
                         Text(
-                          ' \u2022 ',
+                          ' \u2022 $timeAgo',
                           style: TextStyle(
                             fontSize: PlaneTheme.fontSection,
-                            color: theme.colorScheme.outline,
-                          ),
-                        ),
-                        Text(
-                          timeAgo!,
-                          style: TextStyle(
-                            fontSize: PlaneTheme.fontSection,
-                            color: theme.colorScheme.outline,
+                            // outline is the border role; the timestamp is text
+                            // that should simply sit below the subtitle.
+                            color: theme.colorScheme.onSurfaceVariant
+                                .withValues(alpha: 0.7),
                           ),
                         ),
                       ],
@@ -351,6 +337,16 @@ class IssueTile extends StatelessWidget {
       ),
     );
   }
+
+  /// One treatment for the issue identifier in both layouts — the inbox row
+  /// used to render the same string two points larger and in monospace, which
+  /// made the two lists look like different products.
+  static TextStyle _identifierStyle(ThemeData theme) => TextStyle(
+        fontSize: PlaneTheme.fontSmall,
+        fontWeight: FontWeight.w500,
+        color: theme.colorScheme.onSurfaceVariant,
+        letterSpacing: 0.5,
+      );
 
   static Color _parseColor(String hex) {
     hex = hex.replaceFirst('#', '');
@@ -366,7 +362,6 @@ class _MiniAvatar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
     if (member.avatar != null && member.avatar!.isNotEmpty) {
       return Container(
         width: 24,
@@ -374,9 +369,8 @@ class _MiniAvatar extends StatelessWidget {
         decoration: BoxDecoration(
           shape: BoxShape.circle,
           border: Border.all(
-            color: isDark
-                ? Colors.white.withValues(alpha: 0.10)
-                : Colors.black.withValues(alpha: 0.08),
+            color: theme.colorScheme.outlineVariant,
+            width: 0.8,
           ),
         ),
         child: CircleAvatar(

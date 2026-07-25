@@ -3,6 +3,7 @@ import '../../config/m3e/shapes.dart';
 import '../../config/m3e/motion.dart';
 import '../../widgets/m3e/app_bar.dart';
 import '../../widgets/m3e/loading_indicator.dart';
+import '../../widgets/m3e/text_field.dart';
 import '../../config/theme.dart';
 import '../../services/issue_service.dart';
 import '../../models/state.dart';
@@ -82,6 +83,8 @@ class _IssueCreateScreenState extends State<IssueCreateScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final hintColor = scheme.onSurfaceVariant.withValues(alpha: 0.6);
     final isSubIssue = widget.parentIssueId != null;
     final screenTitle = isSubIssue ? 'New Sub-issue' : 'New Issue';
 
@@ -126,58 +129,26 @@ class _IssueCreateScreenState extends State<IssueCreateScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Title field
-            TextField(
+            M3ETextField(
+              label: 'Issue title',
               controller: _nameController,
               autofocus: true,
-              style: const TextStyle(
-                fontSize: 24,
-                fontWeight: FontWeight.w700,
-                letterSpacing: -0.3,
-                color: PlaneTheme.onSurface,
-              ),
-              decoration: InputDecoration(
-                hintText: 'Issue title',
-                hintStyle: TextStyle(
-                  fontSize: 24,
-                  fontWeight: FontWeight.w700,
-                  color: Colors.white.withValues(alpha: 0.15),
-                ),
-                border: InputBorder.none,
-                enabledBorder: InputBorder.none,
-                focusedBorder: InputBorder.none,
-                filled: false,
-                contentPadding: EdgeInsets.zero,
-              ),
             ),
-            const SizedBox(height: 8),
-            // Description field
-            TextField(
+            const SizedBox(height: 12),
+            // Six lines of outlined box: the field always claimed this much
+            // height, it just had no border, so the space read as a gap
+            // between the title and the hint below rather than as the field.
+            M3ETextField(
+              label: 'Description',
+              hint: 'Add description...',
               controller: _descController,
               maxLines: 6,
-              style: const TextStyle(
-                fontSize: 16,
-                color: PlaneTheme.onSurfaceVariant,
-                height: 1.5,
-              ),
-              decoration: InputDecoration(
-                hintText: 'Add description...',
-                hintStyle: TextStyle(
-                  fontSize: 16,
-                  color: Colors.white.withValues(alpha: 0.15),
-                ),
-                border: InputBorder.none,
-                enabledBorder: InputBorder.none,
-                focusedBorder: InputBorder.none,
-                filled: false,
-                contentPadding: EdgeInsets.zero,
-              ),
             ),
+            const SizedBox(height: 8),
             // Markdown hint
             Row(
               children: [
-                Icon(Icons.code, size: 14,
-                    color: Colors.white.withValues(alpha: 0.25)),
+                Icon(Icons.code, size: 14, color: hintColor),
                 const SizedBox(width: 6),
                 Text(
                   'MARKDOWN SUPPORTED',
@@ -185,12 +156,12 @@ class _IssueCreateScreenState extends State<IssueCreateScreen> {
                     fontSize: PlaneTheme.fontSmall,
                     fontWeight: FontWeight.w500,
                     letterSpacing: 2.0,
-                    color: Colors.white.withValues(alpha: 0.25),
+                    color: hintColor,
                   ),
                 ),
               ],
             ),
-            const SizedBox(height: 32),
+            const SizedBox(height: 24),
             // Status & Priority row
             Row(
               children: [
@@ -200,8 +171,12 @@ class _IssueCreateScreenState extends State<IssueCreateScreen> {
                     child: Container(
                       padding: const EdgeInsets.all(16),
                       decoration: BoxDecoration(
-                        color: PlaneTheme.surfaceContainerLow,
+                        color: scheme.surfaceContainerLow,
                         borderRadius: BorderRadius.circular(M3EShape.large),
+                        // Same outline as the fields above — these are inputs
+                        // too, they just open a sheet instead of a keyboard.
+                        border: Border.all(
+                            color: scheme.outlineVariant, width: 0.8),
                       ),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -212,7 +187,7 @@ class _IssueCreateScreenState extends State<IssueCreateScreen> {
                               fontSize: PlaneTheme.fontSmall,
                               fontWeight: FontWeight.w500,
                               letterSpacing: 2.0,
-                              color: Colors.white.withValues(alpha: 0.35),
+                              color: scheme.onSurfaceVariant,
                             ),
                           ),
                           const SizedBox(height: 8),
@@ -233,16 +208,16 @@ class _IssueCreateScreenState extends State<IssueCreateScreen> {
                               Expanded(
                                 child: Text(
                                   _currentState?.name ?? 'Backlog',
-                                  style: const TextStyle(
+                                  style: TextStyle(
                                     fontSize: 14,
                                     fontWeight: FontWeight.w500,
-                                    color: PlaneTheme.onSurface,
+                                    color: scheme.onSurface,
                                   ),
                                 ),
                               ),
                               Icon(Icons.expand_more,
                                   size: 18,
-                                  color: Colors.white.withValues(alpha: 0.30)),
+                                  color: scheme.onSurfaceVariant),
                             ],
                           ),
                         ],
@@ -257,8 +232,10 @@ class _IssueCreateScreenState extends State<IssueCreateScreen> {
                     child: Container(
                       padding: const EdgeInsets.all(16),
                       decoration: BoxDecoration(
-                        color: PlaneTheme.surfaceContainerLow,
+                        color: scheme.surfaceContainerLow,
                         borderRadius: BorderRadius.circular(M3EShape.large),
+                        border: Border.all(
+                            color: scheme.outlineVariant, width: 0.8),
                       ),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -269,7 +246,7 @@ class _IssueCreateScreenState extends State<IssueCreateScreen> {
                               fontSize: PlaneTheme.fontSmall,
                               fontWeight: FontWeight.w500,
                               letterSpacing: 2.0,
-                              color: Colors.white.withValues(alpha: 0.35),
+                              color: scheme.onSurfaceVariant,
                             ),
                           ),
                           const SizedBox(height: 8),
@@ -286,16 +263,16 @@ class _IssueCreateScreenState extends State<IssueCreateScreen> {
                                 child: Text(
                                   _selectedPriority[0].toUpperCase() +
                                       _selectedPriority.substring(1),
-                                  style: const TextStyle(
+                                  style: TextStyle(
                                     fontSize: 14,
                                     fontWeight: FontWeight.w500,
-                                    color: PlaneTheme.onSurface,
+                                    color: scheme.onSurface,
                                   ),
                                 ),
                               ),
                               Icon(Icons.expand_more,
                                   size: 18,
-                                  color: Colors.white.withValues(alpha: 0.30)),
+                                  color: scheme.onSurfaceVariant),
                             ],
                           ),
                         ],

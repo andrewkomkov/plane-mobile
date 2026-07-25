@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../config/theme.dart';
 
 class BottomSheetPicker<T> extends StatelessWidget {
   final String? title;
@@ -43,13 +44,16 @@ class BottomSheetPicker<T> extends StatelessWidget {
             padding: const EdgeInsets.all(16),
             child: Text(title!,
                 style: const TextStyle(
-                    fontSize: 16, fontWeight: FontWeight.w500)),
+                    fontSize: PlaneTheme.fontBody,
+                    fontWeight: FontWeight.w500)),
           ),
         ...items.map((item) => ListTile(
               leading: item.leading,
-              title: Text(item.label, style: const TextStyle(fontSize: 14)),
-              trailing:
-                  item.value == selectedValue ? const Icon(Icons.check, size: 18) : null,
+              title: Text(item.label,
+                  style: const TextStyle(fontSize: PlaneTheme.fontBody)),
+              trailing: item.value == selectedValue
+                  ? const Icon(Icons.check, size: PlaneTheme.iconLarge)
+                  : null,
               onTap: () => onSelected(item.value),
             )),
       ],

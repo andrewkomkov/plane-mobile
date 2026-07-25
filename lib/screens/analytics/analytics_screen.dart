@@ -231,7 +231,8 @@ class _AnalyticsScreenState extends ConsumerState<AnalyticsScreen> {
                         height: 24,
                         decoration: BoxDecoration(
                           color: colorFn(entry.key),
-                          borderRadius: BorderRadius.circular(4),
+                          borderRadius:
+                              BorderRadius.circular(M3EShape.small),
                         ),
                       ),
                     );
@@ -261,7 +262,7 @@ class _AnalyticsScreenState extends ConsumerState<AnalyticsScreen> {
         padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 9),
         decoration: BoxDecoration(
           border: Border.all(
-              color: theme.colorScheme.outline, width: 0.5),
+              color: theme.colorScheme.outlineVariant, width: 0.8),
           borderRadius: BorderRadius.circular(M3EShape.large),
         ),
         child: Row(
@@ -326,7 +327,7 @@ class _StatCard extends StatelessWidget {
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(M3EShape.large),
         border: Border.all(
-            color: theme.colorScheme.outline, width: 0.5),
+            color: theme.colorScheme.outlineVariant, width: 0.8),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,

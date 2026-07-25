@@ -107,10 +107,11 @@ class _KanbanBoardScreenState extends State<KanbanBoardScreen> {
                 decoration: isTarget
                     ? BoxDecoration(
                         borderRadius: BorderRadius.circular(M3EShape.large),
+                        // Drop targets read through the tint, not through a
+                        // thicker outline — one border width across the board.
                         border: Border.all(
-                          color: theme.colorScheme.primary
-                              .withValues(alpha: 0.5),
-                          width: 2,
+                          color: theme.colorScheme.primary,
+                          width: 0.8,
                         ),
                         color: theme.colorScheme.primary
                             .withValues(alpha: 0.05),
@@ -281,8 +282,8 @@ class _KanbanCardContent extends StatelessWidget {
         border: Border.all(
           color: isDragging
               ? theme.colorScheme.primary
-              : theme.colorScheme.outline,
-          width: isDragging ? 1.5 : 0.5,
+              : theme.colorScheme.outlineVariant,
+          width: 0.8,
         ),
         boxShadow: isDragging
             ? [

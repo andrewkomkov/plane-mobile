@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
+import '../../config/m3e/shapes.dart';
 import '../../widgets/m3e/app_bar.dart';
+import '../../widgets/m3e/icon_button.dart';
+import '../../widgets/m3e/text_field.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../config/theme.dart';
 import '../../services/cycle_service.dart';
@@ -226,20 +229,14 @@ class _CycleDetailScreenState extends ConsumerState<CycleDetailScreen> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              TextField(
+              M3ETextField(
+                label: 'Name',
                 controller: nameController,
-                decoration: const InputDecoration(
-                  labelText: 'Name',
-                  border: OutlineInputBorder(),
-                ),
               ),
               const SizedBox(height: 12),
-              TextField(
+              M3ETextField(
+                label: 'Description',
                 controller: descController,
-                decoration: const InputDecoration(
-                  labelText: 'Description',
-                  border: OutlineInputBorder(),
-                ),
                 maxLines: 2,
               ),
             ],
@@ -395,13 +392,13 @@ class _CycleDetailScreenState extends ConsumerState<CycleDetailScreen> {
                               children: [
                                 Expanded(
                                   child: ClipRRect(
-                                    borderRadius: BorderRadius.circular(2),
+                                    borderRadius:
+                                        BorderRadius.circular(M3EShape.full),
                                     child: LinearProgressIndicator(
                                       value: cycle.progress,
                                       minHeight: 6,
-                                      backgroundColor: theme
-                                          .colorScheme.outline
-                                          .withValues(alpha: 0.3),
+                                      backgroundColor:
+                                          theme.colorScheme.outlineVariant,
                                       valueColor:
                                           AlwaysStoppedAnimation<Color>(
                                               statusColor),
@@ -419,10 +416,15 @@ class _CycleDetailScreenState extends ConsumerState<CycleDetailScreen> {
                           ],
                         ),
                       ),
-                      const Divider(height: 1),
-                      // Issues header
+                      Divider(
+                          height: 0.5,
+                          thickness: 0.5,
+                          color: theme.colorScheme.outlineVariant),
+                      // Issues header. The trailing add button carries its own
+                      // 48dp target, so the row's vertical padding is trimmed
+                      // to keep the header the same optical height as before.
                       Padding(
-                        padding: const EdgeInsets.fromLTRB(20, 16, 20, 6),
+                        padding: const EdgeInsets.fromLTRB(20, 4, 12, 0),
                         child: Row(
                           children: [
                             Text('Issues',
@@ -435,18 +437,11 @@ class _CycleDetailScreenState extends ConsumerState<CycleDetailScreen> {
                                 style: TextStyle(
                                     fontSize: PlaneTheme.fontCaption, color: secondary)),
                             const Spacer(),
-                            // Icon-only control: without an explicit label it
-                            // reaches the accessibility tree — and therefore
-                            // `uiautomator dump` — as an unnamed node.
-                            Semantics(
-                              label: 'Add issues to cycle',
-                              button: true,
-                              container: true,
-                              child: GestureDetector(
-                                onTap: _showAddIssuesSheet,
-                                child: Icon(Icons.add,
-                                    size: PlaneTheme.iconLarge, color: secondary),
-                              ),
+                            M3EIconButton(
+                              icon: Icons.add,
+                              tooltip: 'Add issues to cycle',
+                              size: M3EIconButtonSize.small,
+                              onPressed: _showAddIssuesSheet,
                             ),
                           ],
                         ),

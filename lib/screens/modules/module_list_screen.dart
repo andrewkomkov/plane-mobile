@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../config/m3e/motion.dart';
+import '../../config/m3e/shapes.dart';
+import '../../widgets/m3e/text_field.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../config/theme.dart';
 import '../../services/module_service.dart';
@@ -97,32 +99,21 @@ class _ModuleListScreenState extends ConsumerState<ModuleListScreen>
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                TextField(
+                M3ETextField(
+                  label: 'Name',
                   controller: nameController,
-                  decoration: const InputDecoration(
-                    labelText: 'Name',
-                    border: OutlineInputBorder(),
-                  ),
                   autofocus: true,
                 ),
                 const SizedBox(height: 12),
-                TextField(
+                M3ETextField(
+                  label: 'Description',
                   controller: descController,
-                  decoration: const InputDecoration(
-                    labelText: 'Description',
-                    border: OutlineInputBorder(),
-                  ),
                   maxLines: 2,
                 ),
                 const SizedBox(height: 12),
                 DropdownButtonFormField<String>(
                   initialValue: selectedStatus,
-                  decoration: const InputDecoration(
-                    labelText: 'Status',
-                    border: OutlineInputBorder(),
-                    contentPadding:
-                        EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                  ),
+                  decoration: moduleStatusFieldDecoration(ctx),
                   items: [
                     'backlog',
                     'planned',
@@ -282,12 +273,11 @@ class _ModuleCard extends StatelessWidget {
             ),
             const SizedBox(height: 6),
             ClipRRect(
-              borderRadius: BorderRadius.circular(2),
+              borderRadius: BorderRadius.circular(M3EShape.full),
               child: LinearProgressIndicator(
                 value: module.progress,
                 minHeight: 4,
-                backgroundColor:
-                    theme.colorScheme.outline.withValues(alpha: 0.3),
+                backgroundColor: theme.colorScheme.outlineVariant,
                 valueColor: AlwaysStoppedAnimation<Color>(statusColor),
               ),
             ),
