@@ -219,7 +219,10 @@ class _DraggableKanbanCard extends StatelessWidget {
     return LongPressDraggable<_DragData>(
       data: _DragData(issue: issue),
       feedback: Material(
-        elevation: 8,
+        // The card under this carries the lift tonally; this only needs to be
+        // a surface for the dragged copy to live on.
+        elevation: 0,
+        color: Colors.transparent,
         borderRadius: BorderRadius.circular(M3EShape.large),
         child: SizedBox(
           width: 260,
@@ -272,7 +275,14 @@ class _KanbanCardContent extends StatelessWidget {
       margin: const EdgeInsets.symmetric(horizontal: 4, vertical: 3),
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: theme.cardTheme.color ?? theme.colorScheme.surface,
+        // A card being dragged is lifted, and M3 says so with a tonal step
+        // rather than a shadow. It used to say it twice with a shadow: the
+        // Material wrapping this already carries elevation, and this added a
+        // second black one under it — in an app whose theme sets elevation 0
+        // on every other surface it defines.
+        color: isDragging
+            ? theme.colorScheme.surfaceContainerHighest
+            : theme.cardTheme.color ?? theme.colorScheme.surface,
         borderRadius: BorderRadius.circular(M3EShape.large),
         border: Border.all(
           color: isDragging
@@ -280,15 +290,6 @@ class _KanbanCardContent extends StatelessWidget {
               : theme.colorScheme.outlineVariant,
           width: 0.8,
         ),
-        boxShadow: isDragging
-            ? [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.15),
-                  blurRadius: 12,
-                  offset: const Offset(0, 4),
-                )
-              ]
-            : null,
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
