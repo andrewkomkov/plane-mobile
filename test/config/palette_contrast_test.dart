@@ -94,6 +94,31 @@ void main() {
           isNot(PlaneTheme.stateIcon('unstarted')));
     });
 
+    for (final entry in {
+      'light': PlaneTheme.light(),
+      'dark': PlaneTheme.dark(),
+    }.entries) {
+      testWidgets('${entry.key} pending amber reads on its surface and fill',
+          (tester) async {
+        final theme = entry.value;
+        final context = await _contextFor(tester, theme);
+        final pending = PlaneTheme.pendingColor(context);
+
+        final onSurface = _contrast(pending, theme.colorScheme.surface);
+        expect(onSurface, greaterThanOrEqualTo(minimum),
+            reason: 'the sync icon on ${entry.key} surface measures '
+                '${onSurface.toStringAsFixed(2)}:1');
+
+        // The badge draws its count on top of the amber, so the pair has to
+        // hold up on its own — and which side of the range the amber sits on
+        // flips between themes.
+        final onFill = _contrast(PlaneTheme.onPendingColor(context), pending);
+        expect(onFill, greaterThanOrEqualTo(4.5),
+            reason: 'the badge count on ${entry.key} amber measures '
+                '${onFill.toStringAsFixed(2)}:1');
+      });
+    }
+
     testWidgets('every state group has its own glyph', (tester) async {
       final icons = groups.map(PlaneTheme.stateIcon).toSet();
       expect(icons.length, groups.length,

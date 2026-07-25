@@ -102,8 +102,22 @@ class PlaneTheme {
   static const _startedLight = Color(0xFFB45309);
   static const _completedLight = Color(0xFF15803D);
 
+  // Unsynced work waiting to upload. Material has no warning role, and the
+  // sync affordances were reaching for a raw amber that measures 2.02:1 on a
+  // light surface — the same hex, and the same failure, as `started` had.
+  static const _pending = Color(0xFFF59E0B);
+  static const _pendingLight = Color(0xFFB45309);
+
   static bool _isLight(BuildContext context) =>
       Theme.of(context).brightness == Brightness.light;
+
+  static Color pendingColor(BuildContext context) =>
+      _isLight(context) ? _pendingLight : _pending;
+
+  /// Pairs with [pendingColor] as a fill. The two ambers sit on opposite sides
+  /// of the range, so what reads on one is invisible on the other.
+  static Color onPendingColor(BuildContext context) =>
+      _isLight(context) ? Colors.white : Colors.black;
 
   static Color priorityColor(BuildContext context, String priority) {
     final light = _isLight(context);

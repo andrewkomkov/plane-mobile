@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../config/m3e/motion.dart';
 import '../config/m3e/shapes.dart';
 import '../config/m3e/typography.dart';
+import '../config/theme.dart';
 import 'm3e/toolbar.dart';
 
 class NavItem {
@@ -378,11 +379,11 @@ class _PendingBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    const amber = Color(0xFFF59E0B);
+    final amber = PlaneTheme.pendingColor(context);
     return Stack(
       clipBehavior: Clip.none,
       children: [
-        const Icon(Icons.cloud_upload_outlined, size: 20, color: amber),
+        Icon(Icons.cloud_upload_outlined, size: 20, color: amber),
         Positioned(
           right: -8,
           top: -6,
@@ -398,7 +399,7 @@ class _PendingBadge extends StatelessWidget {
               // dominate" case the emphasized cut exists for.
               style: M3EType.emphasized(
                 Theme.of(context).textTheme.labelSmall!,
-              ).copyWith(color: Colors.black),
+              ).copyWith(color: PlaneTheme.onPendingColor(context)),
             ),
           ),
         ),

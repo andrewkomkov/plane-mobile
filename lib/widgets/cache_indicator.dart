@@ -24,7 +24,7 @@ class CacheIndicator extends StatelessWidget {
       decoration: BoxDecoration(
         color: isRefreshing
             ? theme.colorScheme.primary.withValues(alpha: 0.1)
-            : Colors.amber.withValues(alpha: 0.15),
+            : PlaneTheme.pendingColor(context).withValues(alpha: 0.15),
         borderRadius: BorderRadius.circular(M3EShape.extraSmall),
       ),
       child: Row(
@@ -41,11 +41,11 @@ class CacheIndicator extends StatelessWidget {
                     ?.copyWith(color: theme.colorScheme.primary)),
           ] else ...[
             Icon(Icons.cloud_off,
-                size: PlaneTheme.iconSmall, color: Colors.amber[700]),
+                size: PlaneTheme.iconSmall, color: PlaneTheme.pendingColor(context)),
             const SizedBox(width: 6),
             Text('Cached data',
                 style:
-                    theme.textTheme.labelSmall?.copyWith(color: Colors.amber[700])),
+                    theme.textTheme.labelSmall?.copyWith(color: PlaneTheme.pendingColor(context))),
           ],
         ],
       ),
