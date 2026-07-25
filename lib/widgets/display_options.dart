@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../config/m3e/shapes.dart';
 import '../config/theme.dart';
 import '../utils/issue_grouping.dart';
 import 'filter_bar.dart';
@@ -131,12 +132,17 @@ Future<void> showDisplayOptions(BuildContext context, DisplayState ds, VoidCallb
                       const Text('Show sub-issues',
                           style: TextStyle(fontSize: PlaneTheme.fontBody)),
                       const Spacer(),
-                      Switch(
-                        value: ds.showSubIssues,
-                        onChanged: (v) {
-                          setSheetState(() => ds.showSubIssues = v);
-                          onChanged();
-                        },
+                      // The switch sits in a Row next to its caption, so it
+                      // would otherwise be an unnamed node for automation.
+                      Semantics(
+                        label: 'Show sub-issues',
+                        child: Switch(
+                          value: ds.showSubIssues,
+                          onChanged: (v) {
+                            setSheetState(() => ds.showSubIssues = v);
+                            onChanged();
+                          },
+                        ),
                       ),
                     ],
                   ),
@@ -161,15 +167,19 @@ Future<void> showDisplayOptions(BuildContext context, DisplayState ds, VoidCallb
                           style: TextStyle(
                               fontSize: PlaneTheme.fontSection, color: secondary)),
                       const Spacer(),
-                      GestureDetector(
-                        onTap: () {
-                          setSheetState(
-                              () => ds.rowProperties = {'status', 'priority', 'id'});
-                          onChanged();
-                        },
-                        child: Text('Reset',
-                            style: TextStyle(
-                                fontSize: PlaneTheme.fontSection, color: secondary)),
+                      Semantics(
+                        label: 'Reset row properties',
+                        button: true,
+                        child: GestureDetector(
+                          onTap: () {
+                            setSheetState(
+                                () => ds.rowProperties = {'status', 'priority', 'id'});
+                            onChanged();
+                          },
+                          child: Text('Reset',
+                              style: TextStyle(
+                                  fontSize: PlaneTheme.fontSection, color: secondary)),
+                        ),
                       ),
                     ],
                   ),
@@ -232,34 +242,40 @@ class _PropChip extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
-        decoration: BoxDecoration(
-          color: selected
-              ? (isDark
-                  ? Colors.white.withValues(alpha: 0.15)
-                  : Colors.black.withValues(alpha: 0.08))
-              : Colors.transparent,
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(
+    // The chip's own Text is its label; only the on/off state needs exposing,
+    // because it is otherwise carried by colour alone.
+    return Semantics(
+      button: true,
+      selected: selected,
+      child: GestureDetector(
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+          decoration: BoxDecoration(
             color: selected
                 ? (isDark
-                    ? Colors.white.withValues(alpha: 0.2)
-                    : Colors.black.withValues(alpha: 0.15))
-                : (isDark
-                    ? Colors.white.withValues(alpha: 0.08)
-                    : Colors.black.withValues(alpha: 0.08)),
+                    ? Colors.white.withValues(alpha: 0.15)
+                    : Colors.black.withValues(alpha: 0.08))
+                : Colors.transparent,
+            borderRadius: BorderRadius.circular(M3EShape.full),
+            border: Border.all(
+              color: selected
+                  ? (isDark
+                      ? Colors.white.withValues(alpha: 0.2)
+                      : Colors.black.withValues(alpha: 0.15))
+                  : (isDark
+                      ? Colors.white.withValues(alpha: 0.08)
+                      : Colors.black.withValues(alpha: 0.08)),
+            ),
           ),
+          child: Text(label,
+              style: TextStyle(
+                  fontSize: PlaneTheme.fontSection,
+                  fontWeight: selected ? FontWeight.w500 : FontWeight.w400,
+                  color: selected
+                      ? theme.colorScheme.onSurface
+                      : theme.colorScheme.onSurfaceVariant)),
         ),
-        child: Text(label,
-            style: TextStyle(
-                fontSize: PlaneTheme.fontSection,
-                fontWeight: selected ? FontWeight.w500 : FontWeight.w400,
-                color: selected
-                    ? theme.colorScheme.onSurface
-                    : theme.colorScheme.onSurfaceVariant)),
       ),
     );
   }

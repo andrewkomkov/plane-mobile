@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import '../../config/m3e/shapes.dart';
+import '../../widgets/m3e/app_bar.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../config/theme.dart';
 import '../../services/project_service.dart';
@@ -118,7 +120,7 @@ class _AnalyticsScreenState extends ConsumerState<AnalyticsScreen> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return Scaffold(
-      appBar: AppBar(title: const Text('Analytics')),
+      appBar: const M3EAppBar(title: 'Analytics'),
       body: _loading
           ? const LoadingStateWidget()
           : _error != null
@@ -260,7 +262,7 @@ class _AnalyticsScreenState extends ConsumerState<AnalyticsScreen> {
         decoration: BoxDecoration(
           border: Border.all(
               color: theme.colorScheme.outline, width: 0.5),
-          borderRadius: BorderRadius.circular(8),
+          borderRadius: BorderRadius.circular(M3EShape.large),
         ),
         child: Row(
           children: [
@@ -322,7 +324,7 @@ class _StatCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(M3EShape.large),
         border: Border.all(
             color: theme.colorScheme.outline, width: 0.5),
       ),

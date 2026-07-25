@@ -112,53 +112,67 @@ class SpreadsheetView extends StatelessWidget {
                       // State
                       _DataCell(
                         width: 120,
-                        child: InkWell(
-                          onTap: () => _showStatePicker(context, issue),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(
-                                PlaneTheme.stateIcon(
-                                    state?.group ?? 'backlog'),
-                                size: 14,
-                                color: PlaneTheme.stateGroupColor(
-                                    state?.group ?? 'backlog'),
-                              ),
-                              const SizedBox(width: 4),
-                              Flexible(
-                                child: Text(
-                                  state?.name ?? 'Unknown',
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: const TextStyle(fontSize: 12),
+                        // The cell text is just the state name, which repeats
+                        // in every row; the label pins it to one issue.
+                        child: Semantics(
+                          label: 'Change state of '
+                              '$projectIdentifier-${issue.sequenceId}',
+                          button: true,
+                          container: true,
+                          child: InkWell(
+                            onTap: () => _showStatePicker(context, issue),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  PlaneTheme.stateIcon(
+                                      state?.group ?? 'backlog'),
+                                  size: 14,
+                                  color: PlaneTheme.stateGroupColor(
+                                      state?.group ?? 'backlog'),
                                 ),
-                              ),
-                            ],
+                                const SizedBox(width: 4),
+                                Flexible(
+                                  child: Text(
+                                    state?.name ?? 'Unknown',
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: const TextStyle(fontSize: 12),
+                                  ),
+                                ),
+                              ],
+                            ),
                           ),
                         ),
                       ),
                       // Priority
                       _DataCell(
                         width: 100,
-                        child: InkWell(
-                          onTap: () =>
-                              _showPriorityPicker(context, issue),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(
-                                PlaneTheme.priorityIcon(issue.priority),
-                                size: 14,
-                                color: PlaneTheme.priorityColor(
-                                    issue.priority),
-                              ),
-                              const SizedBox(width: 4),
-                              Text(
-                                issue.priority[0].toUpperCase() +
-                                    issue.priority.substring(1),
-                                style: const TextStyle(fontSize: 12),
-                              ),
-                            ],
+                        child: Semantics(
+                          label: 'Change priority of '
+                              '$projectIdentifier-${issue.sequenceId}',
+                          button: true,
+                          container: true,
+                          child: InkWell(
+                            onTap: () =>
+                                _showPriorityPicker(context, issue),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  PlaneTheme.priorityIcon(issue.priority),
+                                  size: 14,
+                                  color: PlaneTheme.priorityColor(
+                                      issue.priority),
+                                ),
+                                const SizedBox(width: 4),
+                                Text(
+                                  issue.priority[0].toUpperCase() +
+                                      issue.priority.substring(1),
+                                  style: const TextStyle(fontSize: 12),
+                                ),
+                              ],
+                            ),
                           ),
                         ),
                       ),

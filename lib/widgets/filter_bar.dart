@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'm3e/chip.dart';
 import '../models/state.dart';
 import '../models/label.dart';
 import '../models/member.dart';
@@ -122,6 +123,7 @@ class FilterBar extends StatelessWidget {
           _buildActionChip(
             context: context,
             label: _sortLabel,
+            action: 'Change sort order',
             icon: filterState.sortAscending
                 ? Icons.arrow_upward
                 : Icons.arrow_downward,
@@ -131,41 +133,30 @@ class FilterBar extends StatelessWidget {
           _buildActionChip(
             context: context,
             label: _groupByLabel,
+            action: 'Change grouping',
             icon: Icons.view_agenda_outlined,
             onTap: () => _showGroupByOptions(context),
           ),
           if (filterState.hasActiveFilters) ...[
             const SizedBox(width: 6),
             if (onSaveAsView != null)
-              GestureDetector(
+              M3EChip(
+                label: 'Save as view',
+                icon: Icons.save_outlined,
+                dense: true,
+                selected: true,
                 onTap: onSaveAsView,
-                child: Chip(
-                  avatar: Icon(Icons.save_outlined,
-                      size: 14, color: theme.colorScheme.primary),
-                  label: Text('Save as view',
-                      style: TextStyle(
-                          fontSize: PlaneTheme.fontCaption, color: theme.colorScheme.primary)),
-                  visualDensity: VisualDensity.compact,
-                  materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                  padding: EdgeInsets.zero,
-                  side: BorderSide(
-                      color: theme.colorScheme.primary.withValues(alpha: 0.3),
-                      width: 0.5),
-                ),
               ),
             const SizedBox(width: 6),
-            GestureDetector(
-              onTap: () => onFilterChanged(const FilterState()),
-              child: Chip(
-                label: Text('Clear',
-                    style: TextStyle(
-                        fontSize: PlaneTheme.fontCaption, color: theme.colorScheme.error)),
-                visualDensity: VisualDensity.compact,
-                materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                padding: EdgeInsets.zero,
-                side: BorderSide(
-                    color: theme.colorScheme.error.withValues(alpha: 0.3),
-                    width: 0.5),
+            Semantics(
+              label: 'Clear all filters',
+              button: true,
+              child: M3EChip(
+                label: 'Clear',
+                dense: true,
+                selected: true,
+                accentColor: theme.colorScheme.error,
+                onTap: () => onFilterChanged(const FilterState()),
               ),
             ),
           ],
@@ -181,37 +172,22 @@ class FilterBar extends StatelessWidget {
     required int activeCount,
     required VoidCallback onTap,
   }) {
-    final theme = Theme.of(context);
-    final isActive = activeCount > 0;
-    return GestureDetector(
-      onTap: onTap,
-      child: Chip(
-        avatar: Icon(icon,
-            size: 14,
-            color: isActive
-                ? theme.colorScheme.primary
-                : theme.colorScheme.onSurfaceVariant),
-        label: Text(
-          isActive ? '$label ($activeCount)' : label,
-          style: TextStyle(
-            fontSize: PlaneTheme.fontCaption,
-            color: isActive
-                ? theme.colorScheme.primary
-                : theme.colorScheme.onSurfaceVariant,
-          ),
-        ),
-        visualDensity: VisualDensity.compact,
-        materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-        padding: EdgeInsets.zero,
-        backgroundColor: isActive
-            ? theme.colorScheme.primary.withValues(alpha: 0.08)
-            : null,
-        side: BorderSide(
-          color: isActive
-              ? theme.colorScheme.primary.withValues(alpha: 0.3)
-              : theme.colorScheme.outline,
-          width: 0.5,
-        ),
+    // The active count rides in the chip's badge rather than in the label, so
+    // the label stays a stable width as filters are added and removed.
+    // The visible text is just the dimension ("State"), which does not say what
+    // tapping does, and the active/inactive state is carried by colour alone —
+    // both are spelled out here for screen readers and uiautomator.
+    return Semantics(
+      label: 'Filter by $label',
+      button: true,
+      selected: activeCount > 0,
+      child: M3EChip(
+        label: label,
+        icon: icon,
+        dense: true,
+        selected: activeCount > 0,
+        count: activeCount,
+        onTap: onTap,
       ),
     );
   }
@@ -219,21 +195,20 @@ class FilterBar extends StatelessWidget {
   Widget _buildActionChip({
     required BuildContext context,
     required String label,
+    required String action,
     required IconData icon,
     required VoidCallback onTap,
   }) {
-    final theme = Theme.of(context);
-    return GestureDetector(
-      onTap: onTap,
-      child: Chip(
-        avatar: Icon(icon, size: 14,
-            color: theme.colorScheme.onSurfaceVariant),
-        label: Text(label,
-            style: TextStyle(
-                fontSize: PlaneTheme.fontCaption, color: theme.colorScheme.onSurfaceVariant)),
-        visualDensity: VisualDensity.compact,
-        materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-        padding: EdgeInsets.zero,
+    // The chip shows the *current* value ("Created"), so the action it performs
+    // has to be named separately.
+    return Semantics(
+      label: action,
+      button: true,
+      child: M3EChip(
+        label: label,
+        icon: icon,
+        dense: true,
+        onTap: onTap,
       ),
     );
   }

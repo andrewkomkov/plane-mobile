@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
+import '../../widgets/m3e/app_bar.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../config/theme.dart';
 import '../../models/project.dart';
 import '../../providers/data_providers.dart';
 import '../../widgets/app_navbar.dart';
@@ -66,38 +66,16 @@ class _ProjectScreenState extends ConsumerState<ProjectScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        backgroundColor: PlaneTheme.background.withValues(alpha: 0.80),
-        leading: IconButton(
-          icon: Icon(Icons.arrow_back, size: 22, color: PlaneTheme.primaryContainer),
-          onPressed: () => Navigator.pop(context),
-        ),
-        title: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              widget.project.name,
-              style: const TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.w700,
-                letterSpacing: -0.5,
-                color: PlaneTheme.onSurface,
-              ),
-            ),
-            Text(
-              widget.project.identifier,
-              style: TextStyle(
-                fontSize: 10,
-                fontWeight: FontWeight.w700,
-                letterSpacing: 2.0,
-                color: Colors.white.withValues(alpha: 0.40),
-              ),
-            ),
-          ],
-        ),
+      appBar: M3EAppBar(
+        title: widget.project.name,
+        subtitle: widget.project.identifier,
         actions: [
-          IconButton(
-            icon: Icon(Icons.edit_square, size: 20, color: PlaneTheme.primaryContainer),
+          // The one primary action on this screen, so it takes the emphasized
+          // tonal treatment rather than being another grey glyph.
+          M3EAppBarAction(
+            icon: Icons.edit_square,
+            tooltip: 'New issue',
+            emphasized: true,
             onPressed: _createIssue,
           ),
         ],

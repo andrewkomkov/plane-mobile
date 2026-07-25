@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'widgets/m3e/loading_indicator.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'config/secure_storage.dart';
@@ -57,7 +58,7 @@ class _PlaneAppState extends ConsumerState<PlaneApp> {
       darkTheme: PlaneTheme.dark(),
       themeMode: themeMode,
       home: _checking
-          ? const Scaffold(body: Center(child: CircularProgressIndicator()))
+          ? const Scaffold(body: Center(child: M3ELoadingIndicator(size: 44)))
           : _configured
               ? HomeScreen(onLogout: () => setState(() => _configured = false))
               : SetupScreen(

@@ -1,5 +1,7 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
+import '../../config/m3e/shapes.dart';
+import '../../widgets/m3e/app_bar.dart';
 import 'package:flutter/services.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
@@ -234,13 +236,13 @@ class _IssueDetailScreenState extends ConsumerState<IssueDetailScreen> {
   Widget build(BuildContext context) {
     if (_loading) {
       return Scaffold(
-        appBar: AppBar(),
+        appBar: const M3EAppBar(title: 'Issue'),
         body: const IssueDetailSkeleton(),
       );
     }
     if (_error != null || _issue == null) {
       return Scaffold(
-        appBar: AppBar(),
+        appBar: const M3EAppBar(title: 'Issue'),
         body: ErrorStateWidget(
           message: 'Failed to load issue',
           onRetry: _load,
@@ -262,30 +264,20 @@ class _IssueDetailScreenState extends ConsumerState<IssueDetailScreen> {
     final activityItems = _buildActivityItems();
 
     return Scaffold(
-      appBar: AppBar(
-        backgroundColor: PlaneTheme.background.withValues(alpha: 0.80),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, size: 22, color: PlaneTheme.onSurface),
-          onPressed: () => Navigator.pop(context),
-        ),
-        title: Text(
-          'Plane',
-          style: TextStyle(
-            fontSize: 22,
-            fontWeight: FontWeight.w700,
-            letterSpacing: -0.3,
-            color: PlaneTheme.primaryContainer,
-          ),
-        ),
+      // The bar used to read "Plane", which told the user nothing they did
+      // not already know. The issue's own identifier is the useful thing here.
+      appBar: M3EAppBar(
+        title: widget.projectIdentifier.isNotEmpty
+            ? '${widget.projectIdentifier}-${issue.sequenceId}'
+            : 'Issue',
         actions: [
-          IconButton(
-              icon: Icon(Icons.edit_square, size: 20, color: PlaneTheme.primaryContainer),
-              onPressed: () {}),
-          IconButton(
-              icon: Icon(Icons.share_outlined, size: 20, color: PlaneTheme.onSurfaceVariant),
+          M3EAppBarAction(
+              icon: Icons.share_outlined,
+              tooltip: 'Share',
               onPressed: () => _shareIssue(issue)),
-          IconButton(
-              icon: Icon(Icons.more_horiz, size: 20, color: PlaneTheme.onSurfaceVariant),
+          M3EAppBarAction(
+              icon: Icons.more_horiz,
+              tooltip: 'More',
               onPressed: () => _showMoreMenu()),
         ],
       ),
@@ -369,23 +361,35 @@ class _IssueDetailScreenState extends ConsumerState<IssueDetailScreen> {
                               label: l,
                               onTap: () => _showLabelPicker(),
                             )),
-                        // Add label chip
-                        PropertyChip(
-                          icon: Icons.label_outline,
-                          iconColor: secondary,
-                          label: issueLabels.isEmpty
-                              ? 'Label'
-                              : '+',
-                          onTap: () => _showLabelPicker(),
+                        // Add label chip. Once labels exist the chip reads
+                        // "+", and a count is no name at all, so both this and
+                        // the assignee chip carry an explicit label.
+                        Semantics(
+                          label: 'Edit labels',
+                          button: true,
+                          container: true,
+                          child: PropertyChip(
+                            icon: Icons.label_outline,
+                            iconColor: secondary,
+                            label: issueLabels.isEmpty
+                                ? 'Label'
+                                : '+',
+                            onTap: () => _showLabelPicker(),
+                          ),
                         ),
                         // Assignee chip
-                        PropertyChip(
-                          icon: Icons.person_outline,
-                          iconColor: secondary,
-                          label: issueMembers.isEmpty
-                              ? 'Assignee'
-                              : '${issueMembers.length}',
-                          onTap: () => _showAssigneePicker(),
+                        Semantics(
+                          label: 'Edit assignees',
+                          button: true,
+                          container: true,
+                          child: PropertyChip(
+                            icon: Icons.person_outline,
+                            iconColor: secondary,
+                            label: issueMembers.isEmpty
+                                ? 'Assignee'
+                                : '${issueMembers.length}',
+                            onTap: () => _showAssigneePicker(),
+                          ),
                         ),
                         // Start date chip
                         PropertyChip(
@@ -491,7 +495,7 @@ class _IssueDetailScreenState extends ConsumerState<IssueDetailScreen> {
                           codeblockDecoration: BoxDecoration(
                             color: theme
                                 .colorScheme.surfaceContainerHighest,
-                            borderRadius: BorderRadius.circular(8),
+                            borderRadius: BorderRadius.circular(M3EShape.large),
                           ),
                           blockquoteDecoration: BoxDecoration(
                             border: Border(
@@ -567,7 +571,7 @@ class _IssueDetailScreenState extends ConsumerState<IssueDetailScreen> {
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
                 decoration: BoxDecoration(
                   color: PlaneTheme.surfaceContainer,
-                  borderRadius: BorderRadius.circular(24),
+                  borderRadius: BorderRadius.circular(M3EShape.full),
                   border: Border.all(
                     color: Colors.white.withValues(alpha: 0.05),
                   ),
@@ -603,22 +607,28 @@ class _IssueDetailScreenState extends ConsumerState<IssueDetailScreen> {
                     ),
                     IconButton(
                       onPressed: () {},
+                      tooltip: 'Attach file to comment',
                       icon: Icon(Icons.attach_file, size: 18,
                           color: PlaneTheme.onSurfaceVariant),
                       visualDensity: VisualDensity.compact,
                       padding: EdgeInsets.zero,
                     ),
-                    GestureDetector(
-                      onTap: _addComment,
-                      child: Container(
-                        width: 30,
-                        height: 30,
-                        decoration: BoxDecoration(
-                          color: PlaneTheme.primaryContainer,
-                          shape: BoxShape.circle,
+                    Semantics(
+                      label: 'Add comment',
+                      button: true,
+                      container: true,
+                      child: GestureDetector(
+                        onTap: _addComment,
+                        child: Container(
+                          width: 30,
+                          height: 30,
+                          decoration: BoxDecoration(
+                            color: PlaneTheme.primaryContainer,
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(Icons.send, size: 14,
+                              color: PlaneTheme.onPrimaryContainer),
                         ),
-                        child: const Icon(Icons.send, size: 14,
-                            color: PlaneTheme.onPrimaryContainer),
                       ),
                     ),
                   ],
@@ -649,9 +659,14 @@ class _IssueDetailScreenState extends ConsumerState<IssueDetailScreen> {
                   style: TextStyle(fontSize: 12, color: secondary)),
             ],
             const Spacer(),
-            GestureDetector(
-              onTap: _addSubIssue,
-              child: Icon(Icons.add, size: 18, color: secondary),
+            Semantics(
+              label: 'Add sub-issue',
+              button: true,
+              container: true,
+              child: GestureDetector(
+                onTap: _addSubIssue,
+                child: Icon(Icons.add, size: 18, color: secondary),
+              ),
             ),
           ],
         ),
@@ -804,9 +819,14 @@ class _IssueDetailScreenState extends ConsumerState<IssueDetailScreen> {
                   style: TextStyle(fontSize: 12, color: secondary)),
             ],
             const Spacer(),
-            GestureDetector(
-              onTap: _showAddLinkDialog,
-              child: Icon(Icons.add, size: 18, color: secondary),
+            Semantics(
+              label: 'Add link',
+              button: true,
+              container: true,
+              child: GestureDetector(
+                onTap: _showAddLinkDialog,
+                child: Icon(Icons.add, size: 18, color: secondary),
+              ),
             ),
           ],
         ),
@@ -1105,17 +1125,25 @@ class _IssueDetailScreenState extends ConsumerState<IssueDetailScreen> {
               Wrap(
                 spacing: 8,
                 runSpacing: 8,
-                children: colors.map((c) => GestureDetector(
-                  onTap: () => setDialogState(() => selectedColor = c),
-                  child: Container(
-                    width: 28,
-                    height: 28,
-                    decoration: BoxDecoration(
-                      color: _parseColor(c),
-                      shape: BoxShape.circle,
-                      border: selectedColor == c
-                          ? Border.all(color: Theme.of(ctx).colorScheme.onSurface, width: 2)
-                          : null,
+                // A swatch is pure colour — the hex is the only stable name
+                // it has, and selection is otherwise only a border.
+                children: colors.map((c) => Semantics(
+                  label: 'Select label colour $c',
+                  button: true,
+                  selected: selectedColor == c,
+                  container: true,
+                  child: GestureDetector(
+                    onTap: () => setDialogState(() => selectedColor = c),
+                    child: Container(
+                      width: 28,
+                      height: 28,
+                      decoration: BoxDecoration(
+                        color: _parseColor(c),
+                        shape: BoxShape.circle,
+                        border: selectedColor == c
+                            ? Border.all(color: Theme.of(ctx).colorScheme.onSurface, width: 2)
+                            : null,
+                      ),
                     ),
                   ),
                 )).toList(),
@@ -1395,7 +1423,7 @@ class _RelationChip extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(6),
+        borderRadius: BorderRadius.circular(M3EShape.full),
         border: Border.all(color: color.withValues(alpha: 0.3), width: 0.5),
         color: color.withValues(alpha: 0.05),
       ),
@@ -1526,12 +1554,12 @@ class _LabelPill extends StatelessWidget {
     final color = _parseColor(label.color);
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(12),
+      borderRadius: BorderRadius.circular(M3EShape.full),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
         decoration: BoxDecoration(
           color: color.withValues(alpha: 0.15),
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(M3EShape.full),
           border: Border.all(color: color.withValues(alpha: 0.4), width: 0.5),
         ),
         child: Row(

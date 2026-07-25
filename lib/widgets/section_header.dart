@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
-import '../config/theme.dart';
+import '../config/m3e/shapes.dart';
+import '../config/m3e/typography.dart';
 
 /// Universal section/group header used across all list screens.
-/// Matches mockup: uppercase label + count badge pill.
+/// Uppercase overline label + count badge pill.
 class SectionHeader extends StatelessWidget {
   final String label;
   final int? count;
@@ -21,31 +22,41 @@ class SectionHeader extends StatelessWidget {
     final effectiveColor = color ?? theme.colorScheme.onSurfaceVariant;
 
     return Padding(
-      padding: const EdgeInsets.fromLTRB(21, 24, 20, 8),
+      padding: const EdgeInsets.fromLTRB(22, 22, 20, 8),
       child: Row(
         children: [
+          // A short colour bar carries the state-group hue, so the label
+          // itself can stay neutral and legible at 11px.
+          if (color != null) ...[
+            Container(
+              width: 3,
+              height: 12,
+              decoration: BoxDecoration(
+                color: effectiveColor,
+                borderRadius: BorderRadius.circular(M3EShape.full),
+              ),
+            ),
+            const SizedBox(width: 8),
+          ],
           Text(
             label.toUpperCase(),
-            style: TextStyle(
-              fontSize: PlaneTheme.fontSection,
-              fontWeight: PlaneTheme.fontSectionWeight,
-              letterSpacing: 0.65,
-              color: effectiveColor,
+            style: M3EType.overline(
+              color != null ? effectiveColor : theme.colorScheme.onSurfaceVariant,
             ),
           ),
           if (count != null) ...[
             const SizedBox(width: 8),
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
               decoration: BoxDecoration(
-                color: theme.colorScheme.surfaceContainer,
-                borderRadius: BorderRadius.circular(10),
+                color: theme.colorScheme.surfaceContainerHigh,
+                borderRadius: BorderRadius.circular(M3EShape.full),
               ),
               child: Text(
                 '$count',
                 style: TextStyle(
-                  fontSize: PlaneTheme.fontSmall,
-                  fontWeight: FontWeight.w500,
+                  fontSize: 10,
+                  fontWeight: FontWeight.w600,
                   color: theme.colorScheme.onSurfaceVariant,
                 ),
               ),

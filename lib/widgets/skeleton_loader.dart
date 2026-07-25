@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../config/m3e/shapes.dart';
 
 // ---------------------------------------------------------------------------
 // Base shimmer mixin — provides a repeating opacity animation (0.3 → 0.7)
@@ -250,7 +251,7 @@ class _ProjectListSkeletonState extends State<ProjectListSkeleton>
                 padding: const EdgeInsets.all(14),
                 decoration: BoxDecoration(
                   color: color.withValues(alpha: shimmer.value * 0.25),
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(M3EShape.large),
                 ),
                 child: Row(
                   children: [

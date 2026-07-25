@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../widgets/m3e/app_bar.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../config/theme.dart';
 import '../../services/module_service.dart';
@@ -381,11 +382,12 @@ class _ModuleDetailScreenState extends ConsumerState<ModuleDetailScreen> {
     final statusColor = _statusColorFor(mod.status);
 
     return Scaffold(
-      appBar: AppBar(
-        title: Text(mod.name),
+      appBar: M3EAppBar(
+        title: mod.name,
         actions: [
-          IconButton(
-            icon: const Icon(Icons.more_horiz, size: 20),
+          M3EAppBarAction(
+            icon: Icons.more_horiz,
+            tooltip: 'More',
             onPressed: () => _showMoreMenu(),
           ),
         ],
@@ -484,10 +486,18 @@ class _ModuleDetailScreenState extends ConsumerState<ModuleDetailScreen> {
                                 style: TextStyle(
                                     fontSize: PlaneTheme.fontCaption, color: secondary)),
                             const Spacer(),
-                            GestureDetector(
-                              onTap: _showAddIssuesSheet,
-                              child: Icon(Icons.add,
-                                  size: PlaneTheme.iconLarge, color: secondary),
+                            // Icon-only control: without an explicit label it
+                            // reaches the accessibility tree — and therefore
+                            // `uiautomator dump` — as an unnamed node.
+                            Semantics(
+                              label: 'Add issues to module',
+                              button: true,
+                              container: true,
+                              child: GestureDetector(
+                                onTap: _showAddIssuesSheet,
+                                child: Icon(Icons.add,
+                                    size: PlaneTheme.iconLarge, color: secondary),
+                              ),
                             ),
                           ],
                         ),

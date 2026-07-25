@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import '../../config/m3e/motion.dart';
+import '../../widgets/m3e/app_bar.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../config/theme.dart';
 import '../../services/notification_service.dart';
@@ -218,17 +220,18 @@ class _NotificationScreenState extends ConsumerState<NotificationScreen> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Notifications'),
+      appBar: M3EAppBar(
+        title: 'Notifications',
         actions: [
           if (_notifications.any((n) => !n.isRead))
-            TextButton(
+            M3EAppBarAction(
+              icon: Icons.done_all,
+              tooltip: 'Mark all read',
               onPressed: _markAllAsRead,
-              child: const Text('Mark all read',
-                  style: TextStyle(fontSize: PlaneTheme.fontSection)),
             ),
-          IconButton(
-            icon: const Icon(Icons.settings_outlined, size: 22),
+          M3EAppBarAction(
+            icon: Icons.settings_outlined,
+            tooltip: 'Notification settings',
             onPressed: _showNotificationSettings,
           ),
         ],
@@ -297,7 +300,8 @@ class _NotificationScreenState extends ConsumerState<NotificationScreen> {
             Icon(Icons.archive, color: theme.colorScheme.error, size: 22),
       ),
       onDismissed: (_) => _archive(notification),
-      child: InkWell(
+      child: M3EPressable(
+        pressedScale: 0.985,
         onTap: () => _onTap(notification),
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 9),

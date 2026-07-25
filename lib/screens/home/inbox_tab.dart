@@ -9,7 +9,7 @@ import '../../database/sync_service.dart';
 import '../issues/issue_detail_screen.dart';
 import '../../widgets/loading_state.dart';
 import '../../widgets/skeleton_loader.dart';
-import '../../widgets/screen_header.dart';
+import '../../widgets/m3e/flexible_app_bar.dart';
 import '../../widgets/issue_tile.dart';
 
 class InboxTab extends ConsumerStatefulWidget {
@@ -212,17 +212,10 @@ class _InboxTabState extends ConsumerState<InboxTab>
   @override
   Widget build(BuildContext context) {
     super.build(context);
-    return SafeArea(
-      bottom: false,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const ScreenHeader(
-              title: 'Inbox',
-              subtitleText: 'PENDING NOTIFICATIONS',
-            ),
-            Expanded(
-              child: _loading && _notifications.isEmpty
+    return M3EFlexibleHeaderScaffold(
+      title: 'Inbox',
+      overline: 'PENDING NOTIFICATIONS',
+      body: _loading && _notifications.isEmpty
           ? const InboxSkeleton()
           : RefreshIndicator(
               onRefresh: () async {
@@ -328,9 +321,6 @@ class _InboxTabState extends ConsumerState<InboxTab>
                       },
                     ),
             ),
-            ),
-          ],
-        ),
     );
   }
 }

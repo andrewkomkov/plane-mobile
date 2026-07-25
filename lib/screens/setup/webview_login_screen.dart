@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../widgets/m3e/app_bar.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 
 /// Opens Plane login in a WebView with a Chrome user agent to bypass
@@ -187,16 +188,18 @@ class _WebViewLoginScreenState extends State<WebViewLoginScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Sign In'),
-        leading: IconButton(
-          icon: const Icon(Icons.close),
+      appBar: M3EAppBar(
+        title: 'Sign In',
+        leading: M3EAppBarAction(
+          icon: Icons.close,
+          tooltip: 'Cancel',
           onPressed: () => Navigator.pop(context),
         ),
         actions: [
-          TextButton.icon(
-            icon: const Icon(Icons.check_circle_outline, size: 20),
-            label: const Text('Done'),
+          M3EAppBarAction(
+            icon: Icons.check_circle_outline,
+            tooltip: 'Done',
+            emphasized: true,
             onPressed: _manualContinue,
           ),
         ],

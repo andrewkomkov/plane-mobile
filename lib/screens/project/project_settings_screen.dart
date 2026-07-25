@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import '../../config/m3e/shapes.dart';
+import '../../widgets/m3e/loading_indicator.dart';
+import '../../widgets/m3e/app_bar.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../config/theme.dart';
 import '../../models/project.dart';
@@ -236,19 +239,28 @@ class _ProjectSettingsScreenState
                     '#EF4444', '#F97316', '#EAB308', '#22C55E',
                     '#3B82F6', '#8B5CF6', '#EC4899', '#6B7280',
                   ].map((c) {
-                    return GestureDetector(
-                      onTap: () => setDialogState(() => color = c),
-                      child: Container(
-                        width: 32,
-                        height: 32,
-                        decoration: BoxDecoration(
-                          color: _parseColor(c),
-                          shape: BoxShape.circle,
-                          border: color == c
-                              ? Border.all(
-                                  color: Theme.of(ctx).colorScheme.onSurface,
-                                  width: 2)
-                              : null,
+                    // A bare colour circle carries no text, so the swatch is
+                    // anonymous to a screen reader and to `uiautomator dump`
+                    // unless it is named here.
+                    return Semantics(
+                      label: 'Label colour ${_colorName(c)}',
+                      button: true,
+                      selected: color == c,
+                      container: true,
+                      child: GestureDetector(
+                        onTap: () => setDialogState(() => color = c),
+                        child: Container(
+                          width: 32,
+                          height: 32,
+                          decoration: BoxDecoration(
+                            color: _parseColor(c),
+                            shape: BoxShape.circle,
+                            border: color == c
+                                ? Border.all(
+                                    color: Theme.of(ctx).colorScheme.onSurface,
+                                    width: 2)
+                                : null,
+                          ),
                         ),
                       ),
                     );
@@ -316,6 +328,21 @@ class _ProjectSettingsScreenState
     }
   }
 
+  /// Human names for the label swatch palette, so the colour picker exposes
+  /// something a screen reader or an automation script can address.
+  static const _swatchNames = {
+    '#EF4444': 'Red',
+    '#F97316': 'Orange',
+    '#EAB308': 'Yellow',
+    '#22C55E': 'Green',
+    '#3B82F6': 'Blue',
+    '#8B5CF6': 'Purple',
+    '#EC4899': 'Pink',
+    '#6B7280': 'Grey',
+  };
+
+  String _colorName(String hex) => _swatchNames[hex] ?? hex;
+
   Color _parseColor(String hex) {
     var h = hex.replaceFirst('#', '');
     if (h.length == 6) h = 'FF$h';
@@ -326,7 +353,7 @@ class _ProjectSettingsScreenState
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return Scaffold(
-      appBar: AppBar(title: const Text('Project Settings')),
+      appBar: const M3EAppBar(title: 'Project Settings'),
       body: _loading
           ? const LoadingStateWidget()
           : ListView(
@@ -357,7 +384,7 @@ class _ProjectSettingsScreenState
                   padding: const EdgeInsets.symmetric(
                       horizontal: 12, vertical: 8),
                   decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(8),
+                    borderRadius: BorderRadius.circular(M3EShape.large),
                     border: Border.all(
                         color: theme.colorScheme.outline, width: 0.5),
                   ),
@@ -411,11 +438,7 @@ class _ProjectSettingsScreenState
                   child: FilledButton(
                     onPressed: _saving ? null : _saveGeneral,
                     child: _saving
-                        ? const SizedBox(
-                            width: 16,
-                            height: 16,
-                            child: CircularProgressIndicator(
-                                strokeWidth: 2))
+                        ? const M3ELoadingIndicator(size: 16)
                         : const Text('Save Changes'),
                   ),
                 ),
@@ -468,7 +491,9 @@ class _ProjectSettingsScreenState
                     _sectionHeader('States (${_states.length})', theme),
                     const Spacer(),
                     IconButton(
-                      icon: const Icon(Icons.add, size: 20),
+                      icon: const Icon(Icons.add,
+                          size: 20, semanticLabel: 'Add state'),
+                      tooltip: 'Add state',
                       onPressed: _addState,
                     ),
                   ],
@@ -489,8 +514,13 @@ class _ProjectSettingsScreenState
                               color:
                                   theme.colorScheme.onSurfaceVariant)),
                       trailing: IconButton(
+                        // Named per state so repeated rows stay distinguishable
+                        // to external automation.
                         icon: Icon(Icons.delete_outline,
-                            size: 18, color: Colors.grey[500]),
+                            size: 18,
+                            color: Colors.grey[500],
+                            semanticLabel: 'Delete state ${s.name}'),
+                        tooltip: 'Delete state',
                         onPressed: () => _deleteState(s),
                       ),
                     )),
@@ -502,7 +532,9 @@ class _ProjectSettingsScreenState
                     _sectionHeader('Labels (${_labels.length})', theme),
                     const Spacer(),
                     IconButton(
-                      icon: const Icon(Icons.add, size: 20),
+                      icon: const Icon(Icons.add,
+                          size: 20, semanticLabel: 'Add label'),
+                      tooltip: 'Add label',
                       onPressed: _addLabel,
                     ),
                   ],
@@ -523,8 +555,9 @@ class _ProjectSettingsScreenState
                       ),
                       label: Text(l.name,
                           style: const TextStyle(fontSize: 13)),
-                      deleteIcon:
-                          const Icon(Icons.close, size: 16),
+                      deleteIcon: Icon(Icons.close,
+                          size: 16, semanticLabel: 'Delete label ${l.name}'),
+                      deleteButtonTooltipMessage: 'Delete label',
                       onDeleted: () => _deleteLabel(l),
                     );
                   }).toList(),

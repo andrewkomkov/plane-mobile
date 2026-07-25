@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import '../../config/m3e/shapes.dart';
+import '../../widgets/m3e/loading_indicator.dart';
+import '../../widgets/m3e/app_bar.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../config/secure_storage.dart';
 import '../../config/api_client.dart';
@@ -152,30 +155,37 @@ class _MenuTabState extends ConsumerState<MenuTab> {
               padding: const EdgeInsets.fromLTRB(20, 8, 12, 0),
               child: Row(
                 children: [
-                  GestureDetector(
-                    onTap: _showSwitchWorkspace,
-                    child: Row(
-                      children: [
-                        Icon(Icons.grid_view, size: 20, color: theme.colorScheme.primary),
-                        const SizedBox(width: 10),
-                        Text(
-                          'Plane',
-                          style: TextStyle(
-                            fontSize: 20,
-                            fontWeight: FontWeight.w700,
-                            letterSpacing: -0.3,
-                            color: theme.colorScheme.onSurface,
+                  // The visible text is the workspace name, which says nothing
+                  // about what tapping it does — hence an explicit label.
+                  Semantics(
+                    label: 'Switch workspace',
+                    button: true,
+                    child: GestureDetector(
+                      onTap: _showSwitchWorkspace,
+                      child: Row(
+                        children: [
+                          Icon(Icons.grid_view, size: 20, color: theme.colorScheme.primary),
+                          const SizedBox(width: 10),
+                          Text(
+                            'Plane',
+                            style: TextStyle(
+                              fontSize: 20,
+                              fontWeight: FontWeight.w700,
+                              letterSpacing: -0.3,
+                              color: theme.colorScheme.onSurface,
+                            ),
                           ),
-                        ),
-                        const SizedBox(width: 4),
-                        Icon(Icons.unfold_more,
-                            size: 14,
-                            color: theme.colorScheme.onSurfaceVariant),
-                      ],
+                          const SizedBox(width: 4),
+                          Icon(Icons.unfold_more,
+                              size: 14,
+                              color: theme.colorScheme.onSurfaceVariant),
+                        ],
+                      ),
                     ),
                   ),
                   const Spacer(),
                   IconButton(
+                    tooltip: 'New issue',
                     icon: Icon(Icons.edit_square,
                         size: 20, color: theme.colorScheme.onSurfaceVariant),
                     onPressed: () {},
@@ -200,7 +210,7 @@ class _MenuTabState extends ConsumerState<MenuTab> {
                       padding: const EdgeInsets.all(16),
                       decoration: BoxDecoration(
                         color: theme.colorScheme.surfaceContainerLow,
-                        borderRadius: BorderRadius.circular(12),
+                        borderRadius: BorderRadius.circular(M3EShape.large),
                         border: Border.all(
                           color: theme.colorScheme.outline.withValues(alpha: 0.15),
                           width: 0.5,
@@ -306,7 +316,7 @@ class _MenuTabState extends ConsumerState<MenuTab> {
                             ? const SizedBox(
                                 width: 16,
                                 height: 16,
-                                child: CircularProgressIndicator(strokeWidth: 2))
+                                child: M3ELoadingIndicator(size: 18))
                             : null,
                         onTap: _showSwitchWorkspace,
                       ),
@@ -367,7 +377,7 @@ class _MenuTabState extends ConsumerState<MenuTab> {
                       padding: const EdgeInsets.symmetric(vertical: 16),
                       decoration: BoxDecoration(
                         color: theme.colorScheme.errorContainer.withValues(alpha: 0.20),
-                        borderRadius: BorderRadius.circular(12),
+                        borderRadius: BorderRadius.circular(M3EShape.large),
                       ),
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.center,
@@ -407,7 +417,7 @@ class _MenuGroup extends StatelessWidget {
     return Container(
       decoration: BoxDecoration(
         color: theme.colorScheme.surfaceContainerLow,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(M3EShape.large),
         border: Border.all(
           color: theme.colorScheme.outline.withValues(alpha: 0.15),
           width: 0.5,
@@ -529,7 +539,7 @@ class _WorkspaceMembersScreenState
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return Scaffold(
-      appBar: AppBar(title: const Text('Workspace Members')),
+      appBar: const M3EAppBar(title: 'Workspace Members'),
       body: _loading
           ? const LoadingStateWidget()
           : _error != null

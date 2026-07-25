@@ -1,12 +1,13 @@
 import 'package:flutter/material.dart';
 import '../config/theme.dart';
+import 'm3e/loading_indicator.dart';
 
 class LoadingStateWidget extends StatelessWidget {
   const LoadingStateWidget({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return const Center(child: CircularProgressIndicator());
+    return const Center(child: M3ELoadingIndicator(size: 44));
   }
 }
 

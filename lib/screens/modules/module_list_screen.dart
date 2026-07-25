@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../config/m3e/motion.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../config/theme.dart';
 import '../../services/module_service.dart';
@@ -250,7 +251,8 @@ class _ModuleCard extends StatelessWidget {
     final theme = Theme.of(context);
     final secondary = theme.colorScheme.onSurfaceVariant;
 
-    return InkWell(
+    return M3EPressable(
+      pressedScale: 0.975,
       onTap: onTap,
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),

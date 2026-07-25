@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import '../../config/m3e/shapes.dart';
+import '../../widgets/m3e/loading_indicator.dart';
+import '../../widgets/m3e/app_bar.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../models/user.dart';
 import '../../services/auth_service.dart';
@@ -69,13 +72,13 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
 
     if (_loading) {
       return Scaffold(
-        appBar: AppBar(title: const Text('Profile')),
+        appBar: const M3EAppBar(title: 'Profile'),
         body: const LoadingStateWidget(),
       );
     }
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Profile')),
+      appBar: const M3EAppBar(title: 'Profile'),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
@@ -116,7 +119,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
               padding: const EdgeInsets.symmetric(
                   horizontal: 12, vertical: 12),
               decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(8),
+                borderRadius: BorderRadius.circular(M3EShape.large),
                 border: Border.all(
                     color: theme.colorScheme.outline, width: 0.5),
                 color: theme.colorScheme.surface,
@@ -135,10 +138,16 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                   fontSize: 12,
                   color: theme.colorScheme.onSurfaceVariant)),
           const SizedBox(height: 4),
-          TextField(
-            controller: _nameController,
-            decoration: const InputDecoration(
-              border: OutlineInputBorder(),
+          // The field's name lives in the caption above it, not in the
+          // decoration, so the input node itself would be anonymous.
+          Semantics(
+            label: 'Display name',
+            container: true,
+            child: TextField(
+              controller: _nameController,
+              decoration: const InputDecoration(
+                border: OutlineInputBorder(),
+              ),
             ),
           ),
           const SizedBox(height: 12),
@@ -151,7 +160,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                       width: 16,
                       height: 16,
                       child:
-                          CircularProgressIndicator(strokeWidth: 2))
+                          M3ELoadingIndicator(size: 18))
                   : const Text('Save'),
             ),
           ),
@@ -209,13 +218,22 @@ class _ThemeOption extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ListTile(
-      contentPadding: EdgeInsets.zero,
-      leading: Icon(icon, size: 20),
-      title: Text(label, style: const TextStyle(fontSize: 14)),
-      trailing:
-          selected ? const Icon(Icons.check, size: 18) : null,
-      onTap: onTap,
+    // ListTile's own `selected` flag repaints the row in the selection colour,
+    // so the active state is annotated instead of switched on. MergeSemantics
+    // folds the flag onto the same node as the title, which is what automation
+    // and screen readers read.
+    return MergeSemantics(
+      child: Semantics(
+        selected: selected,
+        child: ListTile(
+          contentPadding: EdgeInsets.zero,
+          leading: Icon(icon, size: 20),
+          title: Text(label, style: const TextStyle(fontSize: 14)),
+          trailing:
+              selected ? const Icon(Icons.check, size: 18) : null,
+          onTap: onTap,
+        ),
+      ),
     );
   }
 }

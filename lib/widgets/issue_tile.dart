@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import '../config/m3e/motion.dart';
+import '../config/m3e/shapes.dart';
 import '../config/theme.dart';
 import '../models/issue.dart';
 import '../models/label.dart';
@@ -49,6 +51,16 @@ class IssueTile extends StatelessWidget {
     this.allMembers = const [],
   });
 
+  /// Label the row reports to accessibility and to `adb shell uiautomator`.
+  ///
+  /// External automation locates a row by its issue identifier (e.g. "AFS-415")
+  /// with a prefix match, so the identifier has to be the first token. The name
+  /// follows so a human listener still knows which issue this is.
+  String get _semanticLabel {
+    if (projectIdentifier == null) return issue.name;
+    return '$projectIdentifier-${issue.sequenceId} ${issue.name}';
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -63,15 +75,19 @@ class IssueTile extends StatelessWidget {
       return _buildInboxLayout(context, theme, secondary);
     }
 
-    // Standard card layout matching mockup
+    // Standard card layout. M3E press feedback: the whole row squeezes on
+    // touch-down and springs back with a slight overshoot on release.
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 1),
-      child: Material(
-        color: theme.colorScheme.surfaceContainerLow,
-        borderRadius: BorderRadius.circular(12),
-        child: InkWell(
-          onTap: onTap,
-          borderRadius: BorderRadius.circular(12),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 2),
+      child: M3EPressable(
+        pressedScale: 0.975,
+        onTap: onTap,
+        semanticLabel: _semanticLabel,
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            color: theme.colorScheme.surfaceContainerLow,
+            borderRadius: BorderRadius.circular(M3EShape.large),
+          ),
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
             child: Row(
@@ -141,7 +157,8 @@ class IssueTile extends StatelessWidget {
                                 decoration: BoxDecoration(
                                   color: _parseColor(l.color)
                                       .withValues(alpha: 0.15),
-                                  borderRadius: BorderRadius.circular(6),
+                                  borderRadius:
+                                      BorderRadius.circular(M3EShape.full),
                                 ),
                                 child: Text(
                                   l.name,
@@ -229,14 +246,13 @@ class IssueTile extends StatelessWidget {
 
   Widget _buildInboxLayout(
       BuildContext context, ThemeData theme, Color secondary) {
-    final isDark = theme.brightness == Brightness.dark;
-    return InkWell(
+    return M3EPressable(
+      pressedScale: 0.985,
       onTap: onTap,
+      semanticLabel: _semanticLabel,
       child: Container(
         color: isUnread
-            ? (isDark
-                ? theme.colorScheme.surfaceContainerLow
-                : theme.colorScheme.surfaceContainer)
+            ? theme.colorScheme.surfaceContainerLow
             : Colors.transparent,
         padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
         child: Row(

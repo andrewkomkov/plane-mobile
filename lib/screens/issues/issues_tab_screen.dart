@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
+import '../../widgets/m3e/native.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../config/theme.dart';
 import '../../models/issue.dart';
 import '../../models/state.dart';
 import '../../models/label.dart';
@@ -88,7 +88,6 @@ class _IssuesTabScreenState extends ConsumerState<IssuesTabScreen>
   @override
   Widget build(BuildContext context) {
     super.build(context);
-    final theme = Theme.of(context);
 
     if (_initialLoading && _issues.isEmpty) {
       return const IssueListSkeleton();
@@ -96,35 +95,18 @@ class _IssuesTabScreenState extends ConsumerState<IssuesTabScreen>
 
     return Column(
       children: [
-        // View toggle row
+        // View toggle row. Four mutually exclusive views of the same data, so
+        // this is the real androidx ButtonGroup from material3 1.5.0-alpha24,
+        // rendered by Compose in a platform view (see widgets/m3e/native.dart).
+        // Off Android it falls back to the Dart M3EButtonGroup.
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
-          child: Row(
-            children: [
-              _ViewToggle(
-                icon: Icons.view_list_outlined,
-                selected: _viewMode == _ViewMode.list,
-                onTap: () => setState(() => _viewMode = _ViewMode.list),
-              ),
-              const SizedBox(width: 4),
-              _ViewToggle(
-                icon: Icons.view_kanban_outlined,
-                selected: _viewMode == _ViewMode.kanban,
-                onTap: () => setState(() => _viewMode = _ViewMode.kanban),
-              ),
-              const SizedBox(width: 4),
-              _ViewToggle(
-                icon: Icons.table_chart_outlined,
-                selected: _viewMode == _ViewMode.spreadsheet,
-                onTap: () => setState(() => _viewMode = _ViewMode.spreadsheet),
-              ),
-              const SizedBox(width: 4),
-              _ViewToggle(
-                icon: Icons.calendar_month_outlined,
-                selected: _viewMode == _ViewMode.calendar,
-                onTap: () => setState(() => _viewMode = _ViewMode.calendar),
-              ),
-            ],
+          child: M3ENativeButtonGroup(
+            height: 48,
+            labels: const ['List', 'Board', 'Table', 'Calendar'],
+            selectedIndex: _ViewMode.values.indexOf(_viewMode),
+            onSelected: (i) =>
+                setState(() => _viewMode = _ViewMode.values[i]),
           ),
         ),
         Expanded(child: _buildView()),
@@ -176,36 +158,5 @@ class _IssuesTabScreenState extends ConsumerState<IssuesTabScreen>
           onRefresh: _refresh,
         );
     }
-  }
-}
-
-class _ViewToggle extends StatelessWidget {
-  final IconData icon;
-  final bool selected;
-  final VoidCallback onTap;
-
-  const _ViewToggle(
-      {required this.icon, required this.selected, required this.onTap});
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.all(6),
-        decoration: BoxDecoration(
-          color: selected
-              ? theme.colorScheme.primary.withValues(alpha: 0.15)
-              : Colors.transparent,
-          borderRadius: BorderRadius.circular(5),
-        ),
-        child: Icon(icon,
-            size: PlaneTheme.iconMedium,
-            color: selected
-                ? theme.colorScheme.primary
-                : theme.colorScheme.onSurfaceVariant),
-      ),
-    );
   }
 }

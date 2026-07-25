@@ -1,4 +1,8 @@
 import 'package:flutter/material.dart';
+import '../../widgets/m3e/app_bar.dart';
+import '../../widgets/m3e/loading_indicator.dart';
+import '../../config/m3e/motion.dart';
+import '../../config/m3e/shapes.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../services/page_service.dart';
@@ -71,12 +75,14 @@ class _PageDetailScreenState extends ConsumerState<PageDetailScreen> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return Scaffold(
-      appBar: AppBar(
-        title: Text(_page?.name ?? widget.pageName),
+      appBar: M3EAppBar(
+        title: _page?.name ?? widget.pageName,
         actions: [
           if (_page != null && !_page!.isLocked)
-            IconButton(
-                icon: const Icon(Icons.edit, size: 22),
+            M3EAppBarAction(
+                icon: Icons.edit,
+                tooltip: 'Edit page',
+                emphasized: true,
                 onPressed: _editPage),
         ],
       ),
@@ -114,7 +120,7 @@ class _PageDetailScreenState extends ConsumerState<PageDetailScreen> {
                       codeblockDecoration: BoxDecoration(
                         color:
                             theme.colorScheme.surfaceContainerHighest,
-                        borderRadius: BorderRadius.circular(8),
+                        borderRadius: BorderRadius.circular(M3EShape.large),
                       ),
                       codeblockPadding: const EdgeInsets.all(12),
                       blockquoteDecoration: BoxDecoration(
@@ -258,22 +264,39 @@ class _PageEditScreenState extends State<PageEditScreen> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return Scaffold(
-      appBar: AppBar(
-        title: Text(widget.pageId != null ? 'Edit Page' : 'New Page'),
+      appBar: M3EAppBar(
+        title: widget.pageId != null ? 'Edit Page' : 'New Page',
         actions: [
-          IconButton(
-            icon: Icon(_preview ? Icons.edit : Icons.preview, size: 22),
-            onPressed: () => setState(() => _preview = !_preview),
+          M3EAppBarAction(
+            icon: _preview ? Icons.edit : Icons.preview,
             tooltip: _preview ? 'Edit' : 'Preview',
+            onPressed: () => setState(() => _preview = !_preview),
           ),
-          TextButton(
-            onPressed: _saving ? null : _save,
+          Padding(
+            padding: const EdgeInsets.only(left: 4, right: 8),
             child: _saving
-                ? const SizedBox(
-                    width: 16,
-                    height: 16,
-                    child: CircularProgressIndicator(strokeWidth: 2))
-                : const Text('Save'),
+                ? const M3ELoadingIndicator(size: 22)
+                : M3EPressable(
+                    pressedScale: 0.92,
+                    onTap: _save,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 16, vertical: 9),
+                      decoration: BoxDecoration(
+                        color: Theme.of(context).colorScheme.primaryContainer,
+                        borderRadius: BorderRadius.circular(M3EShape.full),
+                      ),
+                      child: Text(
+                        'Save',
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          color:
+                              Theme.of(context).colorScheme.onPrimaryContainer,
+                        ),
+                      ),
+                    ),
+                  ),
           ),
         ],
       ),
@@ -388,7 +411,10 @@ class _ToolbarButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return IconButton(
-      icon: Icon(icon, size: 20),
+      // A tooltip is exposed to Android as tooltipText, not as the node's
+      // content description, so the label has to ride on the icon itself for
+      // `uiautomator dump` to see it.
+      icon: Icon(icon, size: 20, semanticLabel: tooltip),
       tooltip: tooltip,
       onPressed: onTap,
       padding: const EdgeInsets.symmetric(horizontal: 8),

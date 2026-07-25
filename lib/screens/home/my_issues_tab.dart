@@ -10,7 +10,10 @@ import '../../utils/issue_grouping.dart';
 import '../../widgets/filter_bar.dart';
 import '../../widgets/loading_state.dart';
 import '../../widgets/skeleton_loader.dart';
-import '../../widgets/screen_header.dart';
+import '../../widgets/m3e/flexible_app_bar.dart';
+import '../../widgets/m3e/button_group.dart';
+import '../../widgets/m3e/chip.dart';
+import '../../widgets/m3e/fab_menu.dart';
 import '../../widgets/section_header.dart';
 import '../../widgets/issue_tile.dart';
 import '../issues/issue_detail_screen.dart';
@@ -396,12 +399,17 @@ class _MyIssuesTabState extends ConsumerState<MyIssuesTab>
                       children: [
                         const Text('Show sub-issues', style: TextStyle(fontSize: PlaneTheme.fontBody)),
                         const Spacer(),
-                        Switch(
-                          value: _showSubIssues,
-                          onChanged: (v) {
-                            setSheetState(() => _showSubIssues = v);
-                            setState(() {});
-                          },
+                        // The switch sits in a Row next to its caption, so it
+                        // would otherwise be an unnamed node for automation.
+                        Semantics(
+                          label: 'Show sub-issues',
+                          child: Switch(
+                            value: _showSubIssues,
+                            onChanged: (v) {
+                              setSheetState(() => _showSubIssues = v);
+                              setState(() {});
+                            },
+                          ),
                         ),
                       ],
                     ),
@@ -438,20 +446,26 @@ class _MyIssuesTabState extends ConsumerState<MyIssuesTab>
                       runSpacing: 8,
                       children: [
                         for (final prop in ['Status', 'Priority', 'Assignee', 'ID', 'Labels', 'Project', 'Due date', 'Cycle', 'Estimate'])
-                          _PropertyToggle(
-                            label: prop,
+                          // The chip's Text names it; only the on/off state
+                          // needs exposing, as it is carried by colour alone.
+                          Semantics(
+                            button: true,
                             selected: _rowProperties.contains(prop.toLowerCase().replaceAll(' ', '_')),
-                            onTap: () {
-                              final key = prop.toLowerCase().replaceAll(' ', '_');
-                              setSheetState(() {
-                                if (_rowProperties.contains(key)) {
-                                  _rowProperties.remove(key);
-                                } else {
-                                  _rowProperties.add(key);
-                                }
-                              });
-                              setState(() {});
-                            },
+                            child: M3EChip(
+                              label: prop,
+                              selected: _rowProperties.contains(prop.toLowerCase().replaceAll(' ', '_')),
+                              onTap: () {
+                                final key = prop.toLowerCase().replaceAll(' ', '_');
+                                setSheetState(() {
+                                  if (_rowProperties.contains(key)) {
+                                    _rowProperties.remove(key);
+                                  } else {
+                                    _rowProperties.add(key);
+                                  }
+                                });
+                                setState(() {});
+                              },
+                            ),
                           ),
                       ],
                     ),
@@ -472,60 +486,64 @@ class _MyIssuesTabState extends ConsumerState<MyIssuesTab>
     final theme = Theme.of(context);
     final secondary = theme.colorScheme.onSurfaceVariant;
 
-    return SafeArea(
-      bottom: false,
-      child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            ScreenHeader(
-              title: 'My issues',
+    return M3EFlexibleHeaderScaffold(
+      title: 'My issues',
+      actions: [
+        IconButton(
+          tooltip: 'Open list options',
+          icon: Icon(Icons.more_horiz, size: 20, color: secondary),
+          onPressed: () => _showOptionsMenu(),
+        ),
+      ],
+      // The three scopes are mutually exclusive and equally weighted — exactly
+      // what a connected ButtonGroup is for. It also gives the row the press
+      // give-and-take that separate pills could not.
+      bottom: M3EButtonGroup(
+        height: 40,
+        items: const [
+          M3EButtonGroupItem(label: 'Assigned'),
+          M3EButtonGroupItem(label: 'Created'),
+          M3EButtonGroupItem(label: 'All'),
+        ],
+        selectedIndex: _filterModes.indexOf(_filterMode),
+        onSelected: (i) => setState(() => _filterMode = _filterModes[i]),
+      ),
+      body: Stack(
+        children: [
+          Positioned.fill(
+            child: _loading
+                ? const IssueListSkeleton()
+                : _error != null
+                    ? ErrorStateWidget(message: 'Failed to load', onRetry: _load)
+                    : RefreshIndicator(
+                        onRefresh: _load,
+                        child: _buildLinearList(),
+                      ),
+          ),
+          Positioned(
+            right: 20,
+            bottom: 96,
+            child: M3EFabMenu(
               actions: [
-                IconButton(
-                  icon: Icon(Icons.edit_square, size: 20, color: secondary),
+                M3EFabAction(
+                  label: 'New issue',
+                  icon: Icons.edit_square,
                   onPressed: _createIssue,
                 ),
-                IconButton(
-                  icon: Icon(Icons.more_horiz, size: 20, color: secondary),
-                  onPressed: () => _showOptionsMenu(),
+                M3EFabAction(
+                  label: 'Display options',
+                  icon: Icons.tune,
+                  onPressed: _showDisplayOptions,
                 ),
               ],
-              subtitle: Row(
-                children: [
-                  _PillFilter(
-                    label: 'Assigned',
-                    selected: _filterMode == 'assigned',
-                    onTap: () => setState(() => _filterMode = 'assigned'),
-                  ),
-                  const SizedBox(width: 8),
-                  _PillFilter(
-                    label: 'Created',
-                    selected: _filterMode == 'created',
-                    onTap: () => setState(() => _filterMode = 'created'),
-                  ),
-                  const SizedBox(width: 8),
-                  _PillFilter(
-                    label: 'All',
-                    selected: _filterMode == 'all',
-                    onTap: () => setState(() => _filterMode = 'all'),
-                  ),
-                ],
-              ),
             ),
-            // Issue list
-            Expanded(
-              child: _loading
-                  ? const IssueListSkeleton()
-                  : _error != null
-                      ? ErrorStateWidget(message: 'Failed to load', onRetry: _load)
-                      : RefreshIndicator(
-                          onRefresh: _load,
-                          child: _buildLinearList(),
-                        ),
-            ),
-          ],
-        ),
+          ),
+        ],
+      ),
     );
   }
+
+  static const List<String> _filterModes = ['assigned', 'created', 'all'];
 
   Widget _buildLinearList() {
     final grouped = groupIssuesByStateGroup(_filteredAndSorted, _allStates);
@@ -582,79 +600,5 @@ class _MyIssuesTabState extends ConsumerState<MyIssuesTab>
     items.add(const SizedBox(height: 100));
 
     return ListView(children: items);
-  }
-}
-
-class _PropertyToggle extends StatelessWidget {
-  final String label;
-  final bool selected;
-  final VoidCallback onTap;
-  const _PropertyToggle({required this.label, required this.selected, required this.onTap});
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
-        decoration: BoxDecoration(
-          color: selected
-              ? (isDark ? Colors.white.withValues(alpha: 0.15) : Colors.black.withValues(alpha: 0.08))
-              : Colors.transparent,
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(
-            color: selected
-                ? (isDark ? Colors.white.withValues(alpha: 0.2) : Colors.black.withValues(alpha: 0.15))
-                : (isDark ? Colors.white.withValues(alpha: 0.08) : Colors.black.withValues(alpha: 0.08)),
-          ),
-        ),
-        child: Text(label,
-            style: TextStyle(
-                fontSize: PlaneTheme.fontSection,
-                fontWeight: selected ? FontWeight.w500 : FontWeight.w400,
-                color: selected ? theme.colorScheme.onSurface : theme.colorScheme.onSurfaceVariant)),
-      ),
-    );
-  }
-}
-
-class _PillFilter extends StatelessWidget {
-  final String label;
-  final bool selected;
-  final VoidCallback onTap;
-  const _PillFilter({required this.label, required this.selected, required this.onTap});
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        decoration: BoxDecoration(
-          color: selected
-              ? theme.colorScheme.primaryContainer
-              : Colors.transparent,
-          borderRadius: BorderRadius.circular(20),
-          border: selected
-              ? null
-              : Border.all(
-                  color: theme.colorScheme.outline.withValues(alpha: 0.40),
-                ),
-        ),
-        child: Text(
-          label,
-          style: TextStyle(
-            fontSize: 14,
-            fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
-            color: selected
-                ? theme.colorScheme.onPrimaryContainer
-                : theme.colorScheme.onSurfaceVariant,
-          ),
-        ),
-      ),
-    );
   }
 }

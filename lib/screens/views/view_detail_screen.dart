@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../widgets/m3e/app_bar.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../services/issue_service.dart';
 import '../../services/label_service.dart';
@@ -115,9 +116,7 @@ class _ViewDetailScreenState extends ConsumerState<ViewDetailScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: Text(widget.view.name),
-      ),
+      appBar: M3EAppBar(title: widget.view.name),
       body: _loading
           ? const LoadingStateWidget()
           : _error != null

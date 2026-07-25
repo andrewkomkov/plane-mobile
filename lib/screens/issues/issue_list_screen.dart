@@ -184,9 +184,14 @@ class _IssueListScreenState extends ConsumerState<IssueListScreen>
                 Text('${_filteredAndSorted.length} issues',
                     style: TextStyle(fontSize: PlaneTheme.fontCaption, color: secondary)),
                 const Spacer(),
-                GestureDetector(
-                  onTap: () => showDisplayOptions(context, _display, () => setState(() {})),
-                  child: Icon(Icons.tune, size: PlaneTheme.iconMedium, color: secondary),
+                Semantics(
+                  label: 'Display options',
+                  button: true,
+                  container: true,
+                  child: GestureDetector(
+                    onTap: () => showDisplayOptions(context, _display, () => setState(() {})),
+                    child: Icon(Icons.tune, size: PlaneTheme.iconMedium, color: secondary),
+                  ),
                 ),
               ],
             ),

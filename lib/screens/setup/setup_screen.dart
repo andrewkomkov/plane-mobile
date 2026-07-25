@@ -1,5 +1,7 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
+import '../../config/m3e/shapes.dart';
+import '../../widgets/m3e/loading_indicator.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import '../../config/secure_storage.dart';
 import '../../config/api_client.dart';
@@ -278,13 +280,13 @@ class _SetupScreenState extends State<SetupScreen> {
                 OutlinedButton.icon(
                   onPressed: _loading ? null : _signInWithGoogle,
                   icon: _loading
-                      ? const SizedBox(height: 18, width: 18, child: CircularProgressIndicator(strokeWidth: 2))
+                      ? const M3ELoadingIndicator(size: 18)
                       : const Icon(Icons.g_mobiledata, size: 24),
                   label: Text(_loading ? 'Signing in...' : 'Sign in with Google',
                       style: const TextStyle(fontSize: 16)),
                   style: OutlinedButton.styleFrom(
                     padding: const EdgeInsets.symmetric(vertical: 14),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(M3EShape.full)),
                   ),
                 ),
                 const SizedBox(height: 12),
@@ -337,10 +339,10 @@ class _SetupScreenState extends State<SetupScreen> {
                     backgroundColor: theme.colorScheme.primary,
                     foregroundColor: theme.colorScheme.onPrimary,
                     padding: const EdgeInsets.symmetric(vertical: 16),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(M3EShape.full)),
                   ),
                   child: _loading
-                      ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                      ? const M3ELoadingIndicator(size: 20, color: Colors.white)
                       : const Text('Sign In', style: TextStyle(fontSize: 16)),
                 ),
                 const SizedBox(height: 12),
@@ -381,10 +383,10 @@ class _SetupScreenState extends State<SetupScreen> {
                     backgroundColor: theme.colorScheme.primary,
                     foregroundColor: theme.colorScheme.onPrimary,
                     padding: const EdgeInsets.symmetric(vertical: 16),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(M3EShape.full)),
                   ),
                   child: _loading
-                      ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                      ? const M3ELoadingIndicator(size: 20, color: Colors.white)
                       : const Text('Connect', style: TextStyle(fontSize: 16)),
                 ),
                 const SizedBox(height: 12),

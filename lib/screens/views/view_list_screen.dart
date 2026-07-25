@@ -170,8 +170,13 @@ class _ViewListScreenState extends ConsumerState<ViewListScreen>
                       overflow: TextOverflow.ellipsis,
                     ),
                     trailing: IconButton(
+                      // Named per view so repeated rows stay distinguishable
+                      // to external automation.
                       icon: Icon(Icons.delete_outline,
-                          size: 20, color: Colors.grey[500]),
+                          size: 20,
+                          color: Colors.grey[500],
+                          semanticLabel: 'Delete view ${view.name}'),
+                      tooltip: 'Delete view',
                       onPressed: () => _deleteView(view),
                     ),
                     onTap: () async {

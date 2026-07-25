@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'm3e/loading_indicator.dart';
 
 class CacheIndicator extends StatelessWidget {
   final bool isFromCache;
@@ -28,13 +29,9 @@ class CacheIndicator extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           if (isRefreshing) ...[
-            SizedBox(
-              width: 10,
-              height: 10,
-              child: CircularProgressIndicator(
-                strokeWidth: 1.5,
-                color: theme.colorScheme.primary,
-              ),
+            M3ELoadingIndicator(
+              size: 10,
+              color: theme.colorScheme.primary,
             ),
             const SizedBox(width: 6),
             Text('Refreshing...',

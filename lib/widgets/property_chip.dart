@@ -1,6 +1,12 @@
 import 'package:flutter/material.dart';
-import '../config/theme.dart';
+import '../config/m3e/motion.dart';
+import '../config/m3e/shapes.dart';
 
+/// Read-only property display (state, priority, assignee, due date).
+///
+/// Distinct from [M3EChip]: the icon keeps its own semantic colour — priority
+/// red, state green — while the label stays neutral, so a row of these reads as
+/// data rather than as a row of selectable filters.
 class PropertyChip extends StatelessWidget {
   final IconData icon;
   final Color iconColor;
@@ -17,25 +23,33 @@ class PropertyChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return InkWell(
+    final scheme = Theme.of(context).colorScheme;
+
+    return M3EPressable(
+      pressedScale: onTap == null ? 1.0 : 0.94,
       onTap: onTap,
-      borderRadius: BorderRadius.circular(6),
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
         decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(6),
+          borderRadius: BorderRadius.circular(M3EShape.small),
           border: Border.all(
-              color: Theme.of(context).colorScheme.outline, width: 0.5),
+            color: scheme.outlineVariant.withValues(alpha: 0.7),
+            width: 0.8,
+          ),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, size: PlaneTheme.iconSmall, color: iconColor),
-            const SizedBox(width: 5),
-            Text(label,
-                style: const TextStyle(
-                    fontSize: PlaneTheme.fontCaption,
-                    fontWeight: PlaneTheme.fontBodyWeight)),
+            Icon(icon, size: 14, color: iconColor),
+            const SizedBox(width: 6),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w500,
+                color: scheme.onSurface,
+              ),
+            ),
           ],
         ),
       ),

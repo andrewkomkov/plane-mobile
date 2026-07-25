@@ -1,5 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import '../../config/m3e/shapes.dart';
+import '../../widgets/m3e/loading_indicator.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../services/search_service.dart';
 import '../../services/project_service.dart';
@@ -278,7 +280,7 @@ class _CommandPaletteBodyState
                 hintText: 'Type a command or search...',
                 prefixIcon: const Icon(Icons.search, size: 20),
                 border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(10),
+                  borderRadius: BorderRadius.circular(M3EShape.large),
                 ),
               ),
               onChanged: _onChanged,
@@ -288,11 +290,7 @@ class _CommandPaletteBodyState
             const Padding(
               padding: EdgeInsets.all(16),
               child: Center(
-                  child: SizedBox(
-                      width: 20,
-                      height: 20,
-                      child: CircularProgressIndicator(
-                          strokeWidth: 2))),
+                  child: M3ELoadingIndicator(size: 20)),
             ),
           // Quick actions header
           if (!showSearch)

@@ -6,7 +6,10 @@ import '../../providers/data_providers.dart';
 import '../project/project_screen.dart';
 import '../../widgets/loading_state.dart';
 import '../../widgets/skeleton_loader.dart';
-import '../../widgets/screen_header.dart';
+import '../../widgets/m3e/flexible_app_bar.dart';
+import '../../widgets/section_header.dart';
+import '../../config/m3e/shapes.dart';
+import '../../config/m3e/motion.dart';
 
 class ProjectsTab extends ConsumerStatefulWidget {
   final String workspaceSlug;
@@ -95,97 +98,70 @@ class _ProjectsTabState extends ConsumerState<ProjectsTab>
     final theme = Theme.of(context);
     final projects = _projects;
 
-    return SafeArea(
-      bottom: false,
-      child: Column(
+    return M3EFlexibleHeaderScaffold(
+      title: 'Projects',
+      actions: [
+        IconButton(
+          tooltip: 'How to create a project',
+          icon: Icon(Icons.help_outline,
+              size: 20, color: theme.colorScheme.onSurfaceVariant),
+          onPressed: () {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Create projects in the web app')),
+            );
+          },
+        ),
+      ],
+      // Search stays pinned under the title: it filters the whole list, so
+      // scrolling it away would strand the user in filtered results.
+      bottom: Semantics(
+        label: 'Search projects',
+        textField: true,
+        child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+        decoration: BoxDecoration(
+          color: theme.colorScheme.surfaceContainerLow,
+          borderRadius: BorderRadius.circular(M3EShape.full),
+          border: Border.all(
+            color: theme.colorScheme.outlineVariant.withValues(alpha: 0.7),
+            width: 0.8,
+          ),
+        ),
+        child: Row(
+          children: [
+            Icon(Icons.search,
+                size: 19, color: theme.colorScheme.onSurfaceVariant),
+            const SizedBox(width: 10),
+            Expanded(
+              child: TextField(
+                onChanged: (v) => setState(() => _searchQuery = v),
+                style: TextStyle(
+                    fontSize: 15, color: theme.colorScheme.onSurface),
+                decoration: InputDecoration(
+                  hintText: 'Search projects...',
+                  hintStyle: TextStyle(
+                    fontSize: 15,
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                  border: InputBorder.none,
+                  enabledBorder: InputBorder.none,
+                  focusedBorder: InputBorder.none,
+                  filled: false,
+                  contentPadding: EdgeInsets.zero,
+                  isDense: true,
+                ),
+              ),
+            ),
+          ],
+        ),
+        ),
+      ),
+      body: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            ScreenHeader(
-              title: 'Projects',
-              actions: [
-                Container(
-                  width: 36,
-                  height: 36,
-                  decoration: BoxDecoration(
-                    color: theme.colorScheme.primaryContainer,
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: IconButton(
-                    icon: const Icon(Icons.edit_square, size: 18, color: Colors.white),
-                    padding: EdgeInsets.zero,
-                    onPressed: () {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Create projects in the web app')),
-                      );
-                    },
-                  ),
-                ),
-              ],
-            ),
-            // Search field
-            Padding(
-              padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                decoration: BoxDecoration(
-                  color: theme.colorScheme.surfaceContainer,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(
-                    color: theme.colorScheme.outline.withValues(alpha: 0.30),
-                    width: 0.5,
-                  ),
-                ),
-                child: Row(
-                  children: [
-                    Icon(Icons.search, size: 20, color: theme.colorScheme.onSurfaceVariant),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: TextField(
-                        onChanged: (v) => setState(() => _searchQuery = v),
-                        style: TextStyle(fontSize: 15, color: theme.colorScheme.onSurface),
-                        decoration: InputDecoration(
-                          hintText: 'Search projects...',
-                          hintStyle: TextStyle(
-                            fontSize: 15,
-                            color: theme.colorScheme.onSurfaceVariant,
-                          ),
-                          border: InputBorder.none,
-                          enabledBorder: InputBorder.none,
-                          focusedBorder: InputBorder.none,
-                          filled: false,
-                          contentPadding: EdgeInsets.zero,
-                          isDense: true,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-            // Section header
-            Padding(
-              padding: const EdgeInsets.fromLTRB(22, 20, 22, 8),
-              child: Row(
-                children: [
-                  Text(
-                    'ACTIVE PROJECTS',
-                    style: TextStyle(
-                      fontSize: PlaneTheme.fontSection,
-                      fontWeight: FontWeight.w500,
-                      letterSpacing: 2.0,
-                      color: theme.colorScheme.onSurfaceVariant,
-                    ),
-                  ),
-                  const Spacer(),
-                  Text(
-                    '${projects.length} Total',
-                    style: TextStyle(
-                      fontSize: PlaneTheme.fontSmall,
-                      color: theme.colorScheme.onSurfaceVariant,
-                    ),
-                  ),
-                ],
-              ),
+            SectionHeader(
+              label: 'Active projects',
+              count: projects.length,
             ),
             Expanded(
               child: _initialLoading && projects.isEmpty
@@ -200,19 +176,22 @@ class _ProjectsTabState extends ConsumerState<ProjectsTab>
                           return Padding(
                             padding: const EdgeInsets.symmetric(
                                 horizontal: 16, vertical: 3),
-                            child: Material(
-                              color: theme.colorScheme.surfaceContainerLow,
-                              borderRadius: BorderRadius.circular(12),
-                              child: InkWell(
-                                onTap: () => Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (_) => ProjectScreen(
-                                        workspaceSlug: widget.workspaceSlug,
-                                        project: p),
-                                  ),
+                            child: M3EPressable(
+                              pressedScale: 0.975,
+                              onTap: () => Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => ProjectScreen(
+                                      workspaceSlug: widget.workspaceSlug,
+                                      project: p),
                                 ),
-                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: DecoratedBox(
+                                decoration: BoxDecoration(
+                                  color: theme.colorScheme.surfaceContainerLow,
+                                  borderRadius:
+                                      BorderRadius.circular(M3EShape.large),
+                                ),
                                 child: Padding(
                                   padding: const EdgeInsets.all(14),
                                   child: Row(
@@ -223,7 +202,7 @@ class _ProjectsTabState extends ConsumerState<ProjectsTab>
                                         height: 40,
                                         decoration: BoxDecoration(
                                           color: _badgeColor(i).withValues(alpha: 0.20),
-                                          borderRadius: BorderRadius.circular(10),
+                                          borderRadius: BorderRadius.circular(M3EShape.medium),
                                         ),
                                         child: Center(
                                           child: Text(

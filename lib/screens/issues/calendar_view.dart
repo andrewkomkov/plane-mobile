@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../config/m3e/shapes.dart';
 import '../../models/issue.dart';
 import '../../models/state.dart';
 import '../../widgets/issue_row.dart';
@@ -84,6 +85,7 @@ class _CalendarViewState extends State<CalendarView> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               IconButton(
+                tooltip: 'Previous month',
                 icon: const Icon(Icons.chevron_left, size: 20),
                 onPressed: () {
                   setState(() {
@@ -99,6 +101,7 @@ class _CalendarViewState extends State<CalendarView> {
                     fontSize: 16, fontWeight: FontWeight.w600),
               ),
               IconButton(
+                tooltip: 'Next month',
                 icon: const Icon(Icons.chevron_right, size: 20),
                 onPressed: () {
                   setState(() {
@@ -177,53 +180,64 @@ class _CalendarViewState extends State<CalendarView> {
                   date.day == _selectedDay!.day;
 
               return Expanded(
-                child: GestureDetector(
-                  onTap: () => setState(() => _selectedDay = date),
-                  child: Container(
-                    height: 44,
-                    decoration: BoxDecoration(
-                      color: isSelected
-                          ? theme.colorScheme.primary.withValues(alpha: 0.15)
-                          : Colors.transparent,
-                      borderRadius: BorderRadius.circular(6),
-                    ),
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Container(
-                          width: 24,
-                          height: 24,
-                          decoration: isToday
-                              ? BoxDecoration(
-                                  color: theme.colorScheme.primary,
-                                  shape: BoxShape.circle,
-                                )
-                              : null,
-                          alignment: Alignment.center,
-                          child: Text(
-                            '$dayNum',
-                            style: TextStyle(
-                              fontSize: 12,
-                              fontWeight: isToday
-                                  ? FontWeight.w600
-                                  : FontWeight.w400,
-                              color: isToday
-                                  ? Colors.white
-                                  : theme.colorScheme.onSurface,
-                            ),
-                          ),
-                        ),
-                        if (issueCount > 0)
+                // The cell renders a bare number, which is useless as a name:
+                // the label carries the full date and the issue count so a
+                // day can be picked out without reading the grid geometry.
+                child: Semantics(
+                  label: issueCount > 0
+                      ? 'Select day $dateKey, $issueCount issues'
+                      : 'Select day $dateKey, no issues',
+                  button: true,
+                  selected: isSelected,
+                  container: true,
+                  child: GestureDetector(
+                    onTap: () => setState(() => _selectedDay = date),
+                    child: Container(
+                      height: 44,
+                      decoration: BoxDecoration(
+                        color: isSelected
+                            ? theme.colorScheme.primary.withValues(alpha: 0.15)
+                            : Colors.transparent,
+                        borderRadius: BorderRadius.circular(M3EShape.medium),
+                      ),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
                           Container(
-                            margin: const EdgeInsets.only(top: 2),
-                            width: 6,
-                            height: 6,
-                            decoration: BoxDecoration(
-                              color: theme.colorScheme.primary,
-                              shape: BoxShape.circle,
+                            width: 24,
+                            height: 24,
+                            decoration: isToday
+                                ? BoxDecoration(
+                                    color: theme.colorScheme.primary,
+                                    shape: BoxShape.circle,
+                                  )
+                                : null,
+                            alignment: Alignment.center,
+                            child: Text(
+                              '$dayNum',
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: isToday
+                                    ? FontWeight.w600
+                                    : FontWeight.w400,
+                                color: isToday
+                                    ? Colors.white
+                                    : theme.colorScheme.onSurface,
+                              ),
                             ),
                           ),
-                      ],
+                          if (issueCount > 0)
+                            Container(
+                              margin: const EdgeInsets.only(top: 2),
+                              width: 6,
+                              height: 6,
+                              decoration: BoxDecoration(
+                                color: theme.colorScheme.primary,
+                                shape: BoxShape.circle,
+                              ),
+                            ),
+                        ],
+                      ),
                     ),
                   ),
                 ),

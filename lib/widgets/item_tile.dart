@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import '../config/m3e/motion.dart';
+import '../config/m3e/shapes.dart';
 import '../config/theme.dart';
 
 /// Universal list item for non-issue entities: projects, pages, cycles, modules, menu items.
@@ -29,12 +31,17 @@ class ItemTile extends StatelessWidget {
     final secondary = theme.colorScheme.onSurfaceVariant;
     final effectiveIconColor = iconColor ?? secondary;
 
-    return InkWell(
+    return M3EPressable(
+      pressedScale: 0.98,
       onTap: onTap,
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 2),
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          decoration: BoxDecoration(
+            color: theme.colorScheme.surfaceContainerLow,
+            borderRadius: BorderRadius.circular(M3EShape.large),
+          ),
           child: Row(
             children: [
               if (leading != null)

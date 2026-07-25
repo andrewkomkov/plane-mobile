@@ -1,4 +1,8 @@
 import 'package:flutter/material.dart';
+import '../../config/m3e/shapes.dart';
+import '../../config/m3e/motion.dart';
+import '../../widgets/m3e/app_bar.dart';
+import '../../widgets/m3e/loading_indicator.dart';
 import '../../config/theme.dart';
 import '../../services/issue_service.dart';
 import '../../models/state.dart';
@@ -77,57 +81,39 @@ class _IssueCreateScreenState extends State<IssueCreateScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     final isSubIssue = widget.parentIssueId != null;
     final screenTitle = isSubIssue ? 'New Sub-issue' : 'New Issue';
 
     return Scaffold(
-      appBar: AppBar(
-        backgroundColor: PlaneTheme.background.withValues(alpha: 0.80),
-        leading: IconButton(
-          icon: const Icon(Icons.close, size: 22, color: PlaneTheme.onSurface),
+      appBar: M3EAppBar(
+        title: screenTitle,
+        leading: M3EAppBarAction(
+          icon: Icons.close,
+          tooltip: 'Cancel',
           onPressed: () => Navigator.pop(context),
-        ),
-        title: Text(
-          screenTitle,
-          style: const TextStyle(
-            fontSize: 22,
-            fontWeight: FontWeight.w700,
-            letterSpacing: -0.3,
-            color: PlaneTheme.onSurface,
-          ),
         ),
         actions: [
           Padding(
-            padding: const EdgeInsets.only(right: 12),
+            padding: const EdgeInsets.only(left: 4, right: 10),
             child: _saving
-                ? const Center(
-                    child: SizedBox(
-                        width: 20,
-                        height: 20,
-                        child: CircularProgressIndicator(strokeWidth: 2)))
-                : GestureDetector(
+                ? const M3ELoadingIndicator(size: 22)
+                : M3EPressable(
+                    pressedScale: 0.92,
                     onTap: _save,
                     child: Container(
                       padding: const EdgeInsets.symmetric(
-                          horizontal: 16, vertical: 8),
+                          horizontal: 18, vertical: 10),
                       decoration: BoxDecoration(
-                        color: PlaneTheme.primaryContainer,
-                        borderRadius: BorderRadius.circular(12),
-                        boxShadow: [
-                          BoxShadow(
-                            color: PlaneTheme.primaryContainer
-                                .withValues(alpha: 0.10),
-                            blurRadius: 12,
-                            offset: const Offset(0, 4),
-                          ),
-                        ],
+                        color: theme.colorScheme.primaryContainer,
+                        borderRadius: BorderRadius.circular(M3EShape.full),
                       ),
-                      child: const Text(
+                      child: Text(
                         'Create',
                         style: TextStyle(
                           fontSize: 14,
                           fontWeight: FontWeight.w600,
-                          color: PlaneTheme.onPrimaryContainer,
+                          color: theme.colorScheme.onPrimaryContainer,
                         ),
                       ),
                     ),
@@ -215,7 +201,7 @@ class _IssueCreateScreenState extends State<IssueCreateScreen> {
                       padding: const EdgeInsets.all(16),
                       decoration: BoxDecoration(
                         color: PlaneTheme.surfaceContainerLow,
-                        borderRadius: BorderRadius.circular(16),
+                        borderRadius: BorderRadius.circular(M3EShape.large),
                       ),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -272,7 +258,7 @@ class _IssueCreateScreenState extends State<IssueCreateScreen> {
                       padding: const EdgeInsets.all(16),
                       decoration: BoxDecoration(
                         color: PlaneTheme.surfaceContainerLow,
-                        borderRadius: BorderRadius.circular(16),
+                        borderRadius: BorderRadius.circular(M3EShape.large),
                       ),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,

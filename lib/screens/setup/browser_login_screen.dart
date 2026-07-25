@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import '../../config/m3e/shapes.dart';
+import '../../widgets/m3e/app_bar.dart';
 import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -90,10 +92,11 @@ class _BrowserLoginScreenState extends State<BrowserLoginScreen>
     final theme = Theme.of(context);
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Sign In'),
-        leading: IconButton(
-          icon: const Icon(Icons.close),
+      appBar: M3EAppBar(
+        title: 'Sign In',
+        leading: M3EAppBarAction(
+          icon: Icons.close,
+          tooltip: 'Cancel',
           onPressed: () => Navigator.pop(context, null),
         ),
       ),
@@ -149,7 +152,7 @@ class _BrowserLoginScreenState extends State<BrowserLoginScreen>
             foregroundColor: Colors.white,
             padding: const EdgeInsets.symmetric(vertical: 16),
             shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(8),
+              borderRadius: BorderRadius.circular(M3EShape.large),
             ),
           ),
         ),
@@ -201,7 +204,7 @@ class _BrowserLoginScreenState extends State<BrowserLoginScreen>
           style: OutlinedButton.styleFrom(
             padding: const EdgeInsets.symmetric(vertical: 12),
             shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(8),
+              borderRadius: BorderRadius.circular(M3EShape.large),
             ),
           ),
         ),
@@ -214,7 +217,10 @@ class _BrowserLoginScreenState extends State<BrowserLoginScreen>
             border: const OutlineInputBorder(),
             prefixIcon: const Icon(Icons.key),
             suffixIcon: IconButton(
-              icon: const Icon(Icons.paste),
+              // Android exposes a tooltip as tooltipText, not as the node's
+              // content description, so the label rides on the icon.
+              icon: const Icon(Icons.paste,
+                  semanticLabel: 'Paste API token from clipboard'),
               tooltip: 'Paste from clipboard',
               onPressed: _pasteFromClipboard,
             ),
@@ -230,7 +236,7 @@ class _BrowserLoginScreenState extends State<BrowserLoginScreen>
             foregroundColor: Colors.white,
             padding: const EdgeInsets.symmetric(vertical: 16),
             shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(8),
+              borderRadius: BorderRadius.circular(M3EShape.large),
             ),
           ),
           child: const Text('Connect', style: TextStyle(fontSize: 16)),
