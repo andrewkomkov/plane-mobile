@@ -48,19 +48,37 @@ restrained typography, monochromatic icons, frosted-glass bottom nav, tight spac
 
 ## Design System
 
+The visual language is **Material 3 Expressive**, implemented natively in Dart
+(Flutter has no M3E components, and the `material3:1.5.0-alpha24` artifact is
+Compose-only). See [M3_EXPRESSIVE.md](M3_EXPRESSIVE.md) for the tokens,
+components and the Linear-vs-Expressive trade-offs. This section covers what a
+designer needs at the screen level.
+
 ### Font Family
 **Inter** -- used across both themes via `fontFamily: 'Inter'`.
 
 ### Typography Scale
 
-| Token | Size | Weight | Usage |
+Roles come from M3E (`M3EType.textTheme`); sizes stay at Linear's compact
+density. Any role can take its **emphasized** cut (one weight step up, slightly
+tighter tracking) via `M3EType.emphasized()` -- used for the single element that
+should dominate a screen.
+
+| Role | Size | Weight | Usage |
 |---|---|---|---|
-| `fontTitle` | 24 | w700 | Screen titles ("My issues", "Inbox", "Projects") |
-| `fontSection` | 13 | w500 | Section/group headers ("In Progress", "Backlog") |
-| `fontBody` | 15 | w400 | Issue names, list item titles |
-| `fontCaption` | 12 | w400 | Timestamps, IDs, subtitles, secondary text |
-| `fontSmall` | 11 | w400 | Chips, badges, pill labels |
-| AppBar title | 20 | w600 | Material AppBar titles (project name, "Settings") |
+| `headlineMedium` | 24 | w700 | Large screen titles ("My issues", "Inbox") |
+| `headlineSmall` | 20 | w600 | AppBar titles (project name, "Settings") |
+| `titleLarge` | 18 | w600 | Sheet headers |
+| `titleMedium` | 15 | w500 | Issue names, list item titles |
+| `titleSmall` | 13 | w500 | Compact labels |
+| `bodyLarge` / `bodyMedium` | 15 / 14 | w400 | Descriptions, comments, markdown |
+| `bodySmall` | 12 | w400 | Timestamps, IDs, subtitles |
+| `labelLarge` | 14 | w500 | Buttons |
+| `labelMedium` / `labelSmall` | 12 / 11 | w500 | Chips, badges, pills |
+| `M3EType.overline` | 11 | w600 | Uppercase group headers ("IN PROGRESS") |
+
+The legacy `PlaneTheme.font*` constants still exist and still resolve to the
+same sizes, so older screens render identically.
 
 ### Icon Sizes
 
@@ -112,20 +130,46 @@ restrained typography, monochromatic icons, frosted-glass bottom nav, tight spac
 | Completed | `#22C55E` | `Icons.check_circle` |
 | Cancelled | `#EF4444` | `Icons.cancel` |
 
+### Shape Scale
+
+Corners follow the M3 Expressive scale (`M3EShape`). Shape is an *interactive*
+property: selected chips pull their corners in, and pressed surfaces square off
+slightly. Never hard-code a radius -- use the token.
+
+| Token | Radius | Usage |
+|---|---|---|
+| `extraSmall` | 4 | Inline markers |
+| `small` | 8 | Selected chip corners, button-group inner corners |
+| `medium` | 12 | Pressed-state corner |
+| `large` | 16 | Cards, issue tiles, inputs, list items, FAB |
+| `largeIncreased` | 20 | -- |
+| `extraLarge` | 28 | Dialogs |
+| `extraLargeIncreased` | 32 | Bottom sheets |
+| `full` | stadium | Chips, buttons, nav indicator, label pills, badges |
+
 ### Spacing Rules
-- Screen title padding: `EdgeInsets.fromLTRB(20, 16, 20, 0)`
-- Section header padding: `EdgeInsets.fromLTRB(20, 20, 20, 6)`
-- Issue row padding: `EdgeInsets.symmetric(horizontal: 20, vertical: 9)`
-- Item tile padding: `EdgeInsets.symmetric(horizontal: 20, vertical: 12)`
+- Screen title padding: `EdgeInsets.fromLTRB(20, 14, 20, 0)` (handled by `M3EFlexibleHeaderScaffold`)
+- Section header padding: `EdgeInsets.fromLTRB(22, 22, 20, 8)`
+- Issue tile: outer `symmetric(horizontal: 16, vertical: 2)`, inner `symmetric(horizontal: 16, vertical: 14)`
+- Item tile: outer `symmetric(horizontal: 16, vertical: 2)`, inner `symmetric(horizontal: 16, vertical: 14)`
 - Bottom padding on scrollable lists: 100 (to clear the navbar)
 - Card inner padding (Kanban): `EdgeInsets.all(12)`
-- Chip inner padding: `EdgeInsets.symmetric(horizontal: 8, vertical: 5)` (PropertyChip) or `(12, 7)` (toggle chips)
-- Border radius: 6 (chips), 8 (cards, inputs), 12 (stat cards, FAB), 22 (nav bar glass)
+- Chip inner padding: `symmetric(horizontal: 14, vertical: 7)`, dense `(10, 5)`
+- FAB placement over a list: `right: 20, bottom: 96`
 
-### Borders
-- Card/input border: 0.5px, `colorScheme.outline`
-- Chip border: 0.5px, `colorScheme.outline`
-- Divider: 0.5px, `colorScheme.outline`
+### Borders and Elevation
+- Everything is **flat** -- elevation 0 on every component theme. Separation
+  comes from hairlines and surface steps, not shadows. The only shadow in the
+  app is under the floating glass bars.
+- Card/input/chip border: 0.8px, `colorScheme.outlineVariant`
+- Divider: 0.5px, `colorScheme.outlineVariant`
+
+### Motion
+
+No component animates on a fixed duration + curve; everything runs on a spring.
+Use `M3EPressable` for touch feedback and `M3ESpringBuilder` for anything that
+tracks a changing target. Full token table in
+[M3_EXPRESSIVE.md](M3_EXPRESSIVE.md).
 
 ---
 
@@ -179,34 +223,48 @@ HomeScreen (IndexedStack)
 
 ## Shared Components Catalog
 
+### M3E component set
+**Path:** `lib/widgets/m3e/`
+`M3EButtonGroup`, `M3ESplitButton`, `M3EFabMenu`, `M3EFlexibleHeaderScaffold`,
+`M3EAppBar`, `M3ELoadingIndicator`, `M3EChip`, `M3EFloatingToolbar`,
+`M3EGlassContainer`.
+Full behaviour reference in [M3_EXPRESSIVE.md](M3_EXPRESSIVE.md).
+
+### M3EAppBar
+**Path:** `lib/widgets/m3e/app_bar.dart`
+**Props:** `title`, `subtitle`, `actions`, `leading`, `showDivider`, `bottom`, `backgroundColor`
+**Layout:** 56px row, title in `headlineSmall` (20/w600) with optional `bodySmall` subtitle beneath, hairline divider below. Back button appears only when the route can pop. Actions are `M3EAppBarAction` (44x44 tap target, press-squeeze to 0.86); pass `emphasized: true` to give the single primary action a tonal circle.
+**Used by:** every screen that is not a home tab -- issue detail/create, cycles, modules, pages, views, notifications, analytics, profile, project, project settings, sign-in.
+
 ### AppNavBar
 **Path:** `lib/widgets/app_navbar.dart`
-**Props:** `items` (List<NavItem>), `currentIndex`, `onTap`, `showSearch`, `onSearchTap`, `onSearchDoubleTap`, `onSearchLongPress`
-**Layout:** Frosted-glass pill (`BackdropFilter` + `ClipRRect`, blur: 30/30). Height: 58px, border-radius: 22. Active item gets a tinted pill with label below icon. Search is a separate 58x58 glass circle.
-**Padding:** `EdgeInsets.fromLTRB(20, 0, 20, 10)` -- sits at screen bottom via `extendBody: true`.
-**Overflow:** If items > 4, extra items go to a "More" bottom sheet.
+**Props:** `items` (List<NavItem>), `currentIndex`, `onTap`, `showSearch`, `onSearchTap`, `onSearchDoubleTap`, `onSearchLongPress`, `pendingWrites`
+**Layout:** Frosted-glass pill (`M3EGlassContainer`, blur 30/30). Height 60px, fully rounded. The M3E active indicator is a 56x34 tinted pill that **springs between destinations** (`defaultSpatial`) rather than cross-fading; the active destination reveals its label beneath the icon. Search is a separate 56x60 glass pill.
+**Padding:** `EdgeInsets.fromLTRB(16, 0, 16, 8)` -- sits at screen bottom via `extendBody: true`.
+**Overflow:** If items > 5, extras go to a "More" bottom sheet.
 **Gestures on search:** tap = open search tab, double-tap = open with auto-focus, long-press = open command palette.
-**Reference:** Similar to Linear's floating bottom nav.
 
-### ScreenHeader
-**Path:** `lib/widgets/screen_header.dart`
-**Props:** `title`, `actions` (optional widgets), `subtitle` (optional widget row)
-**Layout:** Padding `(20, 16, 20, 0)`. Title is `fontTitle` (24/w700). Actions sit right-aligned. Subtitle row sits below with top padding 12.
+### M3EFlexibleHeaderScaffold
+**Path:** `lib/widgets/m3e/flexible_app_bar.dart`
+**Props:** `title`, `overline`, `bottom` (persistent row), `actions`, `leading`, `body`, `collapseDistance`
+**Layout:** Toolbar row (brand mark + actions) above a large 24/w700 title. As the body scrolls, the large title row collapses continuously and the toolbar cross-fades from the "Plane" brand to a 17/w600 inline title; the divider fades in only once content is underneath.
+**Replaces** the former `ScreenHeader` (deleted).
 **Used by:** InboxTab, MyIssuesTab, ProjectsTab.
 
 ### SectionHeader
 **Path:** `lib/widgets/section_header.dart`
 **Props:** `label`, `count` (optional int), `color` (optional)
-**Layout:** Padding `(20, 20, 20, 6)`. Label: `fontSection` (13/w500). Count: `fontCaption` (12), secondary color.
-**Used by:** MyIssuesTab, IssueListScreen, CycleListScreen, NotificationScreen, SearchScreen.
+**Layout:** Padding `(22, 22, 20, 8)`. Label uses `M3EType.overline` (11/w600, uppercase). When `color` is set, a 3x12 fully-rounded colour bar carries the state-group hue so the label itself stays legible. Count sits in a stadium badge on `surfaceContainerHigh`.
+**Used by:** MyIssuesTab, ProjectsTab, IssueListScreen, CycleListScreen, NotificationScreen, SearchScreen.
 
 ### IssueTile
 **Path:** `lib/widgets/issue_tile.dart`
 **Props:** `issue`, `state`, `projectIdentifier`, `subtitle`, `showId/showProject/showAssignee/showDueDate/showPriority/showState/showLabels/showSubIssues`, `isUnread`, `timeAgo`, `maxTitleLines`, `onTap`, `allLabels`, `allMembers`
 **Two layouts:**
-1. **Standard row** (no subtitle): horizontal row with optional priority icon, state icon, ID text, title (expanded), label dots, sub-issue count, overdue/due-date icon, assignee avatars. Padding: `(20, 9)`.
-2. **Inbox layout** (subtitle present): two-line layout. Left: state icon (20px). Right column: top line = ID + title, bottom line = priority icon + subtitle text + timeAgo. Unread items get a 3% primary tint background.
-**Reference:** Similar to Linear's issue rows.
+1. **Standard row** (no subtitle): rounded card (`M3EShape.large`) on `surfaceContainerLow`. Horizontal row with optional priority icon, state icon, ID text, title (expanded), stadium label pills, sub-issue count, overdue/due-date icon, assignee avatars. Outer padding `(16, 2)`, inner `(16, 14)`.
+2. **Inbox layout** (subtitle present): two-line layout. Left: state icon (20px). Right column: top line = ID + title, bottom line = priority icon + subtitle text + timeAgo. Unread items sit on `surfaceContainerLow`.
+**Press feedback:** both layouts are wrapped in `M3EPressable` -- the row squeezes to 0.975 (0.985 for inbox) on touch-down and springs back with overshoot on release.
+**Reference:** Linear's issue rows, with M3E press physics.
 
 ### IssueRow (wrapper)
 **Path:** `lib/widgets/issue_row.dart`
@@ -215,18 +273,19 @@ Backward-compatible wrapper around IssueTile. Enables all row properties. Used b
 ### ItemTile
 **Path:** `lib/widgets/item_tile.dart`
 **Props:** `icon`, `iconColor`, `title`, `subtitle`, `leading` (custom widget), `trailing`, `onTap`
-**Layout:** Padding `(20, 12)`. Icon: 20px. Title: `fontBody` (15/w400). Subtitle: `fontCaption` (12), secondary color.
-**Used by:** ProjectsTab, MenuTab, PageListScreen, SearchScreen.
+**Layout:** Rounded card (`M3EShape.large`) on `surfaceContainerLow`. Outer padding `(16, 2)`, inner `(16, 14)`. Icon 20px. Title 15/w500. Subtitle 12, secondary. Wrapped in `M3EPressable` (0.98).
+**Used by:** MenuTab, PageListScreen, SearchScreen.
 
 ### PropertyChip
 **Path:** `lib/widgets/property_chip.dart`
 **Props:** `icon`, `iconColor`, `label`, `onTap`
-**Layout:** Rounded container (radius 6), border 0.5px outline. Padding `(8, 5)`. Icon: 14px. Label: 12/w400.
+**Layout:** `M3EShape.small` corners, 0.8px `outlineVariant` border, padding `(10, 6)`. Icon 14px keeps its **semantic** colour (priority red, state green) while the label stays neutral, so a row of these reads as data rather than as filters. `M3EPressable` (0.94) when tappable.
+**Distinct from `M3EChip`,** which is the selectable filter chip -- selection there changes corner radius as well as tint.
 **Used by:** IssueDetailScreen (status, priority, labels, assignee, dates), CycleDetailScreen, ModuleDetailScreen, ModuleListScreen.
 
 ### LoadingStateWidget
 **Path:** `lib/widgets/loading_state.dart`
-Simple centered `CircularProgressIndicator`. No skeleton loading.
+Centered `M3ELoadingIndicator` (44px) -- a filled shape rotating while morphing through seven lobed forms. Note for tests: it animates forever, so `pumpAndSettle` will time out; use `pump(duration)`.
 
 ### ErrorStateWidget
 **Path:** `lib/widgets/loading_state.dart`
@@ -253,13 +312,13 @@ Shows a Linear-style bottom sheet with grouping/ordering/sort/completed-filter/s
 **Purpose:** Shows activity notifications on issues the user is involved with -- like Linear's Inbox.
 
 **Layout:**
-- Header: `ScreenHeader(title: 'Inbox')` -- 24/w700 title, no actions, no subtitle.
+- Header: `M3EFlexibleHeaderScaffold(title: 'Inbox', overline: 'PENDING NOTIFICATIONS')` -- collapses into the toolbar on scroll.
 - Body: `ListView.separated` of `IssueTile` in inbox mode (with subtitle).
 - Empty state: icon `Icons.inbox_outlined`, "No notifications", subtitle "Activity on your issues will appear here".
 - Loading: `LoadingStateWidget`.
 - Bottom padding: 100.
 
-**Components used:** ScreenHeader, IssueTile (inbox layout), LoadingStateWidget, EmptyStateWidget.
+**Components used:** M3EFlexibleHeaderScaffold, IssueTile (inbox layout), LoadingStateWidget, EmptyStateWidget.
 
 **Data shown:** Notification title (issue name), activity text (actor + action), priority icon, state icon, issue ID, read/unread status, time ago.
 
@@ -288,14 +347,15 @@ Shows a Linear-style bottom sheet with grouping/ordering/sort/completed-filter/s
 **Purpose:** Shows all issues assigned to or created by the current user, across all projects.
 
 **Layout:**
-- Header: `ScreenHeader` with title "My issues", two action icons (edit, more_horiz), and subtitle row with pill filters (Assigned / Created / All).
+- Header: `M3EFlexibleHeaderScaffold` with title "My issues", a `more_horiz` action, and an `M3EButtonGroup` (Assigned / Created / All) pinned below the title. Pressing a scope widens it while its neighbour compresses.
+- Create is an `M3EFabMenu` at `right: 20, bottom: 96` -- expands to "New issue" and "Display options" over a blurred scrim.
 - Pill filters: rounded containers (radius 8), padding `(14, 6)`, `fontSection` (13), filled when selected.
 - Body: grouped list with `SectionHeader` (grouped by state group: Backlog, Unstarted, etc.) + `IssueTile` standard rows.
 - Empty state: "No issues", "All caught up".
 - Loading: `LoadingStateWidget`.
 - Error: `ErrorStateWidget` with retry.
 
-**Components used:** ScreenHeader, SectionHeader, IssueTile (standard), LoadingStateWidget, EmptyStateWidget, ErrorStateWidget.
+**Components used:** M3EFlexibleHeaderScaffold, M3EButtonGroup, M3EFabMenu, M3EChip (display options), SectionHeader, IssueTile (standard), LoadingStateWidget, EmptyStateWidget, ErrorStateWidget.
 
 **Data shown:** Issue name, priority icon, state icon, issue ID with project identifier. Configurable via row properties (status, priority, id, labels, project, due date, assignee).
 
@@ -325,11 +385,11 @@ Shows a Linear-style bottom sheet with grouping/ordering/sort/completed-filter/s
 **Purpose:** Lists all projects in the current workspace.
 
 **Layout:**
-- Header: `ScreenHeader(title: 'Projects')` -- no actions, no subtitle.
+- Header: `M3EFlexibleHeaderScaffold(title: 'Projects')` with a stadium search field pinned below the title (it filters the whole list, so it does not scroll away).
 - Body: `ListView.builder` of `ItemTile` widgets. Each project has a leading 36x36 rounded square (radius 8) with the project identifier text (10px, w600) centered inside, tinted `primary.withAlpha(0.15)`. Trailing: chevron_right icon (20px).
 - Bottom padding: 100.
 
-**Components used:** ScreenHeader, ItemTile (with custom leading), LoadingStateWidget.
+**Components used:** M3EFlexibleHeaderScaffold, SectionHeader, LoadingStateWidget.
 
 **Data shown:** Project name, project identifier (in leading square).
 
@@ -444,7 +504,7 @@ Shows a Linear-style bottom sheet with grouping/ordering/sort/completed-filter/s
 
 **Current issues:**
 - No create button for pages, modules, cycles -- only issues.
-- The AppBar is Material3 default, while home tabs use custom ScreenHeader -- visual inconsistency.
+- Sub-screens use `M3EAppBar` (fixed 56px bar); home tabs use `M3EFlexibleHeaderScaffold` (collapsing). Both are M3E and share the type scale, so the weight now matches -- only the collapse behaviour differs, which is intentional: a detail screen has no large title to collapse.
 - View mode toggle (list/kanban/spreadsheet/calendar) is defined in IssuesTabScreen but currently not exposed in the UI (the `_ViewToggle` widget exists but isn't rendered in the build method).
 
 **Reference:** Similar to Linear's project view with sidebar navigation, adapted to mobile tabs.
@@ -1208,7 +1268,7 @@ Shows a Linear-style bottom sheet with grouping/ordering/sort/completed-filter/s
 
 ### Design Inconsistencies
 5. **Two notification-like screens:** InboxTab (home) and NotificationScreen (menu) serve overlapping purposes.
-6. **AppBar vs ScreenHeader:** Home tabs use custom `ScreenHeader` (24/w700), project sub-screens use Material `AppBar` (20/w600). Different visual weight.
+6. **AppBar vs flexible header:** ~~resolved~~ -- home tabs use `M3EFlexibleHeaderScaffold`, sub-screens use `M3EAppBar`. Both draw from the M3E type scale and share the hairline divider; no Material `AppBar` remains in the app.
 7. **ListTile vs ItemTile:** ViewListScreen uses raw `ListTile` with hardcoded grey colors, while every other screen uses `ItemTile` with theme colors.
 8. **Display options duplication:** MyIssuesTab has its own display options implementation; IssueListScreen uses the shared `showDisplayOptions`. Should consolidate.
 9. **Date formats vary:** Calendar uses ISO (YYYY-MM-DD), Pages use European (dd.MM.yyyy), Analytics uses "d/M", notifications use `timeAgo`. No consistent formatting.
