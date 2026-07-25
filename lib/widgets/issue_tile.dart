@@ -160,21 +160,43 @@ class IssueTile extends StatelessWidget {
                         Wrap(
                           spacing: 6,
                           runSpacing: 4,
-                          children: issueLabels.take(3).map((l) => Container(
-                                padding: const EdgeInsets.symmetric(
-                                    horizontal: 8, vertical: 3),
-                                decoration: BoxDecoration(
-                                  color: _parseColor(l.color)
-                                      .withValues(alpha: 0.15),
-                                  borderRadius:
-                                      BorderRadius.circular(M3EShape.full),
-                                ),
-                                child: Text(
-                                  l.name,
-                                  style: theme.textTheme.labelSmall
-                                      ?.copyWith(color: _parseColor(l.color)),
-                                ),
-                              )).toList(),
+                          // A label's colour is whatever hex the server holds,
+                          // so it cannot be trusted as a text colour — a dark
+                          // one vanishes on the dark theme, a pale one on the
+                          // light. It carries in the fill and the dot instead,
+                          // and the name stays on a role, which is what the
+                          // detail screen already does.
+                          children: issueLabels.take(3).map((l) {
+                            final labelColor = _parseColor(l.color);
+                            return Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 8, vertical: 3),
+                              decoration: BoxDecoration(
+                                color: labelColor.withValues(alpha: 0.15),
+                                borderRadius:
+                                    BorderRadius.circular(M3EShape.full),
+                                border: Border.all(
+                                    color: labelColor.withValues(alpha: 0.4),
+                                    width: 0.8),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Container(
+                                    width: 6,
+                                    height: 6,
+                                    decoration: BoxDecoration(
+                                      color: labelColor,
+                                      shape: BoxShape.circle,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 5),
+                                  Text(l.name,
+                                      style: theme.textTheme.labelSmall),
+                                ],
+                              ),
+                            );
+                          }).toList(),
                         ),
                       ],
                     ],

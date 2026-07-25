@@ -140,6 +140,39 @@ void main() {
       });
     }
 
+    for (final entry in {
+      'light': PlaneTheme.light(),
+      'dark': PlaneTheme.dark(),
+    }.entries) {
+      testWidgets('${entry.key} surface ramp steps down at every level',
+          (tester) async {
+        final scheme = entry.value.colorScheme;
+        // Nothing else separates a card from the page it sits on. When two
+        // adjacent steps hold the same value — surface and surfaceContainerLow
+        // were both #F8F8F8 in light mode — every filled surface reads as flat
+        // and only its outline says where it ends.
+        final ramp = <String, Color>{
+          'surfaceContainerLowest': scheme.surfaceContainerLowest,
+          'surface': scheme.surface,
+          'surfaceContainerLow': scheme.surfaceContainerLow,
+          'surfaceContainer': scheme.surfaceContainer,
+          'surfaceContainerHigh': scheme.surfaceContainerHigh,
+          'surfaceContainerHighest': scheme.surfaceContainerHighest,
+        };
+
+        final names = ramp.keys.toList();
+        for (var i = 0; i < names.length - 1; i++) {
+          final here = _luminance(ramp[names[i]]!);
+          final next = _luminance(ramp[names[i + 1]]!);
+          // Dark themes climb as they go up the ramp, light themes descend.
+          final moved = entry.key == 'light' ? here > next : here < next;
+          expect(moved, isTrue,
+              reason: '${names[i]} and ${names[i + 1]} do not differ on '
+                  '${entry.key}');
+        }
+      });
+    }
+
     testWidgets('every state group has its own glyph', (tester) async {
       final icons = groups.map(PlaneTheme.stateIcon).toSet();
       expect(icons.length, groups.length,

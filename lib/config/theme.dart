@@ -39,7 +39,9 @@ class PlaneTheme {
 
   // Light theme legacy colors
   static const _bgLight = Color(0xFFFFFFFF);
-  static const _surfaceLight = Color(0xFFF8F8F8);
+  // Sits one step below the scaffold and one above surfaceContainerLow — see
+  // the ramp note further down.
+  static const _surfaceLight = Color(0xFFFCFCFC);
   static const _textPrimaryLight = Color(0xFF1A1A1A);
   static const _textSecondaryLight = Color(0xFF6B6B6B);
 
@@ -201,14 +203,21 @@ class PlaneTheme {
     }
   }
 
-  // Light theme surface variants
-  static const _surfaceContainerLight = Color(0xFFF5F5F5);
-  static const _surfaceContainerLowLight = Color(0xFFF8F8F8);
-  static const _surfaceContainerHighLight = Color(0xFFEBEBEB);
-  static const _surfaceContainerHighestLight = Color(0xFFE0E0E0);
+  // Light theme surface variants.
+  //
+  // The ramp has to descend in luminance at every step, because that descent is
+  // the only thing separating a card from the page behind it. It did not:
+  // `surface` and `surfaceContainerLow` were both #F8F8F8, so every card, tile
+  // and text field fill in light mode was exactly the colour it sat on and only
+  // its outline said where it ended. The dark ramp was stepped correctly all
+  // along; this was light-only.
+  static const _surfaceContainerLight = Color(0xFFF2F2F2);
+  static const _surfaceContainerLowLight = Color(0xFFF7F7F7);
+  static const _surfaceContainerHighLight = Color(0xFFECECEC);
+  static const _surfaceContainerHighestLight = Color(0xFFE5E5E5);
   // WCAG 1.4.11 asks 3:1 of any boundary that identifies a control. The old
   // #E0E0E0 managed 1.32:1 on white — a field outline nobody could see. This
-  // clears it at 3.45:1 on background and 3.25:1 on cards.
+  // clears it at 3.45:1 on background and 3.22:1 on cards.
   static const _outlineLight = Color(0xFF8A8A8A);
   static const _outlineVariantLight = Color(0xFFD0D0D0);
 

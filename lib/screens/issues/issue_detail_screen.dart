@@ -353,7 +353,7 @@ class _IssueDetailScreenState extends ConsumerState<IssueDetailScreen> {
                           height: 4,
                           decoration: BoxDecoration(
                             shape: BoxShape.circle,
-                            color: PlaneTheme.outlineVariant,
+                            color: theme.colorScheme.outlineVariant,
                           ),
                         ),
                         Text(
@@ -581,7 +581,10 @@ class _IssueDetailScreenState extends ConsumerState<IssueDetailScreen> {
                 children: [
                   CircleAvatar(
                     radius: 14,
-                    backgroundColor: PlaneTheme.surfaceContainerHighest,
+                    // The scheme role, not the dark constant of the same name:
+                    // the raw one stayed near-black in light mode, so the
+                    // comment bar carried a dark disc with a grey glyph on it.
+                    backgroundColor: theme.colorScheme.surfaceContainerHighest,
                     child: Icon(Icons.person,
                         size: 14, color: theme.colorScheme.onSurfaceVariant),
                   ),
