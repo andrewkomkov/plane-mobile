@@ -63,21 +63,29 @@ fi
 # harness, not the app, so launching it by hand just sits on the splash screen
 # looking like a hang. Put the real app back, so the device is usable after a
 # run instead of quietly broken.
+#
+# It has to be REBUILT, not reinstalled from build/. `flutter test` writes the
+# test APK to the very same path the app build uses, so installing that file
+# again just reinstates the harness — which is precisely the trap this is here
+# to close.
+readonly APK='build/app/outputs/flutter-apk/app-debug.apk'
+
 restore_app() {
-  local apk='build/app/outputs/flutter-apk/app-debug.apk'
-  if [[ ! -f "$apk" ]]; then
-    echo >&2
-    echo "note: the test binary is still installed on the device." >&2
-    echo "      Restore the app with: flutter build apk --debug && adb install -r $apk" >&2
+  echo
+  echo 'Rebuilding and reinstalling the app over the test binary...'
+  if ! flutter build apk --debug >/dev/null 2>&1 || [[ ! -f "$APK" ]]; then
+    echo "warning: could not rebuild the app; the TEST binary is still installed." >&2
+    echo "         Fix with: flutter build apk --debug && adb install -r $APK" >&2
     return
   fi
-  echo
-  echo 'Restoring the app build over the test binary...'
   local adb_args=()
   [[ -n "$DEVICE" ]] && adb_args=(-s "$DEVICE")
-  adb "${adb_args[@]}" install -r "$apk" >/dev/null 2>&1 \
-    && echo 'Done — the app on the device is the app again.' \
-    || echo 'warning: could not reinstall the app build.' >&2
+  if adb "${adb_args[@]}" install -r "$APK" >/dev/null 2>&1; then
+    echo 'Done — the app on the device is the app again.'
+  else
+    echo "warning: rebuilt the app but could not install it." >&2
+    echo "         Fix with: adb install -r $APK" >&2
+  fi
 }
 trap restore_app EXIT
 
