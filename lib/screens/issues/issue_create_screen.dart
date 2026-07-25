@@ -199,8 +199,7 @@ class _IssueCreateScreenState extends State<IssueCreateScreen> {
                                 decoration: BoxDecoration(
                                   shape: BoxShape.circle,
                                   color: _currentState != null
-                                      ? PlaneTheme.stateGroupColor(
-                                          _currentState!.group)
+                                      ? PlaneTheme.stateGroupColor(context, _currentState!.group)
                                       : PlaneTheme.backlog,
                                 ),
                               ),
@@ -255,8 +254,7 @@ class _IssueCreateScreenState extends State<IssueCreateScreen> {
                               Icon(
                                 PlaneTheme.priorityIcon(_selectedPriority),
                                 size: 16,
-                                color: PlaneTheme.priorityColor(
-                                    _selectedPriority),
+                                color: PlaneTheme.priorityColor(context, _selectedPriority),
                               ),
                               const SizedBox(width: 8),
                               Expanded(
@@ -304,7 +302,7 @@ class _IssueCreateScreenState extends State<IssueCreateScreen> {
                   leading: Icon(
                     PlaneTheme.stateIcon(s.group),
                     size: 18,
-                    color: PlaneTheme.stateGroupColor(s.group),
+                    color: PlaneTheme.stateGroupColor(context, s.group),
                   ),
                   title: Text(s.name, style: const TextStyle(fontSize: 14)),
                   trailing: _selectedState == s.id
@@ -337,7 +335,7 @@ class _IssueCreateScreenState extends State<IssueCreateScreen> {
                   leading: Icon(
                     PlaneTheme.priorityIcon(p),
                     size: 18,
-                    color: PlaneTheme.priorityColor(p),
+                    color: PlaneTheme.priorityColor(context, p),
                   ),
                   title: Text(p[0].toUpperCase() + p.substring(1),
                       style: const TextStyle(fontSize: 14)),

@@ -128,8 +128,7 @@ class SpreadsheetView extends StatelessWidget {
                                   PlaneTheme.stateIcon(
                                       state?.group ?? 'backlog'),
                                   size: 14,
-                                  color: PlaneTheme.stateGroupColor(
-                                      state?.group ?? 'backlog'),
+                                  color: PlaneTheme.stateGroupColor(context, state?.group ?? 'backlog'),
                                 ),
                                 const SizedBox(width: 4),
                                 Flexible(
@@ -162,8 +161,7 @@ class SpreadsheetView extends StatelessWidget {
                                 Icon(
                                   PlaneTheme.priorityIcon(issue.priority),
                                   size: 14,
-                                  color: PlaneTheme.priorityColor(
-                                      issue.priority),
+                                  color: PlaneTheme.priorityColor(context, issue.priority),
                                 ),
                                 const SizedBox(width: 4),
                                 Text(
@@ -226,7 +224,7 @@ class SpreadsheetView extends StatelessWidget {
           children: states.values
               .map((s) => ListTile(
                     leading: Icon(PlaneTheme.stateIcon(s.group),
-                        color: PlaneTheme.stateGroupColor(s.group),
+                        color: PlaneTheme.stateGroupColor(context, s.group),
                         size: 18),
                     title: Text(s.name,
                         style: const TextStyle(fontSize: 14)),
@@ -253,7 +251,7 @@ class SpreadsheetView extends StatelessWidget {
           children: ['urgent', 'high', 'medium', 'low', 'none']
               .map((p) => ListTile(
                     leading: Icon(PlaneTheme.priorityIcon(p),
-                        color: PlaneTheme.priorityColor(p), size: 18),
+                        color: PlaneTheme.priorityColor(context, p), size: 18),
                     title: Text(p[0].toUpperCase() + p.substring(1),
                         style: const TextStyle(fontSize: 14)),
                     onTap: () async {

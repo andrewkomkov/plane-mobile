@@ -130,8 +130,7 @@ class _KanbanBoardScreenState extends State<KanbanBoardScreen> {
                             PlaneTheme.stateIcon(
                                 state?.group ?? 'backlog'),
                             size: PlaneTheme.iconSmall,
-                            color: PlaneTheme.stateGroupColor(
-                                state?.group ?? 'backlog'),
+                            color: PlaneTheme.stateGroupColor(context, state?.group ?? 'backlog'),
                           ),
                           const SizedBox(width: 6),
                           Text(
@@ -321,7 +320,7 @@ class _KanbanCardContent extends StatelessWidget {
               Icon(
                 PlaneTheme.priorityIcon(issue.priority),
                 size: PlaneTheme.iconSmall,
-                color: PlaneTheme.priorityColor(issue.priority),
+                color: PlaneTheme.priorityColor(context, issue.priority),
               ),
             ],
           ),

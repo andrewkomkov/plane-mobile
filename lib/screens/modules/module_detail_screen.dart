@@ -204,7 +204,7 @@ class _ModuleDetailScreenState extends ConsumerState<ModuleDetailScreen> {
                         secondary: Icon(
                           PlaneTheme.priorityIcon(issue.priority),
                           size: 16,
-                          color: PlaneTheme.priorityColor(issue.priority),
+                          color: PlaneTheme.priorityColor(context, issue.priority),
                         ),
                         controlAffinity: ListTileControlAffinity.trailing,
                         dense: true,

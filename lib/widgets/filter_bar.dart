@@ -265,7 +265,7 @@ class FilterBar extends StatelessWidget {
                       });
                     },
                     secondary: Icon(PlaneTheme.stateIcon(s.group),
-                        color: PlaneTheme.stateGroupColor(s.group), size: PlaneTheme.iconLarge),
+                        color: PlaneTheme.stateGroupColor(context, s.group), size: PlaneTheme.iconLarge),
                     title:
                         Text(s.name, style: const TextStyle(fontSize: PlaneTheme.fontBody)),
                     controlAffinity: ListTileControlAffinity.trailing,
@@ -305,7 +305,7 @@ class FilterBar extends StatelessWidget {
                       });
                     },
                     secondary: Icon(PlaneTheme.priorityIcon(p),
-                        color: PlaneTheme.priorityColor(p), size: PlaneTheme.iconLarge),
+                        color: PlaneTheme.priorityColor(context, p), size: PlaneTheme.iconLarge),
                     title: Text(p[0].toUpperCase() + p.substring(1),
                         style: const TextStyle(fontSize: PlaneTheme.fontBody)),
                     controlAffinity: ListTileControlAffinity.trailing,

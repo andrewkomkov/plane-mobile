@@ -269,7 +269,7 @@ class _AnalyticsScreenState extends ConsumerState<AnalyticsScreen> {
           children: [
             Icon(PlaneTheme.priorityIcon(issue.priority),
                 size: PlaneTheme.iconMedium,
-                color: PlaneTheme.priorityColor(issue.priority)),
+                color: PlaneTheme.priorityColor(context, issue.priority)),
             const SizedBox(width: 10),
             Expanded(
               child: Text(issue.name,
@@ -291,11 +291,11 @@ class _AnalyticsScreenState extends ConsumerState<AnalyticsScreen> {
   }
 
   Color _priorityColor(String priority) {
-    return PlaneTheme.priorityColor(priority);
+    return PlaneTheme.priorityColor(context, priority);
   }
 
   Color _stateGroupColor(String group) {
-    return PlaneTheme.stateGroupColor(group);
+    return PlaneTheme.stateGroupColor(context, group);
   }
 
   String _capitalize(String s) {

@@ -67,12 +67,29 @@ class PlaneTheme {
   static const double iconMedium = 16;
   static const double iconLarge = 20;
 
+  // Priority and state colours.
+  //
+  // These carry meaning rather than decoration, so they are not part of the
+  // ColorScheme — but they are still drawn on a surface, and the surface
+  // changes with the theme. The base set was picked against near-black. On
+  // white the light hues collapse: amber `started` measures 2.02:1 and yellow
+  // `medium` 1.81:1 against `_surfaceLight`, where WCAG 1.4.11 asks 3:1 of any
+  // icon carrying information.
+  //
+  // So each token that fails gets a darker twin for light mode, same hue,
+  // measured at 4.6:1 or better. The four that already pass on both — urgent,
+  // low, noPriority, cancelled — keep one value, because a colour that works is
+  // better left recognisable across themes.
+
   // Priority colors
   static const urgent = Color(0xFFEF4444);
   static const high = Color(0xFFF97316);
   static const medium = Color(0xFFEAB308);
   static const low = Color(0xFF3B82F6);
   static const noPriority = Color(0xFF6B7280);
+
+  static const _highLight = Color(0xFFC2410C);
+  static const _mediumLight = Color(0xFFA16207);
 
   // State group colors
   static const backlog = Color(0xFF6B7280);
@@ -81,22 +98,31 @@ class PlaneTheme {
   static const completed = Color(0xFF22C55E);
   static const cancelled = Color(0xFFEF4444);
 
-  static Color priorityColor(String priority) {
+  static const _unstartedLight = Color(0xFF4B5563);
+  static const _startedLight = Color(0xFFB45309);
+  static const _completedLight = Color(0xFF15803D);
+
+  static bool _isLight(BuildContext context) =>
+      Theme.of(context).brightness == Brightness.light;
+
+  static Color priorityColor(BuildContext context, String priority) {
+    final light = _isLight(context);
     switch (priority) {
       case 'urgent': return urgent;
-      case 'high': return high;
-      case 'medium': return medium;
+      case 'high': return light ? _highLight : high;
+      case 'medium': return light ? _mediumLight : medium;
       case 'low': return low;
       default: return noPriority;
     }
   }
 
-  static Color stateGroupColor(String group) {
+  static Color stateGroupColor(BuildContext context, String group) {
+    final light = _isLight(context);
     switch (group) {
       case 'backlog': return backlog;
-      case 'unstarted': return unstarted;
-      case 'started': return started;
-      case 'completed': return completed;
+      case 'unstarted': return light ? _unstartedLight : unstarted;
+      case 'started': return light ? _startedLight : started;
+      case 'completed': return light ? _completedLight : completed;
       case 'cancelled': return cancelled;
       default: return backlog;
     }
@@ -114,7 +140,11 @@ class PlaneTheme {
 
   static IconData stateIcon(String group) {
     switch (group) {
-      case 'backlog': return Icons.circle_outlined;
+      // Backlog and unstarted used to share this glyph and differ only by two
+      // greys 1.9:1 apart, which in a list is no difference at all. The state
+      // is the one thing an issue row has to say, so it says it in shape:
+      // queued dots for backlog, an empty ring for a todo not yet picked up.
+      case 'backlog': return Icons.pending_outlined;
       case 'unstarted': return Icons.circle_outlined;
       case 'started': return Icons.timelapse;
       case 'completed': return Icons.check_circle;

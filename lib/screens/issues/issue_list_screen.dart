@@ -155,9 +155,9 @@ class _IssueListScreenState extends ConsumerState<IssueListScreen>
   Color _groupColor(String key) {
     switch (_display.groupByField) {
       case GroupByField.state:
-        return PlaneTheme.stateGroupColor(key);
+        return PlaneTheme.stateGroupColor(context, key);
       case GroupByField.priority:
-        return PlaneTheme.priorityColor(key);
+        return PlaneTheme.priorityColor(context, key);
       case GroupByField.assignee:
       case GroupByField.label:
         return Theme.of(context).colorScheme.primary;

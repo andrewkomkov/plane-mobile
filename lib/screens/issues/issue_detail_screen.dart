@@ -339,15 +339,14 @@ class _IssueDetailScreenState extends ConsumerState<IssueDetailScreen> {
                         PropertyChip(
                           icon: PlaneTheme.stateIcon(
                               state?.group ?? 'backlog'),
-                          iconColor: PlaneTheme.stateGroupColor(
-                              state?.group ?? 'backlog'),
+                          iconColor: PlaneTheme.stateGroupColor(context, state?.group ?? 'backlog'),
                           label: state?.name ?? 'Unknown',
                           onTap: () => _showStatePicker(),
                         ),
                         PropertyChip(
                           icon: PlaneTheme.priorityIcon(issue.priority),
                           iconColor:
-                              PlaneTheme.priorityColor(issue.priority),
+                              PlaneTheme.priorityColor(context, issue.priority),
                           label: issue.priority[0].toUpperCase() +
                               issue.priority.substring(1),
                           onTap: () => _showPriorityPicker(),
@@ -663,14 +662,13 @@ class _IssueDetailScreenState extends ConsumerState<IssueDetailScreen> {
                     Icon(
                       PlaneTheme.stateIcon(subState?.group ?? 'backlog'),
                       size: 16,
-                      color: PlaneTheme.stateGroupColor(
-                          subState?.group ?? 'backlog'),
+                      color: PlaneTheme.stateGroupColor(context, subState?.group ?? 'backlog'),
                     ),
                     const SizedBox(width: 8),
                     Icon(
                       PlaneTheme.priorityIcon(sub.priority),
                       size: 14,
-                      color: PlaneTheme.priorityColor(sub.priority),
+                      color: PlaneTheme.priorityColor(context, sub.priority),
                     ),
                     const SizedBox(width: 8),
                     Expanded(
@@ -1001,7 +999,7 @@ class _IssueDetailScreenState extends ConsumerState<IssueDetailScreen> {
           children: widget.states.values
               .map((s) => ListTile(
                     leading: Icon(PlaneTheme.stateIcon(s.group),
-                        color: PlaneTheme.stateGroupColor(s.group),
+                        color: PlaneTheme.stateGroupColor(context, s.group),
                         size: 18),
                     title: Text(s.name,
                         style: const TextStyle(fontSize: 14)),
@@ -1026,7 +1024,7 @@ class _IssueDetailScreenState extends ConsumerState<IssueDetailScreen> {
           children: ['urgent', 'high', 'medium', 'low', 'none']
               .map((p) => ListTile(
                     leading: Icon(PlaneTheme.priorityIcon(p),
-                        color: PlaneTheme.priorityColor(p), size: 18),
+                        color: PlaneTheme.priorityColor(context, p), size: 18),
                     title: Text(p[0].toUpperCase() + p.substring(1),
                         style: const TextStyle(fontSize: 14)),
                     onTap: () {

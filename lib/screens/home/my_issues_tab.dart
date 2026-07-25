@@ -196,9 +196,9 @@ class _MyIssuesTabState extends ConsumerState<MyIssuesTab>
   Color _groupColor(String key) {
     switch (_filterState.groupBy) {
       case GroupByField.state:
-        return PlaneTheme.stateGroupColor(key);
+        return PlaneTheme.stateGroupColor(context, key);
       case GroupByField.priority:
-        return PlaneTheme.priorityColor(key);
+        return PlaneTheme.priorityColor(context, key);
       case GroupByField.assignee:
       case GroupByField.label:
         return Theme.of(context).colorScheme.primary;
@@ -574,7 +574,7 @@ class _MyIssuesTabState extends ConsumerState<MyIssuesTab>
     for (final entry in grouped.entries) {
       items.add(SectionHeader(
         label: groupLabel(entry.key),
-        color: PlaneTheme.stateGroupColor(entry.key),
+        color: PlaneTheme.stateGroupColor(context, entry.key),
       ));
       for (final issue in entry.value) {
         final state = _allStates[issue.state];

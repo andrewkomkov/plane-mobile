@@ -1,0 +1,103 @@
+import 'dart:math' as math;
+
+import 'package:flutter/material.dart';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:plane_mobile/config/theme.dart';
+
+/// Relative luminance, WCAG 2.1 formula.
+double _luminance(Color c) {
+  double channel(double v) =>
+      v <= 0.03928 ? v / 12.92 : math.pow((v + 0.055) / 1.055, 2.4).toDouble();
+  return 0.2126 * channel(c.r) +
+      0.7152 * channel(c.g) +
+      0.0722 * channel(c.b);
+}
+
+double _contrast(Color a, Color b) {
+  final la = _luminance(a);
+  final lb = _luminance(b);
+  final hi = math.max(la, lb);
+  final lo = math.min(la, lb);
+  return (hi + 0.05) / (lo + 0.05);
+}
+
+/// Renders under a given theme and hands back a BuildContext from inside it,
+/// which is what the palette resolves against.
+Future<BuildContext> _contextFor(WidgetTester tester, ThemeData theme) async {
+  late BuildContext captured;
+  await tester.pumpWidget(MaterialApp(
+    theme: theme,
+    home: Builder(builder: (context) {
+      captured = context;
+      return const SizedBox();
+    }),
+  ));
+  return captured;
+}
+
+void main() {
+  // WCAG 1.4.11: a graphical object that carries meaning needs 3:1 against
+  // what is behind it. These icons are the only thing saying what state or
+  // priority an issue has, so they qualify.
+  const minimum = 3.0;
+
+  const priorities = ['urgent', 'high', 'medium', 'low', 'none'];
+  const groups = [
+    'backlog',
+    'unstarted',
+    'started',
+    'completed',
+    'cancelled',
+  ];
+
+  group('palette contrast', () {
+    for (final entry in {
+      'light': PlaneTheme.light(),
+      'dark': PlaneTheme.dark(),
+    }.entries) {
+      testWidgets('${entry.key} theme clears $minimum:1 on its surfaces',
+          (tester) async {
+        final theme = entry.value;
+        final context = await _contextFor(tester, theme);
+        final scheme = theme.colorScheme;
+
+        // Both surfaces matter: rows sit on `surface`, the page behind them on
+        // the scaffold background, and the same icon is drawn over each.
+        final backdrops = <String, Color>{
+          'surface': scheme.surface,
+          'scaffold': theme.scaffoldBackgroundColor,
+        };
+
+        for (final backdrop in backdrops.entries) {
+          for (final p in priorities) {
+            final ratio =
+                _contrast(PlaneTheme.priorityColor(context, p), backdrop.value);
+            expect(ratio, greaterThanOrEqualTo(minimum),
+                reason: 'priority "$p" on ${entry.key} ${backdrop.key} '
+                    'measures ${ratio.toStringAsFixed(2)}:1');
+          }
+          for (final g in groups) {
+            final ratio = _contrast(
+                PlaneTheme.stateGroupColor(context, g), backdrop.value);
+            expect(ratio, greaterThanOrEqualTo(minimum),
+                reason: 'state "$g" on ${entry.key} ${backdrop.key} '
+                    'measures ${ratio.toStringAsFixed(2)}:1');
+          }
+        }
+      });
+    }
+
+    testWidgets('backlog and unstarted are told apart by shape', (tester) async {
+      // They sit two greys apart, which is not a difference you can see in a
+      // list. The glyph has to carry it.
+      expect(PlaneTheme.stateIcon('backlog'),
+          isNot(PlaneTheme.stateIcon('unstarted')));
+    });
+
+    testWidgets('every state group has its own glyph', (tester) async {
+      final icons = groups.map(PlaneTheme.stateIcon).toSet();
+      expect(icons.length, groups.length,
+          reason: 'two state groups share an icon');
+    });
+  });
+}

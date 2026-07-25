@@ -117,7 +117,7 @@ class IssueTile extends StatelessWidget {
                     PlaneTheme.stateIcon(state?.group ?? 'backlog'),
                     size: PlaneTheme.iconMedium,
                     color: state != null
-                        ? PlaneTheme.stateGroupColor(state!.group)
+                        ? PlaneTheme.stateGroupColor(context, state!.group)
                         : PlaneTheme.backlog,
                   ),
                   const SizedBox(width: 12),
@@ -141,7 +141,7 @@ class IssueTile extends StatelessWidget {
                             Icon(
                               PlaneTheme.priorityIcon(issue.priority),
                               size: PlaneTheme.iconSmall,
-                              color: PlaneTheme.priorityColor(issue.priority),
+                              color: PlaneTheme.priorityColor(context, issue.priority),
                             ),
                           ],
                         ],
@@ -278,7 +278,7 @@ class IssueTile extends StatelessWidget {
               child: Icon(
                 PlaneTheme.stateIcon(state?.group ?? 'backlog'),
                 size: PlaneTheme.iconLarge,
-                color: PlaneTheme.stateGroupColor(state?.group ?? 'backlog'),
+                color: PlaneTheme.stateGroupColor(context, state?.group ?? 'backlog'),
               ),
             ),
             const SizedBox(width: 14),
@@ -320,7 +320,7 @@ class IssueTile extends StatelessWidget {
                       if (showPriority) ...[
                         Icon(PlaneTheme.priorityIcon(issue.priority),
                             size: PlaneTheme.iconSmall,
-                            color: PlaneTheme.priorityColor(issue.priority)),
+                            color: PlaneTheme.priorityColor(context, issue.priority)),
                         const SizedBox(width: 6),
                       ],
                       Expanded(

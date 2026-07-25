@@ -508,7 +508,7 @@ class _ProjectSettingsScreenState
                       contentPadding: EdgeInsets.zero,
                       leading: Icon(
                         PlaneTheme.stateIcon(s.group),
-                        color: PlaneTheme.stateGroupColor(s.group),
+                        color: PlaneTheme.stateGroupColor(context, s.group),
                         size: 20,
                       ),
                       title: Text(s.name,
