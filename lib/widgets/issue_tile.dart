@@ -56,9 +56,28 @@ class IssueTile extends StatelessWidget {
   /// External automation locates a row by its issue identifier (e.g. "AFS-415")
   /// with a prefix match, so the identifier has to be the first token. The name
   /// follows so a human listener still knows which issue this is.
-  String get _semanticLabel {
-    if (projectIdentifier == null) return issue.name;
-    return '$projectIdentifier-${issue.sequenceId} ${issue.name}';
+  ///
+  /// The label has to carry the row's properties too. M3EPressable replaces the
+  /// subtree's semantics when given a label, so the state icon, priority,
+  /// labels and assignee avatars are erased from the tree — a screen-reader
+  /// user would otherwise get none of what a sighted user reads at a glance.
+  String _semanticLabelFor(List<Member> members, List<Label> labels) {
+    final parts = <String>[
+      if (projectIdentifier != null) '$projectIdentifier-${issue.sequenceId}',
+      issue.name,
+      if (showState && state != null) 'state ${state!.name}',
+      if (showPriority && issue.priority != 'none')
+        'priority ${issue.priority}',
+      if (showLabels && labels.isNotEmpty)
+        'labels ${labels.take(3).map((l) => l.name).join(', ')}',
+      if (showAssignee && members.isNotEmpty)
+        'assigned to ${members.take(3).map((m) => m.displayName).join(', ')}',
+      if (showSubIssues && issue.subIssuesCount > 0)
+        '${issue.subIssuesCount} sub-issues',
+      if (showDueDate && issue.isOverdue) 'overdue',
+      if (isUnread) 'unread',
+    ];
+    return parts.join(', ');
   }
 
   @override
@@ -82,7 +101,7 @@ class IssueTile extends StatelessWidget {
       child: M3EPressable(
         pressedScale: 0.975,
         onTap: onTap,
-        semanticLabel: _semanticLabel,
+        semanticLabel: _semanticLabelFor(issueMembers, issueLabels),
         child: DecoratedBox(
           decoration: BoxDecoration(
             color: theme.colorScheme.surfaceContainerLow,
@@ -244,7 +263,7 @@ class IssueTile extends StatelessWidget {
     return M3EPressable(
       pressedScale: 0.985,
       onTap: onTap,
-      semanticLabel: _semanticLabel,
+      semanticLabel: _semanticLabelFor(const [], const []),
       child: Container(
         color: isUnread
             ? theme.colorScheme.surfaceContainerLow

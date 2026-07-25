@@ -95,10 +95,13 @@ class AppNavBar extends StatelessWidget {
                 pressedScale: 0.92,
                 onTap: onSearchTap,
                 onLongPress: onSearchLongPress,
+                // Declared on M3EPressable, not on a nested GestureDetector:
+                // a labelled control excludes its subtree, which silently
+                // dropped this gesture for assistive tech.
+                onDoubleTap: onSearchDoubleTap,
                 semanticLabel: 'Search',
-                child: GestureDetector(
-                  onDoubleTap: onSearchDoubleTap,
-                  child: M3EGlassContainer(
+                child: Builder(
+                  builder: (context) => M3EGlassContainer(
                     height: _NavMetrics.barHeightFor(context),
                     width: 56,
                     child: Center(

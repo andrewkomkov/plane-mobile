@@ -183,6 +183,11 @@ class M3EPressable extends StatefulWidget {
   /// which destination or filter is currently active.
   final bool? selected;
 
+  /// Re-declared on the semantics node alongside [onTap]. A labelled control
+  /// excludes its subtree, which would otherwise drop this action from
+  /// assistive tech entirely.
+  final VoidCallback? onDoubleTap;
+
   const M3EPressable({
     super.key,
     required this.child,
@@ -193,6 +198,7 @@ class M3EPressable extends StatefulWidget {
     this.onPressedChanged,
     this.semanticLabel,
     this.selected,
+    this.onDoubleTap,
   });
 
   @override
@@ -216,6 +222,7 @@ class _M3EPressableState extends State<M3EPressable> {
       onTapCancel: widget.onTap == null ? null : () => _setPressed(false),
       onTap: widget.onTap,
       onLongPress: widget.onLongPress,
+      onDoubleTap: widget.onDoubleTap,
       behavior: HitTestBehavior.opaque,
       child: M3ESpringBuilder(
         value: _pressed ? widget.pressedScale : 1.0,
