@@ -2,7 +2,6 @@ import '../config/api_client.dart';
 import '../models/issue.dart';
 import '../models/state.dart';
 import '../models/activity.dart';
-import '../models/attachment.dart';
 import '../models/link.dart';
 
 class IssueService {
@@ -155,23 +154,6 @@ class IssueService {
     final list = data is Map ? (data['results'] ?? []) : data;
     if (list is List) {
       return list.map((e) => Activity.fromJson(e)).toList();
-    }
-    return [];
-  }
-
-  static Future<List<Attachment>> getAttachments(
-    String workspaceSlug,
-    String projectId,
-    String issueId,
-  ) async {
-    final dio = await ApiClient.getInstance();
-    final response = await dio.get(
-      '/workspaces/$workspaceSlug/projects/$projectId/issues/$issueId/issue-attachments/',
-    );
-    final data = response.data;
-    final list = data is Map ? (data['results'] ?? []) : data;
-    if (list is List) {
-      return list.map((e) => Attachment.fromJson(e)).toList();
     }
     return [];
   }

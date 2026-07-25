@@ -356,8 +356,8 @@ class _ModuleDetailScreenState extends ConsumerState<ModuleDetailScreen> {
                 }
               }
             },
-            child: const Text('Delete',
-                style: TextStyle(color: Colors.red)),
+            child: Text('Delete',
+                style: TextStyle(color: Theme.of(ctx).colorScheme.error)),
           ),
         ],
       ),
@@ -526,9 +526,9 @@ class _ModuleDetailScreenState extends ConsumerState<ModuleDetailScreen> {
                               alignment: Alignment.centerRight,
                               padding:
                                   const EdgeInsets.only(right: 20),
-                              color: Colors.red.withValues(alpha: 0.1),
-                              child: const Icon(Icons.remove_circle_outline,
-                                  color: Colors.red, size: PlaneTheme.iconLarge),
+                              color: theme.colorScheme.error.withValues(alpha: 0.1),
+                              child: Icon(Icons.remove_circle_outline,
+                                  color: theme.colorScheme.error, size: PlaneTheme.iconLarge),
                             ),
                             confirmDismiss: (_) async {
                               await _removeIssue(issue);
@@ -580,13 +580,13 @@ class _ModuleDetailScreenState extends ConsumerState<ModuleDetailScreen> {
               },
             ),
             ListTile(
-              leading: const Icon(Icons.delete_outline,
-                  color: Colors.red, size: 20),
+              leading: Icon(Icons.delete_outline,
+                  color: Theme.of(ctx).colorScheme.error, size: 20),
               title: Text('Delete module',
                   style: Theme.of(ctx)
                       .textTheme
                       .bodyMedium
-                      ?.copyWith(color: Colors.red)),
+                      ?.copyWith(color: Theme.of(ctx).colorScheme.error)),
               onTap: () {
                 Navigator.pop(ctx);
                 _confirmDelete();

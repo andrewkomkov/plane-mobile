@@ -156,7 +156,7 @@ class _IssueDetailScreenState extends ConsumerState<IssueDetailScreen> {
 
     _subIssues = await _tryLoad(() => IssueService.getSubIssues(ws, pid, iid), <Issue>[]);
     _relations = await _tryLoad(() => IssueService.getIssueRelations(ws, pid, iid), <Map<String, dynamic>>[]);
-    _attachments = await _tryLoad(() => IssueService.getAttachments(ws, pid, iid), <Attachment>[]);
+    _attachments = await _tryLoad(() => AttachmentService.getAttachments(ws, pid, iid), <Attachment>[]);
     _links = await _tryLoad(() => IssueService.getLinks(ws, pid, iid), <IssueLink>[]);
 
     // Module + cycle name via proxy (single SQL query, no N+1)
@@ -980,13 +980,13 @@ class _IssueDetailScreenState extends ConsumerState<IssueDetailScreen> {
           mainAxisSize: MainAxisSize.min,
           children: [
             ListTile(
-              leading: const Icon(Icons.delete_outline,
-                  color: Colors.red, size: 20),
+              leading: Icon(Icons.delete_outline,
+                  color: Theme.of(ctx).colorScheme.error, size: 20),
               title: Text('Delete issue',
                   style: Theme.of(ctx)
                       .textTheme
                       .bodyMedium
-                      ?.copyWith(color: Colors.red)),
+                      ?.copyWith(color: Theme.of(ctx).colorScheme.error)),
               onTap: () {
                 Navigator.pop(ctx);
                 _confirmDelete();
@@ -1015,8 +1015,8 @@ class _IssueDetailScreenState extends ConsumerState<IssueDetailScreen> {
               Navigator.pop(ctx);
               _deleteIssue();
             },
-            child: const Text('Delete',
-                style: TextStyle(color: Colors.red)),
+            child: Text('Delete',
+                style: TextStyle(color: Theme.of(ctx).colorScheme.error)),
           ),
         ],
       ),
