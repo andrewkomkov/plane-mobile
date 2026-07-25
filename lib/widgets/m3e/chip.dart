@@ -46,7 +46,7 @@ class M3EChip extends StatelessWidget {
     // it is the one neutral outline every bordered surface in the app uses.
     final borderColor = selected
         ? accent.withValues(alpha: 0.4)
-        : scheme.outlineVariant;
+        : scheme.outline;
 
     return M3EPressable(
       pressedScale: 0.94,

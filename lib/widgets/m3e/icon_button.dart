@@ -126,10 +126,7 @@ class M3EIconButton extends StatelessWidget {
               color: background,
               borderRadius: BorderRadius.circular(corner),
               border: style == M3EIconButtonStyle.outlined
-                  ? Border.all(
-                      color: scheme.outlineVariant.withValues(alpha: 0.7),
-                      width: 0.8,
-                    )
+                  ? Border.all(color: scheme.outline, width: 0.8)
                   : null,
             ),
             child: Icon(

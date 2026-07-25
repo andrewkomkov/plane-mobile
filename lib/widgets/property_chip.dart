@@ -29,7 +29,9 @@ class PropertyChip extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(M3EShape.small),
-        border: Border.all(color: scheme.outlineVariant, width: 0.8),
+        // A chip's outline is what makes it read as a chip, so it takes the
+        // control-boundary role rather than the decorative divider one.
+        border: Border.all(color: scheme.outline, width: 0.8),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,

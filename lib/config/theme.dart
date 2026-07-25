@@ -128,7 +128,10 @@ class PlaneTheme {
   static const _surfaceContainerLowLight = Color(0xFFF8F8F8);
   static const _surfaceContainerHighLight = Color(0xFFEBEBEB);
   static const _surfaceContainerHighestLight = Color(0xFFE0E0E0);
-  static const _outlineLight = Color(0xFFE0E0E0);
+  // WCAG 1.4.11 asks 3:1 of any boundary that identifies a control. The old
+  // #E0E0E0 managed 1.32:1 on white — a field outline nobody could see. This
+  // clears it at 3.45:1 on background and 3.25:1 on cards.
+  static const _outlineLight = Color(0xFF8A8A8A);
   static const _outlineVariantLight = Color(0xFFD0D0D0);
 
   static ThemeData light() => _build(
