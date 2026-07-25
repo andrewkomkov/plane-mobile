@@ -12,3 +12,4 @@ ios/Pods/
 .env
 *.apk
 *.aab
+android/.kotlin/
