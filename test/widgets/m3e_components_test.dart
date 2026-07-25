@@ -329,6 +329,58 @@ void main() {
     });
   });
 
+  group('reduced motion', () {
+    // Every moving thing in this app is a spring, so a user who asks the system
+    // for less motion must actually get less — otherwise the whole design
+    // language ignores an accessibility setting.
+    testWidgets('M3ESpringBuilder snaps instead of animating', (tester) async {
+      late double observed;
+      Widget build(double target) => MaterialApp(
+            home: MediaQuery(
+              data: const MediaQueryData(disableAnimations: true),
+              child: M3ESpringBuilder(
+                value: target,
+                spring: M3EMotion.defaultSpatial,
+                builder: (_, v, __) {
+                  observed = v;
+                  return const SizedBox.shrink();
+                },
+              ),
+            ),
+          );
+
+      await tester.pumpWidget(build(0));
+      await tester.pumpWidget(build(1));
+      await tester.pump();
+      // No settling: the value is already there on the very next frame.
+      expect(observed, 1.0);
+    });
+
+    testWidgets('springs still animate when motion is allowed', (tester) async {
+      late double observed;
+      Widget build(double target) => MaterialApp(
+            home: MediaQuery(
+              data: const MediaQueryData(),
+              child: M3ESpringBuilder(
+                value: target,
+                spring: M3EMotion.defaultSpatial,
+                builder: (_, v, __) {
+                  observed = v;
+                  return const SizedBox.shrink();
+                },
+              ),
+            ),
+          );
+
+      await tester.pumpWidget(build(0));
+      await tester.pumpWidget(build(1));
+      await tester.pump(const Duration(milliseconds: 16));
+      expect(observed, lessThan(1.0));
+      await tester.pumpAndSettle();
+      expect(observed, closeTo(1, 0.02));
+    });
+  });
+
   group('M3ENative', () {
     // The Compose-backed views come from material3:1.5.0-alpha24 and can only
     // render on Android. Under `flutter test` there is no platform view

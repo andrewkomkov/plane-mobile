@@ -112,6 +112,10 @@ class _M3ESpringBuilderState extends State<M3ESpringBuilder>
   @override
   void didUpdateWidget(M3ESpringBuilder old) {
     super.didUpdateWidget(old);
+    if (MediaQuery.maybeDisableAnimationsOf(context) ?? false) {
+      _controller.value = widget.value;
+      return;
+    }
     if (old.value != widget.value) {
       _controller.animateWith(
         SpringSimulation(
@@ -132,6 +136,15 @@ class _M3ESpringBuilderState extends State<M3ESpringBuilder>
 
   @override
   Widget build(BuildContext context) {
+    // Respect the system's reduce-motion setting. Every moving thing in this
+    // app is a spring, so honouring it here covers the whole surface — the
+    // value snaps to its target and the simulation never runs.
+    if (MediaQuery.maybeDisableAnimationsOf(context) ?? false) {
+      if (_controller.value != widget.value) {
+        _controller.value = widget.value;
+      }
+      return widget.builder(context, widget.value, widget.child);
+    }
     return AnimatedBuilder(
       animation: _controller,
       child: widget.child,
