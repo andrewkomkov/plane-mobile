@@ -54,8 +54,31 @@ args=(
   --no-uninstall
 )
 
-if [[ $# -gt 0 ]]; then
-  args+=(-d "$1")
+readonly DEVICE="${1-}"
+if [[ -n "$DEVICE" ]]; then
+  args+=(-d "$DEVICE")
 fi
 
-exec flutter "${args[@]}"
+# The APK left installed at this point is the TEST binary: its entrypoint is the
+# harness, not the app, so launching it by hand just sits on the splash screen
+# looking like a hang. Put the real app back, so the device is usable after a
+# run instead of quietly broken.
+restore_app() {
+  local apk='build/app/outputs/flutter-apk/app-debug.apk'
+  if [[ ! -f "$apk" ]]; then
+    echo >&2
+    echo "note: the test binary is still installed on the device." >&2
+    echo "      Restore the app with: flutter build apk --debug && adb install -r $apk" >&2
+    return
+  fi
+  echo
+  echo 'Restoring the app build over the test binary...'
+  local adb_args=()
+  [[ -n "$DEVICE" ]] && adb_args=(-s "$DEVICE")
+  adb "${adb_args[@]}" install -r "$apk" >/dev/null 2>&1 \
+    && echo 'Done — the app on the device is the app again.' \
+    || echo 'warning: could not reinstall the app build.' >&2
+}
+trap restore_app EXIT
+
+flutter "${args[@]}"
