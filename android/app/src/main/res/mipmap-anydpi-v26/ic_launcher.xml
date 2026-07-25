@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Android 8 and up mask the launcher icon to whatever shape the launcher uses.
+  Without this file the app shipped only a legacy square, which every modern
+  launcher shrinks and drops onto a plate of its own — which is why the icon
+  looked wrong on the device rather than in the file.
+
+  The monochrome layer is what lets Android 13 themed icons tint the mark
+  instead of falling back to the legacy bitmap.
+-->
+<adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
+    <background android:drawable="@color/ic_launcher_background" />
+    <foreground android:drawable="@mipmap/ic_launcher_foreground" />
+    <monochrome android:drawable="@mipmap/ic_launcher_foreground" />
+</adaptive-icon>

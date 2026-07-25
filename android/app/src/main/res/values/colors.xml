@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- The near-black the Plane mark has always been drawn on. Sampled from
+         the original launcher bitmap so the adaptive icon and the legacy one
+         are the same colour. -->
+    <color name="ic_launcher_background">#01141E</color>
+</resources>
