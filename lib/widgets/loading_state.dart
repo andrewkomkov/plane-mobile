@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import '../config/theme.dart';
 import 'm3e/loading_indicator.dart';
 
 class LoadingStateWidget extends StatelessWidget {
@@ -29,10 +28,8 @@ class ErrorStateWidget extends StatelessWidget {
           const SizedBox(height: 12),
           Text(
             message ?? 'Something went wrong',
-            style: TextStyle(
-              fontSize: PlaneTheme.fontBody,
-              color: theme.colorScheme.onSurfaceVariant,
-            ),
+            style: theme.textTheme.bodyLarge
+                ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
             textAlign: TextAlign.center,
           ),
           if (onRetry != null) ...[
@@ -71,18 +68,15 @@ class EmptyStateWidget extends StatelessWidget {
           ],
           Text(
             message,
-            style: TextStyle(
-              fontSize: PlaneTheme.fontBody,
-              color: theme.colorScheme.onSurfaceVariant,
-            ),
+            style: theme.textTheme.bodyLarge
+                ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
             textAlign: TextAlign.center,
           ),
           if (subtitle != null) ...[
             const SizedBox(height: 4),
             Text(
               subtitle!,
-              style: TextStyle(
-                fontSize: PlaneTheme.fontSection,
+              style: theme.textTheme.bodySmall?.copyWith(
                 color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.7),
               ),
               textAlign: TextAlign.center,

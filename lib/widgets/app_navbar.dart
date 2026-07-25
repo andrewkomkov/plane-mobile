@@ -2,6 +2,7 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import '../config/m3e/motion.dart';
 import '../config/m3e/shapes.dart';
+import '../config/m3e/typography.dart';
 import 'm3e/toolbar.dart';
 
 class NavItem {
@@ -393,11 +394,11 @@ class _PendingBadge extends StatelessWidget {
             ),
             child: Text(
               '$count',
-              style: const TextStyle(
-                fontSize: 9,
-                fontWeight: FontWeight.w700,
-                color: Colors.black,
-              ),
+              // A pending-write count is exactly the "one thing that must
+              // dominate" case the emphasized cut exists for.
+              style: M3EType.emphasized(
+                Theme.of(context).textTheme.labelSmall!,
+              ).copyWith(color: Colors.black),
             ),
           ),
         ),
@@ -419,7 +420,8 @@ class _OverflowTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
 
     return M3EPressable(
       pressedScale: 0.97,
@@ -445,9 +447,12 @@ class _OverflowTile extends StatelessWidget {
             const SizedBox(width: 16),
             Text(
               item.label,
-              style: TextStyle(
-                fontSize: 15,
-                fontWeight: isActive ? FontWeight.w600 : FontWeight.w500,
+              // The active destination is the one row that should dominate the
+              // sheet, so it takes the emphasized cut of the same role.
+              style: (isActive
+                      ? M3EType.emphasized(theme.textTheme.titleMedium!)
+                      : theme.textTheme.titleMedium!)
+                  .copyWith(
                 color: isActive ? scheme.onSurface : scheme.onSurfaceVariant,
               ),
             ),

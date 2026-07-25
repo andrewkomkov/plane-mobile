@@ -181,7 +181,7 @@ class _IssueListScreenState extends ConsumerState<IssueListScreen>
             child: Row(
               children: [
                 Text('${_filteredAndSorted.length} issues',
-                    style: TextStyle(fontSize: PlaneTheme.fontCaption, color: secondary)),
+                    style: theme.textTheme.bodySmall),
                 const Spacer(),
                 M3EIconButton(
                   icon: Icons.tune,

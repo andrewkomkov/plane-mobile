@@ -2,6 +2,7 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import '../../config/m3e/motion.dart';
 import '../../config/m3e/shapes.dart';
+import '../../config/m3e/typography.dart';
 
 /// Open and close run on a controller rather than a spring: the overlay
 /// staggers several items against one clock, and a stagger needs a shared
@@ -151,11 +152,9 @@ class _M3EFabMenuState extends State<M3EFabMenu>
                   const SizedBox(width: 10),
                   Text(
                     widget.label!,
-                    style: TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w600,
-                      color: scheme.onPrimaryContainer,
-                    ),
+                    style: M3EType.emphasized(
+                      Theme.of(context).textTheme.titleMedium!,
+                    ).copyWith(color: scheme.onPrimaryContainer),
                   ),
                 ],
               ],
@@ -288,11 +287,10 @@ class _FabMenuOverlay extends StatelessWidget {
                   const SizedBox(width: 12),
                   Text(
                     action.label,
-                    style: TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w500,
-                      color: scheme.onSurface,
-                    ),
+                    style: Theme.of(context)
+                        .textTheme
+                        .titleMedium
+                        ?.copyWith(color: scheme.onSurface),
                   ),
                 ],
               ),

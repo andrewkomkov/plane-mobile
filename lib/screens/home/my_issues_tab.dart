@@ -11,6 +11,7 @@ import '../../widgets/filter_bar.dart';
 import '../../widgets/loading_state.dart';
 import '../../widgets/skeleton_loader.dart';
 import '../../config/m3e/shapes.dart';
+import '../../config/m3e/typography.dart';
 import '../../widgets/m3e/flexible_app_bar.dart';
 import '../../widgets/m3e/button_group.dart';
 import '../../widgets/m3e/chip.dart';
@@ -227,15 +228,15 @@ class _MyIssuesTabState extends ConsumerState<MyIssuesTab>
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Padding(
-              padding: EdgeInsets.all(16),
+            Padding(
+              padding: const EdgeInsets.all(16),
               child: Text('Select project',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600)),
+                  style: Theme.of(ctx).textTheme.titleLarge),
             ),
             ...projects.map((p) => ListTile(
                   leading: const Icon(Icons.folder_outlined, size: 20),
                   title: Text('${p.identifier} - ${p.name}',
-                      style: const TextStyle(fontSize: 14)),
+                      style: Theme.of(ctx).textTheme.bodyMedium),
                   onTap: () {
                     Navigator.pop(ctx);
                     _openCreateScreen(p);
@@ -275,7 +276,8 @@ class _MyIssuesTabState extends ConsumerState<MyIssuesTab>
           children: [
             ListTile(
               leading: const Icon(Icons.tune, size: 20),
-              title: const Text('Display options', style: TextStyle(fontSize: PlaneTheme.fontBody)),
+              title: Text('Display options',
+                  style: Theme.of(ctx).textTheme.bodyLarge),
               onTap: () {
                 Navigator.pop(ctx);
                 _showDisplayOptions();
@@ -283,7 +285,7 @@ class _MyIssuesTabState extends ConsumerState<MyIssuesTab>
             ),
             ListTile(
               leading: const Icon(Icons.refresh, size: 20),
-              title: const Text('Refresh', style: TextStyle(fontSize: PlaneTheme.fontBody)),
+              title: Text('Refresh', style: Theme.of(ctx).textTheme.bodyLarge),
               onTap: () {
                 Navigator.pop(ctx);
                 _load();
@@ -319,9 +321,11 @@ class _MyIssuesTabState extends ConsumerState<MyIssuesTab>
                 padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
                 child: Row(
                   children: [
-                    Text(label, style: const TextStyle(fontSize: PlaneTheme.fontBody)),
+                    Text(label, style: theme.textTheme.bodyLarge),
                     const Spacer(),
-                    Text(value, style: TextStyle(fontSize: PlaneTheme.fontBody, color: secondary)),
+                    Text(value,
+                        style: theme.textTheme.bodyLarge
+                            ?.copyWith(color: secondary)),
                     const SizedBox(width: 4),
                     Icon(Icons.unfold_more, size: PlaneTheme.iconMedium, color: secondary),
                   ],
@@ -400,7 +404,7 @@ class _MyIssuesTabState extends ConsumerState<MyIssuesTab>
                     padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 6),
                     child: Row(
                       children: [
-                        const Text('Show sub-issues', style: TextStyle(fontSize: PlaneTheme.fontBody)),
+                        Text('Show sub-issues', style: theme.textTheme.bodyLarge),
                         const Spacer(),
                         // The switch sits in a Row next to its caption, so it
                         // would otherwise be an unnamed node for automation.
@@ -429,7 +433,9 @@ class _MyIssuesTabState extends ConsumerState<MyIssuesTab>
                     padding: const EdgeInsets.symmetric(horizontal: 20),
                     child: Row(
                       children: [
-                        Text('Row properties', style: TextStyle(fontSize: PlaneTheme.fontSection, color: secondary)),
+                        Text('Row properties',
+                            style: theme.textTheme.titleSmall
+                                ?.copyWith(color: secondary)),
                         const Spacer(),
                         // A TextButton rather than a bare tap target: it
                         // carries the 48dp minimum without extra layout.
@@ -441,9 +447,8 @@ class _MyIssuesTabState extends ConsumerState<MyIssuesTab>
                           style: TextButton.styleFrom(
                             foregroundColor: secondary,
                             minimumSize: const Size(48, 48),
-                            textStyle: const TextStyle(
-                                fontSize: PlaneTheme.fontSection,
-                                fontWeight: PlaneTheme.fontSectionWeight),
+                            textStyle: M3EType.emphasized(
+                                theme.textTheme.titleSmall!),
                           ),
                           child: const Text('Reset'),
                         ),

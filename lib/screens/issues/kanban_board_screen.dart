@@ -135,18 +135,14 @@ class _KanbanBoardScreenState extends State<KanbanBoardScreen> {
                           const SizedBox(width: 6),
                           Text(
                             state?.name ?? 'Unknown',
-                            style: TextStyle(
-                              fontSize: PlaneTheme.fontSection,
-                              fontWeight: PlaneTheme.fontSectionWeight,
-                              color:
-                                  theme.colorScheme.onSurfaceVariant,
+                            style: theme.textTheme.titleSmall?.copyWith(
+                              color: theme.colorScheme.onSurfaceVariant,
                             ),
                           ),
                           const SizedBox(width: 6),
                           Text(
                             '${columnIssues.length}',
-                            style: TextStyle(
-                              fontSize: PlaneTheme.fontSmall,
+                            style: theme.textTheme.labelSmall?.copyWith(
                               color: theme
                                   .colorScheme.onSurfaceVariant
                                   .withValues(alpha: 0.6),
@@ -299,8 +295,7 @@ class _KanbanCardContent extends StatelessWidget {
         children: [
           Text(
             '$identifier-${issue.sequenceId}',
-            style: TextStyle(
-              fontSize: PlaneTheme.fontSmall,
+            style: theme.textTheme.labelSmall?.copyWith(
               color: theme.colorScheme.onSurfaceVariant,
             ),
           ),
@@ -309,10 +304,7 @@ class _KanbanCardContent extends StatelessWidget {
             issue.name,
             maxLines: 3,
             overflow: TextOverflow.ellipsis,
-            style: const TextStyle(
-                fontSize: PlaneTheme.fontSection,
-                fontWeight: FontWeight.w400,
-                height: 1.4),
+            style: theme.textTheme.titleSmall,
           ),
           const SizedBox(height: 8),
           Row(

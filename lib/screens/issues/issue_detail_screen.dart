@@ -302,10 +302,7 @@ class _IssueDetailScreenState extends ConsumerState<IssueDetailScreen> {
                           _projectIdentifier.isNotEmpty
                               ? '$_projectIdentifier-${issue.sequenceId}'
                               : '${issue.sequenceId}',
-                          style: TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w500,
-                            letterSpacing: 0.5,
+                          style: theme.textTheme.titleSmall?.copyWith(
                             color: theme.colorScheme.onSurfaceVariant,
                           ),
                         ),
@@ -320,10 +317,7 @@ class _IssueDetailScreenState extends ConsumerState<IssueDetailScreen> {
                         ),
                         Text(
                           'Created ${_timeAgoFromDate(issue.createdAt)}',
-                          style: TextStyle(
-                            fontSize: 13,
-                            color: theme.colorScheme.onSurfaceVariant,
-                          ),
+                          style: theme.textTheme.bodySmall,
                         ),
                       ],
                     ),
@@ -409,10 +403,8 @@ class _IssueDetailScreenState extends ConsumerState<IssueDetailScreen> {
                     if (issue.isOverdue) ...[
                       const SizedBox(height: 6),
                       Text('Overdue',
-                          style: TextStyle(
-                              fontSize: 12,
-                              color: PlaneTheme.urgent,
-                              fontWeight: FontWeight.w500)),
+                          style: theme.textTheme.labelMedium
+                              ?.copyWith(color: PlaneTheme.urgent)),
                     ],
                     // Module & Cycle
                     if (_moduleName != null || _cycleName != null) ...[
@@ -427,7 +419,7 @@ class _IssueDetailScreenState extends ConsumerState<IssueDetailScreen> {
                               children: [
                                 Icon(Icons.view_module_outlined, size: 14, color: secondary),
                                 const SizedBox(width: 4),
-                                Text(_moduleName!, style: TextStyle(fontSize: 13, color: secondary)),
+                                Text(_moduleName!, style: theme.textTheme.bodySmall),
                               ],
                             ),
                           if (_cycleName != null)
@@ -436,7 +428,7 @@ class _IssueDetailScreenState extends ConsumerState<IssueDetailScreen> {
                               children: [
                                 Icon(Icons.replay_outlined, size: 14, color: secondary),
                                 const SizedBox(width: 4),
-                                Text(_cycleName!, style: TextStyle(fontSize: 13, color: secondary)),
+                                Text(_cycleName!, style: theme.textTheme.bodySmall),
                               ],
                             ),
                         ],
@@ -446,10 +438,8 @@ class _IssueDetailScreenState extends ConsumerState<IssueDetailScreen> {
                     if (issueMembers.isNotEmpty) ...[
                       const SizedBox(height: 14),
                       Text('Assignees',
-                          style: TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w500,
-                              color: secondary)),
+                          style: theme.textTheme.labelMedium
+                              ?.copyWith(color: secondary)),
                       const SizedBox(height: 6),
                       Wrap(
                         spacing: 8,
@@ -466,24 +456,11 @@ class _IssueDetailScreenState extends ConsumerState<IssueDetailScreen> {
                       MarkdownBody(
                         data: htmlToMarkdown(issue.descriptionHtml!),
                         styleSheet: MarkdownStyleSheet(
-                          p: TextStyle(
-                              fontSize: 14,
-                              height: 1.6,
-                              color: theme.colorScheme.onSurface),
-                          h1: TextStyle(
-                              fontSize: 20,
-                              fontWeight: FontWeight.w600,
-                              color: theme.colorScheme.onSurface),
-                          h2: TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.w600,
-                              color: theme.colorScheme.onSurface),
-                          h3: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w500,
-                              color: theme.colorScheme.onSurface),
-                          code: TextStyle(
-                              fontSize: 13,
+                          p: theme.textTheme.bodyMedium,
+                          h1: theme.textTheme.headlineSmall,
+                          h2: theme.textTheme.titleLarge,
+                          h3: theme.textTheme.titleMedium,
+                          code: theme.textTheme.bodySmall?.copyWith(
                               color: theme.colorScheme.primary,
                               backgroundColor: theme.colorScheme.primary
                                   .withValues(alpha: 0.08)),
@@ -498,9 +475,7 @@ class _IssueDetailScreenState extends ConsumerState<IssueDetailScreen> {
                                     color: theme.colorScheme.primary,
                                     width: 3)),
                           ),
-                          listBullet: TextStyle(
-                              fontSize: 14,
-                              color: theme.colorScheme.onSurface),
+                          listBullet: theme.textTheme.bodyMedium,
                         ),
                         selectable: true,
                       ),
@@ -524,15 +499,12 @@ class _IssueDetailScreenState extends ConsumerState<IssueDetailScreen> {
                     Row(
                       children: [
                         Text('Activity',
-                            style: TextStyle(
-                                fontSize: 14,
-                                fontWeight: FontWeight.w500,
-                                color: secondary)),
+                            style: theme.textTheme.labelLarge
+                                ?.copyWith(color: secondary)),
                         const Spacer(),
                         if (activityItems.isNotEmpty)
                           Text('${activityItems.length}',
-                              style: TextStyle(
-                                  fontSize: 12, color: secondary)),
+                              style: theme.textTheme.bodySmall),
                       ],
                     ),
                     const SizedBox(height: 12),
@@ -542,8 +514,7 @@ class _IssueDetailScreenState extends ConsumerState<IssueDetailScreen> {
                       Padding(
                         padding: const EdgeInsets.only(top: 8),
                         child: Text('No activity yet',
-                            style: TextStyle(
-                                fontSize: 13, color: secondary)),
+                            style: theme.textTheme.bodySmall),
                       ),
                     const SizedBox(height: 80),
                   ],
@@ -608,20 +579,18 @@ class _IssueDetailScreenState extends ConsumerState<IssueDetailScreen> {
 
   // --- Sub-issues section ---
   Widget _buildSubIssuesSection(Color secondary) {
+    final theme = Theme.of(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Row(
           children: [
             Text('Sub-issues',
-                style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w500,
-                    color: secondary)),
+                style: theme.textTheme.labelLarge?.copyWith(color: secondary)),
             if (_subIssues.isNotEmpty) ...[
               const SizedBox(width: 6),
               Text('${_subIssues.length}',
-                  style: TextStyle(fontSize: 12, color: secondary)),
+                  style: theme.textTheme.bodySmall),
             ],
             const Spacer(),
             M3EIconButton(
@@ -635,8 +604,7 @@ class _IssueDetailScreenState extends ConsumerState<IssueDetailScreen> {
         ),
         const SizedBox(height: 8),
         if (_subIssues.isEmpty)
-          Text('No sub-issues',
-              style: TextStyle(fontSize: 13, color: secondary))
+          Text('No sub-issues', style: theme.textTheme.bodySmall)
         else
           ..._subIssues.map((sub) {
             final subState = widget.states[sub.state];
@@ -675,7 +643,7 @@ class _IssueDetailScreenState extends ConsumerState<IssueDetailScreen> {
                       child: Text(sub.name,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(fontSize: 13)),
+                          style: theme.textTheme.titleSmall),
                     ),
                   ],
                 ),
@@ -688,14 +656,12 @@ class _IssueDetailScreenState extends ConsumerState<IssueDetailScreen> {
 
   // --- Relations section ---
   Widget _buildRelationsSection(Color secondary) {
+    final theme = Theme.of(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text('Relations',
-            style: TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.w500,
-                color: secondary)),
+            style: theme.textTheme.labelLarge?.copyWith(color: secondary)),
         const SizedBox(height: 8),
         Wrap(
           spacing: 6,
@@ -716,27 +682,24 @@ class _IssueDetailScreenState extends ConsumerState<IssueDetailScreen> {
 
   // --- Attachments section ---
   Widget _buildAttachmentsSection(Color secondary) {
+    final theme = Theme.of(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Row(
           children: [
             Text('Attachments',
-                style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w500,
-                    color: secondary)),
+                style: theme.textTheme.labelLarge?.copyWith(color: secondary)),
             if (_attachments.isNotEmpty) ...[
               const SizedBox(width: 6),
               Text('${_attachments.length}',
-                  style: TextStyle(fontSize: 12, color: secondary)),
+                  style: theme.textTheme.bodySmall),
             ],
           ],
         ),
         const SizedBox(height: 8),
         if (_attachments.isEmpty)
-          Text('No attachments',
-              style: TextStyle(fontSize: 13, color: secondary))
+          Text('No attachments', style: theme.textTheme.bodySmall)
         else
           ..._attachments.map((a) => Padding(
                 padding: const EdgeInsets.symmetric(vertical: 4),
@@ -749,12 +712,13 @@ class _IssueDetailScreenState extends ConsumerState<IssueDetailScreen> {
                         a.filename ?? 'Unnamed file',
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(fontSize: 13),
+                        style: theme.textTheme.titleSmall,
                       ),
                     ),
                     if (a.displaySize.isNotEmpty)
                       Text(a.displaySize,
-                          style: TextStyle(fontSize: 11, color: secondary)),
+                          style: theme.textTheme.labelSmall
+                              ?.copyWith(color: secondary)),
                   ],
                 ),
               )),
@@ -771,14 +735,11 @@ class _IssueDetailScreenState extends ConsumerState<IssueDetailScreen> {
         Row(
           children: [
             Text('Links',
-                style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w500,
-                    color: secondary)),
+                style: theme.textTheme.labelLarge?.copyWith(color: secondary)),
             if (_links.isNotEmpty) ...[
               const SizedBox(width: 6),
               Text('${_links.length}',
-                  style: TextStyle(fontSize: 12, color: secondary)),
+                  style: theme.textTheme.bodySmall),
             ],
             const Spacer(),
             M3EIconButton(
@@ -792,8 +753,7 @@ class _IssueDetailScreenState extends ConsumerState<IssueDetailScreen> {
         ),
         const SizedBox(height: 8),
         if (_links.isEmpty)
-          Text('No links',
-              style: TextStyle(fontSize: 13, color: secondary))
+          Text('No links', style: theme.textTheme.bodySmall)
         else
           ..._links.map((link) => InkWell(
                 onTap: () {
@@ -816,8 +776,7 @@ class _IssueDetailScreenState extends ConsumerState<IssueDetailScreen> {
                               link.title ?? link.url,
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
-                              style: TextStyle(
-                                fontSize: 13,
+                              style: theme.textTheme.titleSmall?.copyWith(
                                 color: theme.colorScheme.primary,
                               ),
                             ),
@@ -826,8 +785,8 @@ class _IssueDetailScreenState extends ConsumerState<IssueDetailScreen> {
                                 link.url,
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
-                                style: TextStyle(
-                                    fontSize: 11, color: secondary),
+                                style: theme.textTheme.labelSmall
+                                    ?.copyWith(color: secondary),
                               ),
                           ],
                         ),
@@ -951,8 +910,11 @@ class _IssueDetailScreenState extends ConsumerState<IssueDetailScreen> {
             ListTile(
               leading: const Icon(Icons.delete_outline,
                   color: Colors.red, size: 20),
-              title: const Text('Delete issue',
-                  style: TextStyle(color: Colors.red, fontSize: 14)),
+              title: Text('Delete issue',
+                  style: Theme.of(ctx)
+                      .textTheme
+                      .bodyMedium
+                      ?.copyWith(color: Colors.red)),
               onTap: () {
                 Navigator.pop(ctx);
                 _confirmDelete();
@@ -1002,7 +964,7 @@ class _IssueDetailScreenState extends ConsumerState<IssueDetailScreen> {
                         color: PlaneTheme.stateGroupColor(context, s.group),
                         size: 18),
                     title: Text(s.name,
-                        style: const TextStyle(fontSize: 14)),
+                        style: Theme.of(ctx).textTheme.bodyMedium),
                     onTap: () {
                       Navigator.pop(ctx);
                       _updateField({'state': s.id});
@@ -1026,7 +988,7 @@ class _IssueDetailScreenState extends ConsumerState<IssueDetailScreen> {
                     leading: Icon(PlaneTheme.priorityIcon(p),
                         color: PlaneTheme.priorityColor(context, p), size: 18),
                     title: Text(p[0].toUpperCase() + p.substring(1),
-                        style: const TextStyle(fontSize: 14)),
+                        style: Theme.of(ctx).textTheme.bodyMedium),
                     onTap: () {
                       Navigator.pop(ctx);
                       _updateField({'priority': p});
@@ -1159,9 +1121,7 @@ class _IssueDetailScreenState extends ConsumerState<IssueDetailScreen> {
                     const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                 child: Row(
                   children: [
-                    const Text('Labels',
-                        style: TextStyle(
-                            fontSize: 16, fontWeight: FontWeight.w500)),
+                    Text('Labels', style: Theme.of(ctx).textTheme.titleMedium),
                     const Spacer(),
                     TextButton(
                       onPressed: () {
@@ -1174,10 +1134,10 @@ class _IssueDetailScreenState extends ConsumerState<IssueDetailScreen> {
                 ),
               ),
               if (_allLabels.isEmpty)
-                const Padding(
-                  padding: EdgeInsets.all(16),
+                Padding(
+                  padding: const EdgeInsets.all(16),
                   child: Text('No labels yet',
-                      style: TextStyle(fontSize: 13)),
+                      style: Theme.of(ctx).textTheme.bodySmall),
                 ),
               ..._allLabels.map((l) => CheckboxListTile(
                     value: selected.contains(l.id),
@@ -1198,15 +1158,16 @@ class _IssueDetailScreenState extends ConsumerState<IssueDetailScreen> {
                         shape: BoxShape.circle,
                       ),
                     ),
-                    title:
-                        Text(l.name, style: const TextStyle(fontSize: 14)),
+                    title: Text(l.name,
+                        style: Theme.of(ctx).textTheme.bodyMedium),
                     controlAffinity: ListTileControlAffinity.trailing,
                     dense: true,
                   )),
               const Divider(),
               ListTile(
                 leading: const Icon(Icons.add, size: 20),
-                title: const Text('Create new label', style: TextStyle(fontSize: 14)),
+                title: Text('Create new label',
+                    style: Theme.of(ctx).textTheme.bodyMedium),
                 onTap: () async {
                   Navigator.pop(ctx);
                   await _createLabel();
@@ -1234,9 +1195,8 @@ class _IssueDetailScreenState extends ConsumerState<IssueDetailScreen> {
                     const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                 child: Row(
                   children: [
-                    const Text('Assignees',
-                        style: TextStyle(
-                            fontSize: 16, fontWeight: FontWeight.w500)),
+                    Text('Assignees',
+                        style: Theme.of(ctx).textTheme.titleMedium),
                     const Spacer(),
                     TextButton(
                       onPressed: () {
@@ -1249,10 +1209,10 @@ class _IssueDetailScreenState extends ConsumerState<IssueDetailScreen> {
                 ),
               ),
               if (_allMembers.isEmpty)
-                const Padding(
-                  padding: EdgeInsets.all(16),
+                Padding(
+                  padding: const EdgeInsets.all(16),
                   child: Text('No members found',
-                      style: TextStyle(fontSize: 13)),
+                      style: Theme.of(ctx).textTheme.bodySmall),
                 ),
               ..._allMembers.map((m) => CheckboxListTile(
                     value: selected.contains(m.id),
@@ -1267,10 +1227,10 @@ class _IssueDetailScreenState extends ConsumerState<IssueDetailScreen> {
                     },
                     secondary: _buildMemberAvatar(m),
                     title: Text(m.displayName,
-                        style: const TextStyle(fontSize: 14)),
+                        style: Theme.of(ctx).textTheme.bodyMedium),
                     subtitle: m.email.isNotEmpty
                         ? Text(m.email,
-                            style: const TextStyle(fontSize: 12))
+                            style: Theme.of(ctx).textTheme.bodySmall)
                         : null,
                     controlAffinity: ListTileControlAffinity.trailing,
                     dense: true,
@@ -1296,7 +1256,8 @@ class _IssueDetailScreenState extends ConsumerState<IssueDetailScreen> {
       backgroundColor: theme.colorScheme.primary.withValues(alpha: 0.2),
       child: Text(
         (m.displayName.isNotEmpty ? m.displayName : '?')[0].toUpperCase(),
-        style: TextStyle(fontSize: 11, color: theme.colorScheme.primary),
+        style: theme.textTheme.labelSmall
+            ?.copyWith(color: theme.colorScheme.primary),
       ),
     );
   }
@@ -1391,13 +1352,12 @@ class _RelationChip extends StatelessWidget {
           Icon(_icon, size: 13, color: color),
           const SizedBox(width: 4),
           Text('$_label: ',
-              style: TextStyle(fontSize: 11, color: color,
-                  fontWeight: FontWeight.w500)),
+              style: theme.textTheme.labelSmall?.copyWith(color: color)),
           Flexible(
             child: Text(issueName,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: TextStyle(fontSize: 11, color: color)),
+                style: theme.textTheme.labelSmall?.copyWith(color: color)),
           ),
         ],
       ),
@@ -1480,15 +1440,12 @@ class _ActivityCard extends StatelessWidget {
               children: [
                 Text(
                   _description,
-                  style: TextStyle(
-                      fontSize: 12,
-                      color: theme.colorScheme.onSurfaceVariant),
+                  style: theme.textTheme.bodySmall,
                 ),
                 const SizedBox(height: 2),
                 Text(
                   timeAgo(activity.createdAt),
-                  style: TextStyle(
-                      fontSize: 10,
+                  style: theme.textTheme.labelSmall?.copyWith(
                       color: theme.colorScheme.onSurfaceVariant
                           .withValues(alpha: 0.6)),
                 ),
@@ -1533,8 +1490,7 @@ class _LabelPill extends StatelessWidget {
             ),
             const SizedBox(width: 5),
             Text(label.name,
-                style: const TextStyle(
-                    fontSize: 12, fontWeight: FontWeight.w400)),
+                style: Theme.of(context).textTheme.labelMedium),
           ],
         ),
       ),
@@ -1573,13 +1529,12 @@ class _AssigneeChip extends StatelessWidget {
             child: Text(
               (member.displayName.isNotEmpty ? member.displayName : '?')[0]
                   .toUpperCase(),
-              style: TextStyle(
-                  fontSize: 10, color: theme.colorScheme.primary),
+              style: theme.textTheme.labelSmall
+                  ?.copyWith(color: theme.colorScheme.primary),
             ),
           ),
         const SizedBox(width: 5),
-        Text(member.displayName,
-            style: const TextStyle(fontSize: 12)),
+        Text(member.displayName, style: theme.textTheme.labelMedium),
       ],
     );
   }
@@ -1606,18 +1561,16 @@ class _CommentCard extends StatelessWidget {
                     theme.colorScheme.primary.withValues(alpha: 0.2),
                 child: Text(
                   (comment.actorDetail ?? '?')[0].toUpperCase(),
-                  style: TextStyle(
-                      fontSize: 11, color: theme.colorScheme.primary),
+                  style: theme.textTheme.labelSmall
+                      ?.copyWith(color: theme.colorScheme.primary),
                 ),
               ),
               const SizedBox(width: 8),
               Text(comment.actorDetail ?? 'Unknown',
-                  style: const TextStyle(
-                      fontWeight: FontWeight.w500, fontSize: 13)),
+                  style: theme.textTheme.titleSmall),
               const SizedBox(width: 8),
               Text(timeAgo(comment.createdAt),
-                  style: TextStyle(
-                      fontSize: 11,
+                  style: theme.textTheme.labelSmall?.copyWith(
                       color: theme.colorScheme.onSurfaceVariant)),
             ],
           ),
@@ -1628,7 +1581,7 @@ class _CommentCard extends StatelessWidget {
                       ?.replaceAll(RegExp(r'<[^>]*>'), '')
                       .trim() ??
                   '',
-              style: const TextStyle(fontSize: 14),
+              style: theme.textTheme.bodyMedium,
             ),
           ),
         ],

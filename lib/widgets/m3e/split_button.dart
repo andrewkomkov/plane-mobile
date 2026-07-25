@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../config/m3e/motion.dart';
 import '../../config/m3e/shapes.dart';
+import '../../config/m3e/typography.dart';
 
 class M3EMenuOption {
   final String label;
@@ -96,9 +97,7 @@ class _M3ESplitButtonState extends State<M3ESplitButton> {
                 ],
                 Text(
                   option.label,
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w500,
+                  style: theme.textTheme.labelLarge?.copyWith(
                     color: option.isDestructive
                         ? theme.colorScheme.error
                         : theme.colorScheme.onSurface,
@@ -152,11 +151,9 @@ class _M3ESplitButtonState extends State<M3ESplitButton> {
                   ],
                   Text(
                     widget.label,
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
-                      color: foreground,
-                    ),
+                    style: M3EType.emphasized(
+                      Theme.of(context).textTheme.labelLarge!,
+                    ).copyWith(color: foreground),
                   ),
                 ],
               ),

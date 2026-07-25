@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../config/m3e/shapes.dart';
+import '../../config/m3e/typography.dart';
 import '../../widgets/m3e/loading_indicator.dart';
 import '../../widgets/m3e/app_bar.dart';
 import '../../widgets/m3e/icon_button.dart';
@@ -70,11 +71,10 @@ class _MenuTabState extends ConsumerState<MenuTab> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Padding(
-              padding: EdgeInsets.all(16),
+            Padding(
+              padding: const EdgeInsets.all(16),
               child: Text('Switch Workspace',
-                  style: TextStyle(
-                      fontSize: 16, fontWeight: FontWeight.w500)),
+                  style: Theme.of(ctx).textTheme.titleMedium),
             ),
             if (_workspaces.isEmpty)
               const Padding(
@@ -98,20 +98,19 @@ class _MenuTabState extends ConsumerState<MenuTab> {
                               ws.name.isNotEmpty
                                   ? ws.name[0].toUpperCase()
                                   : '?',
-                              style: TextStyle(
-                                  fontSize: 13,
-                                  color:
-                                      Theme.of(ctx).colorScheme.primary),
+                              style: Theme.of(ctx)
+                                  .textTheme
+                                  .titleSmall
+                                  ?.copyWith(
+                                      color: Theme.of(ctx)
+                                          .colorScheme
+                                          .primary),
                             ),
                           ),
-                    title:
-                        Text(ws.name, style: const TextStyle(fontSize: 14)),
+                    title: Text(ws.name,
+                        style: Theme.of(ctx).textTheme.bodyMedium),
                     subtitle: Text(ws.slug,
-                        style: TextStyle(
-                            fontSize: 12,
-                            color: Theme.of(ctx)
-                                .colorScheme
-                                .onSurfaceVariant)),
+                        style: Theme.of(ctx).textTheme.bodySmall),
                     trailing: ws.slug == widget.workspaceSlug
                         ? const Icon(Icons.check, size: 18)
                         : null,
@@ -172,12 +171,8 @@ class _MenuTabState extends ConsumerState<MenuTab> {
                           const SizedBox(width: 10),
                           Text(
                             'Plane',
-                            style: TextStyle(
-                              fontSize: 20,
-                              fontWeight: FontWeight.w700,
-                              letterSpacing: -0.3,
-                              color: theme.colorScheme.onSurface,
-                            ),
+                            style: M3EType.emphasized(
+                                theme.textTheme.headlineSmall!),
                           ),
                           const SizedBox(width: 4),
                           Icon(Icons.unfold_more,
@@ -228,10 +223,8 @@ class _MenuTabState extends ConsumerState<MenuTab> {
                                 theme.colorScheme.primary.withValues(alpha: 0.15),
                             child: Text(
                               widget.user!.displayName[0].toUpperCase(),
-                              style: TextStyle(
+                              style: theme.textTheme.headlineSmall?.copyWith(
                                 color: theme.colorScheme.primary,
-                                fontWeight: FontWeight.w700,
-                                fontSize: 20,
                               ),
                             ),
                           ),
@@ -240,15 +233,11 @@ class _MenuTabState extends ConsumerState<MenuTab> {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(widget.user!.displayName,
-                                  style: TextStyle(
-                                      fontWeight: FontWeight.w700,
-                                      fontSize: 18,
-                                      color: theme.colorScheme.onSurface)),
+                                  style: M3EType.emphasized(
+                                      theme.textTheme.titleLarge!)),
                               const SizedBox(height: 2),
                               Text(widget.user!.email,
-                                  style: TextStyle(
-                                      fontSize: 14,
-                                      fontWeight: FontWeight.w500,
+                                  style: theme.textTheme.labelLarge?.copyWith(
                                       color: theme.colorScheme.onSurfaceVariant)),
                             ],
                           ),
@@ -390,11 +379,9 @@ class _MenuTabState extends ConsumerState<MenuTab> {
                           const SizedBox(width: 10),
                           Text(
                             'Disconnect',
-                            style: TextStyle(
-                              fontSize: 15,
-                              fontWeight: FontWeight.w600,
-                              color: theme.colorScheme.error,
-                            ),
+                            style: M3EType.emphasized(
+                                    theme.textTheme.titleMedium!)
+                                .copyWith(color: theme.colorScheme.error),
                           ),
                         ],
                       ),
@@ -471,16 +458,9 @@ class _MenuRow extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(label,
-                      style: TextStyle(
-                          fontSize: 15,
-                          fontWeight: FontWeight.w500,
-                          color: theme.colorScheme.onSurface)),
+                  Text(label, style: theme.textTheme.titleMedium),
                   if (subtitle != null)
-                    Text(subtitle!,
-                        style: TextStyle(
-                            fontSize: 12,
-                            color: theme.colorScheme.onSurfaceVariant)),
+                    Text(subtitle!, style: theme.textTheme.bodySmall),
                 ],
               ),
             ),
@@ -568,20 +548,17 @@ class _WorkspaceMembersScreenState
                                                 ? m.displayName
                                                 : '?')[0]
                                             .toUpperCase(),
-                                        style: TextStyle(
-                                            fontSize: 13,
-                                            color: theme
-                                                .colorScheme.primary),
+                                        style: theme.textTheme.titleSmall
+                                            ?.copyWith(
+                                                color: theme
+                                                    .colorScheme.primary),
                                       )
                                     : null,
                           ),
                           title: Text(m.displayName,
-                              style: const TextStyle(fontSize: 14)),
+                              style: theme.textTheme.bodyMedium),
                           subtitle: Text(m.email,
-                              style: TextStyle(
-                                  fontSize: 12,
-                                  color: theme
-                                      .colorScheme.onSurfaceVariant)),
+                              style: theme.textTheme.bodySmall),
                         );
                       },
                     ),

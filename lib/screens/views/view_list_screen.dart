@@ -165,7 +165,7 @@ class _ViewListScreenState extends ConsumerState<ViewListScreen>
                     title: Text(view.name),
                     subtitle: Text(
                       view.description ?? timeAgoShort(view.updatedAt),
-                      style: TextStyle(fontSize: 12, color: secondary),
+                      style: Theme.of(ctx).textTheme.bodySmall,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),

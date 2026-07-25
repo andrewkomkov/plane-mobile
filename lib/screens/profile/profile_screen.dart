@@ -99,10 +99,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                               ? _user!.displayName
                               : '?')[0]
                           .toUpperCase(),
-                      style: TextStyle(
-                          fontSize: 28,
-                          color: theme.colorScheme.primary,
-                          fontWeight: FontWeight.w600),
+                      style: theme.textTheme.headlineLarge
+                          ?.copyWith(color: theme.colorScheme.primary),
                     )
                   : null,
             ),
@@ -111,10 +109,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
 
           // Email (read-only)
           if (_user != null) ...[
-            Text('Email',
-                style: TextStyle(
-                    fontSize: 12,
-                    color: theme.colorScheme.onSurfaceVariant)),
+            Text('Email', style: theme.textTheme.bodySmall),
             const SizedBox(height: 4),
             // Read-only, but it sits in the same form as the editable field
             // below, so it borrows that field's outline, corner and fill rather
@@ -129,8 +124,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                 color: theme.colorScheme.surfaceContainerLow,
               ),
               child: Text(_user!.email,
-                  style: TextStyle(
-                      fontSize: 14,
+                  style: theme.textTheme.bodyMedium?.copyWith(
                       color: theme.colorScheme.onSurfaceVariant)),
             ),
             const SizedBox(height: 16),
@@ -159,11 +153,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
 
           // Theme section
           const SizedBox(height: 32),
-          Text('Appearance',
-              style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
-                  color: theme.colorScheme.onSurface)),
+          Text('Appearance', style: theme.textTheme.titleMedium),
           const SizedBox(height: 12),
           _ThemeOption(
             icon: Icons.dark_mode,
@@ -220,7 +210,7 @@ class _ThemeOption extends StatelessWidget {
         child: ListTile(
           contentPadding: EdgeInsets.zero,
           leading: Icon(icon, size: 20),
-          title: Text(label, style: const TextStyle(fontSize: 14)),
+          title: Text(label, style: Theme.of(context).textTheme.bodyMedium),
           trailing:
               selected ? const Icon(Icons.check, size: 18) : null,
           onTap: onTap,

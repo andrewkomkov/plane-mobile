@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import '../../config/m3e/motion.dart';
 import '../../widgets/m3e/app_bar.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../config/theme.dart';
+import '../../config/m3e/typography.dart';
 import '../../services/notification_service.dart';
 import '../../models/notification.dart';
 import '../../utils/time_ago.dart';
@@ -158,16 +158,13 @@ class _NotificationScreenState extends ConsumerState<NotificationScreen> {
                 Padding(
                   padding: const EdgeInsets.all(16),
                   child: Text('Email notification preferences',
-                      style: TextStyle(
-                          fontSize: PlaneTheme.fontBody,
-                          fontWeight: FontWeight.w500,
-                          color: theme.colorScheme.onSurface)),
+                      style: theme.textTheme.titleMedium),
                 ),
                 SwitchListTile(
-                  title: const Text('Property changes',
-                      style: TextStyle(fontSize: PlaneTheme.fontBody)),
-                  subtitle: const Text('Issue priority, assignee, label changes',
-                      style: TextStyle(fontSize: PlaneTheme.fontCaption)),
+                  title: Text('Property changes',
+                      style: theme.textTheme.bodyLarge),
+                  subtitle: Text('Issue priority, assignee, label changes',
+                      style: theme.textTheme.bodySmall),
                   value: propertyChange,
                   onChanged: (v) {
                     setSheetState(() => propertyChange = v);
@@ -175,10 +172,10 @@ class _NotificationScreenState extends ConsumerState<NotificationScreen> {
                   },
                 ),
                 SwitchListTile(
-                  title: const Text('State changes',
-                      style: TextStyle(fontSize: PlaneTheme.fontBody)),
-                  subtitle: const Text('Issue state transitions',
-                      style: TextStyle(fontSize: PlaneTheme.fontCaption)),
+                  title: Text('State changes',
+                      style: theme.textTheme.bodyLarge),
+                  subtitle: Text('Issue state transitions',
+                      style: theme.textTheme.bodySmall),
                   value: stateChange,
                   onChanged: (v) {
                     setSheetState(() => stateChange = v);
@@ -186,10 +183,10 @@ class _NotificationScreenState extends ConsumerState<NotificationScreen> {
                   },
                 ),
                 SwitchListTile(
-                  title: const Text('Comments',
-                      style: TextStyle(fontSize: PlaneTheme.fontBody)),
-                  subtitle: const Text('New comments on your issues',
-                      style: TextStyle(fontSize: PlaneTheme.fontCaption)),
+                  title: Text('Comments',
+                      style: theme.textTheme.bodyLarge),
+                  subtitle: Text('New comments on your issues',
+                      style: theme.textTheme.bodySmall),
                   value: comment,
                   onChanged: (v) {
                     setSheetState(() => comment = v);
@@ -197,10 +194,10 @@ class _NotificationScreenState extends ConsumerState<NotificationScreen> {
                   },
                 ),
                 SwitchListTile(
-                  title: const Text('Mentions',
-                      style: TextStyle(fontSize: PlaneTheme.fontBody)),
-                  subtitle: const Text('When someone mentions you',
-                      style: TextStyle(fontSize: PlaneTheme.fontCaption)),
+                  title: Text('Mentions',
+                      style: theme.textTheme.bodyLarge),
+                  subtitle: Text('When someone mentions you',
+                      style: theme.textTheme.bodySmall),
                   value: mention,
                   onChanged: (v) {
                     setSheetState(() => mention = v);
@@ -338,20 +335,17 @@ class _NotificationScreenState extends ConsumerState<NotificationScreen> {
                       notification.title,
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        fontSize: PlaneTheme.fontBody,
-                        fontWeight: notification.isRead
-                            ? FontWeight.w400
-                            : FontWeight.w600,
-                      ),
+                      // Read and unread share one role so the two rows keep
+                      // identical metrics; unread takes the emphasized cut.
+                      style: notification.isRead
+                          ? theme.textTheme.titleMedium
+                          : M3EType.emphasized(theme.textTheme.titleMedium!),
                     ),
                     if (notification.entityName != null) ...[
                       const SizedBox(height: 4),
                       Text(
                         notification.entityName!,
-                        style: TextStyle(
-                            fontSize: PlaneTheme.fontCaption,
-                            color: theme.colorScheme.onSurfaceVariant),
+                        style: theme.textTheme.bodySmall,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
@@ -359,8 +353,7 @@ class _NotificationScreenState extends ConsumerState<NotificationScreen> {
                     const SizedBox(height: 4),
                     Text(
                       timeAgoShort(notification.createdAt),
-                      style: TextStyle(
-                          fontSize: PlaneTheme.fontSmall,
+                      style: theme.textTheme.labelSmall?.copyWith(
                           color: theme.colorScheme.onSurfaceVariant),
                     ),
                   ],

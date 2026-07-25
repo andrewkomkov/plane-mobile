@@ -23,7 +23,8 @@ class PropertyChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
 
     final chip = Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
@@ -40,11 +41,7 @@ class PropertyChip extends StatelessWidget {
           const SizedBox(width: 6),
           Text(
             label,
-            style: TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.w500,
-              color: scheme.onSurface,
-            ),
+            style: theme.textTheme.labelMedium,
           ),
         ],
       ),

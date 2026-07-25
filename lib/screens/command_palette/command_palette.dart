@@ -127,18 +127,17 @@ class _CommandPaletteBodyState
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Padding(
-              padding: EdgeInsets.all(16),
+            Padding(
+              padding: const EdgeInsets.all(16),
               child: Text('Switch Project',
-                  style: TextStyle(
-                      fontSize: 16, fontWeight: FontWeight.w500)),
+                  style: Theme.of(ctx).textTheme.titleMedium),
             ),
             ..._projects.map((p) => ListTile(
                   leading: const Icon(Icons.bolt_outlined, size: 20),
                   title: Text(p.name,
-                      style: const TextStyle(fontSize: 14)),
+                      style: Theme.of(ctx).textTheme.bodyMedium),
                   subtitle: Text(p.identifier,
-                      style: const TextStyle(fontSize: 12)),
+                      style: Theme.of(ctx).textTheme.bodySmall),
                   onTap: () => Navigator.pop(ctx, p),
                 )),
           ],
@@ -308,11 +307,8 @@ class _CommandPaletteBodyState
               child: Align(
                 alignment: Alignment.centerLeft,
                 child: Text('Quick actions',
-                    style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w500,
-                        color:
-                            theme.colorScheme.onSurfaceVariant)),
+                    style: theme.textTheme.labelMedium?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant)),
               ),
             ),
           // Items
@@ -325,11 +321,8 @@ class _CommandPaletteBodyState
                     padding:
                         const EdgeInsets.fromLTRB(16, 4, 16, 4),
                     child: Text('Actions',
-                        style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w500,
-                            color: theme
-                                .colorScheme.onSurfaceVariant)),
+                        style: theme.textTheme.labelMedium?.copyWith(
+                            color: theme.colorScheme.onSurfaceVariant)),
                   ),
                   ...filteredActions.map((a) => _buildItem(a, theme)),
                   if (items.isNotEmpty)
@@ -337,11 +330,8 @@ class _CommandPaletteBodyState
                       padding:
                           const EdgeInsets.fromLTRB(16, 8, 16, 4),
                       child: Text('Results',
-                          style: TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w500,
-                              color: theme
-                                  .colorScheme.onSurfaceVariant)),
+                          style: theme.textTheme.labelMedium?.copyWith(
+                              color: theme.colorScheme.onSurfaceVariant)),
                     ),
                 ],
                 ...items.map((item) => _buildItem(item, theme)),
@@ -366,12 +356,9 @@ class _CommandPaletteBodyState
   Widget _buildItem(_CommandItem item, ThemeData theme) {
     return ListTile(
       leading: Icon(item.icon, size: 20),
-      title: Text(item.label, style: const TextStyle(fontSize: 14)),
+      title: Text(item.label, style: theme.textTheme.bodyMedium),
       subtitle: item.subtitle != null
-          ? Text(item.subtitle!,
-              style: TextStyle(
-                  fontSize: 12,
-                  color: theme.colorScheme.onSurfaceVariant))
+          ? Text(item.subtitle!, style: theme.textTheme.bodySmall)
           : null,
       onTap: item.onTap,
     );

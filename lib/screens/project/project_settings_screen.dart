@@ -396,20 +396,14 @@ class _ProjectSettingsScreenState
                   child: Row(
                     children: [
                       Text('Identifier: ',
-                          style: TextStyle(
-                              fontSize: 14,
+                          style: theme.textTheme.bodyMedium?.copyWith(
                               color:
                                   theme.colorScheme.onSurfaceVariant)),
                       Text(widget.project.identifier,
-                          style: const TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w500)),
+                          style: theme.textTheme.labelLarge),
                       const Spacer(),
                       Text('(read-only)',
-                          style: TextStyle(
-                              fontSize: 12,
-                              color:
-                                  theme.colorScheme.onSurfaceVariant)),
+                          style: theme.textTheme.bodySmall),
                     ],
                   ),
                 ),
@@ -417,8 +411,7 @@ class _ProjectSettingsScreenState
                 Row(
                   children: [
                     Text('Network: ',
-                        style: TextStyle(
-                            fontSize: 14,
+                        style: theme.textTheme.bodyMedium?.copyWith(
                             color:
                                 theme.colorScheme.onSurfaceVariant)),
                     const SizedBox(width: 8),
@@ -469,23 +462,16 @@ class _ProjectSettingsScreenState
                       child: Text(
                         (m.displayName.isNotEmpty ? m.displayName : '?')[0]
                             .toUpperCase(),
-                        style: TextStyle(
-                            fontSize: 13,
-                            color: theme.colorScheme.primary),
+                        style: theme.textTheme.titleSmall
+                            ?.copyWith(color: theme.colorScheme.primary),
                       ),
                     ),
                     title: Text(m.displayName,
-                        style: const TextStyle(fontSize: 14)),
+                        style: theme.textTheme.bodyMedium),
                     subtitle: Text(m.email,
-                        style: TextStyle(
-                            fontSize: 12,
-                            color:
-                                theme.colorScheme.onSurfaceVariant)),
+                        style: theme.textTheme.bodySmall),
                     trailing: Text(role,
-                        style: TextStyle(
-                            fontSize: 12,
-                            color:
-                                theme.colorScheme.onSurfaceVariant)),
+                        style: theme.textTheme.bodySmall),
                   );
                 }),
 
@@ -512,12 +498,9 @@ class _ProjectSettingsScreenState
                         size: 20,
                       ),
                       title: Text(s.name,
-                          style: const TextStyle(fontSize: 14)),
+                          style: theme.textTheme.bodyMedium),
                       subtitle: Text(s.group,
-                          style: TextStyle(
-                              fontSize: 12,
-                              color:
-                                  theme.colorScheme.onSurfaceVariant)),
+                          style: theme.textTheme.bodySmall),
                       // Named per state so repeated rows stay distinguishable
                       // to external automation.
                       trailing: M3EIconButton(
@@ -558,7 +541,7 @@ class _ProjectSettingsScreenState
                         ),
                       ),
                       label: Text(l.name,
-                          style: const TextStyle(fontSize: 13)),
+                          style: theme.textTheme.labelMedium),
                       deleteIcon: Icon(Icons.close,
                           size: 16, semanticLabel: 'Delete label ${l.name}'),
                       deleteButtonTooltipMessage: 'Delete label',
@@ -583,10 +566,7 @@ class _ProjectSettingsScreenState
                         Expanded(
                           child: Text(
                             'Set up integrations in the web app',
-                            style: TextStyle(
-                                fontSize: 13,
-                                color:
-                                    theme.colorScheme.onSurfaceVariant),
+                            style: theme.textTheme.bodySmall,
                           ),
                         ),
                       ],
@@ -602,13 +582,10 @@ class _ProjectSettingsScreenState
                       contentPadding: EdgeInsets.zero,
                       leading: const Icon(Icons.code, size: 20),
                       title: Text(name.toString(),
-                          style: const TextStyle(fontSize: 14)),
+                          style: theme.textTheme.bodyMedium),
                       subtitle: owner.toString().isNotEmpty
                           ? Text(owner.toString(),
-                              style: TextStyle(
-                                  fontSize: 12,
-                                  color:
-                                      theme.colorScheme.onSurfaceVariant))
+                              style: theme.textTheme.bodySmall)
                           : null,
                     );
                   }),
@@ -629,11 +606,7 @@ class _ProjectSettingsScreenState
   }
 
   Widget _sectionHeader(String title, ThemeData theme) {
-    return Text(title,
-        style: TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.w600,
-            color: theme.colorScheme.onSurface));
+    return Text(title, style: theme.textTheme.titleMedium);
   }
 
   Widget _featureRow(String name, bool enabled, ThemeData theme) {
@@ -647,12 +620,10 @@ class _ProjectSettingsScreenState
             color: enabled ? PlaneTheme.completed : PlaneTheme.cancelled,
           ),
           const SizedBox(width: 10),
-          Text(name, style: const TextStyle(fontSize: 14)),
+          Text(name, style: theme.textTheme.bodyMedium),
           const Spacer(),
           Text(enabled ? 'Enabled' : 'Disabled',
-              style: TextStyle(
-                  fontSize: 12,
-                  color: theme.colorScheme.onSurfaceVariant)),
+              style: theme.textTheme.bodySmall),
         ],
       ),
     );

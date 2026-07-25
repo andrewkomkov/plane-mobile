@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../config/m3e/shapes.dart';
+import '../../config/m3e/typography.dart';
 import '../../widgets/m3e/icon_button.dart';
 import '../../models/issue.dart';
 import '../../models/state.dart';
@@ -98,8 +99,7 @@ class _CalendarViewState extends State<CalendarView> {
               ),
               Text(
                 '${_monthName(_currentMonth.month)} ${_currentMonth.year}',
-                style: const TextStyle(
-                    fontSize: 16, fontWeight: FontWeight.w600),
+                style: theme.textTheme.titleMedium,
               ),
               M3EIconButton(
                 icon: Icons.chevron_right,
@@ -123,10 +123,8 @@ class _CalendarViewState extends State<CalendarView> {
                 .map((d) => Expanded(
                       child: Center(
                         child: Text(d,
-                            style: TextStyle(
-                                fontSize: 11,
-                                fontWeight: FontWeight.w500,
-                                color: secondary)),
+                            style: theme.textTheme.labelSmall
+                                ?.copyWith(color: secondary)),
                       ),
                     ))
                 .toList(),
@@ -218,11 +216,13 @@ class _CalendarViewState extends State<CalendarView> {
                             alignment: Alignment.center,
                             child: Text(
                               '$dayNum',
-                              style: TextStyle(
-                                fontSize: 12,
-                                fontWeight: isToday
-                                    ? FontWeight.w600
-                                    : FontWeight.w400,
+                              // Today is the one day that has to dominate the
+                              // grid, which is what the emphasized cut is for.
+                              style: (isToday
+                                      ? M3EType.emphasized(
+                                          theme.textTheme.labelMedium!)
+                                      : theme.textTheme.bodySmall!)
+                                  .copyWith(
                                 color: isToday
                                     // Dark `primary` is a light lavender, so
                                     // white on it is 1.70:1. Roles come in
@@ -265,17 +265,14 @@ class _CalendarViewState extends State<CalendarView> {
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
             child: Text(
               '${_formatDate(_selectedDay!)} (${issues.length} issues)',
-              style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w500,
-                  color: secondary),
+              style: theme.textTheme.titleSmall?.copyWith(color: secondary),
             ),
           ),
           Expanded(
             child: issues.isEmpty
                 ? Center(
                     child: Text('No issues due this day',
-                        style: TextStyle(fontSize: 13, color: secondary)),
+                        style: theme.textTheme.bodySmall),
                   )
                 : ListView.builder(
                     itemCount: issues.length,
@@ -318,17 +315,14 @@ class _CalendarViewState extends State<CalendarView> {
           padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
           child: Text(
             'No date (${noDate.length} issues)',
-            style: TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w500,
-                color: secondary),
+            style: theme.textTheme.titleSmall?.copyWith(color: secondary),
           ),
         ),
         Expanded(
           child: noDate.isEmpty
               ? Center(
                   child: Text('All issues have dates',
-                      style: TextStyle(fontSize: 13, color: secondary)),
+                      style: theme.textTheme.bodySmall),
                 )
               : ListView.builder(
                   itemCount: noDate.length,

@@ -36,21 +36,18 @@ class BottomSheetPicker<T> extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
         if (title != null)
           Padding(
             padding: const EdgeInsets.all(16),
-            child: Text(title!,
-                style: const TextStyle(
-                    fontSize: PlaneTheme.fontBody,
-                    fontWeight: FontWeight.w500)),
+            child: Text(title!, style: textTheme.titleMedium),
           ),
         ...items.map((item) => ListTile(
               leading: item.leading,
-              title: Text(item.label,
-                  style: const TextStyle(fontSize: PlaneTheme.fontBody)),
+              title: Text(item.label, style: textTheme.bodyLarge),
               trailing: item.value == selectedValue
                   ? const Icon(Icons.check, size: PlaneTheme.iconLarge)
                   : null,

@@ -266,8 +266,8 @@ class FilterBar extends StatelessWidget {
                     },
                     secondary: Icon(PlaneTheme.stateIcon(s.group),
                         color: PlaneTheme.stateGroupColor(context, s.group), size: PlaneTheme.iconLarge),
-                    title:
-                        Text(s.name, style: const TextStyle(fontSize: PlaneTheme.fontBody)),
+                    title: Text(s.name,
+                        style: Theme.of(ctx).textTheme.bodyLarge),
                     controlAffinity: ListTileControlAffinity.trailing,
                     dense: true,
                   )),
@@ -307,7 +307,7 @@ class FilterBar extends StatelessWidget {
                     secondary: Icon(PlaneTheme.priorityIcon(p),
                         color: PlaneTheme.priorityColor(context, p), size: PlaneTheme.iconLarge),
                     title: Text(p[0].toUpperCase() + p.substring(1),
-                        style: const TextStyle(fontSize: PlaneTheme.fontBody)),
+                        style: Theme.of(ctx).textTheme.bodyLarge),
                     controlAffinity: ListTileControlAffinity.trailing,
                     dense: true,
                   )),
@@ -333,9 +333,10 @@ class FilterBar extends StatelessWidget {
                     filterState.copyWith(selectedAssignees: selected));
               }),
               if (members.isEmpty)
-                const Padding(
-                  padding: EdgeInsets.all(16),
-                  child: Text('No members', style: TextStyle(fontSize: PlaneTheme.fontSection)),
+                Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Text('No members',
+                      style: Theme.of(ctx).textTheme.bodySmall),
                 ),
               ...members.map((m) => CheckboxListTile(
                     value: selected.contains(m.id),
@@ -357,13 +358,12 @@ class FilterBar extends StatelessWidget {
                       child: Text(
                         (m.displayName.isNotEmpty ? m.displayName : '?')[0]
                             .toUpperCase(),
-                        style: TextStyle(
-                            fontSize: PlaneTheme.fontSmall,
+                        style: Theme.of(ctx).textTheme.labelSmall?.copyWith(
                             color: Theme.of(ctx).colorScheme.primary),
                       ),
                     ),
                     title: Text(m.displayName,
-                        style: const TextStyle(fontSize: PlaneTheme.fontBody)),
+                        style: Theme.of(ctx).textTheme.bodyLarge),
                     controlAffinity: ListTileControlAffinity.trailing,
                     dense: true,
                   )),
@@ -389,9 +389,10 @@ class FilterBar extends StatelessWidget {
                     filterState.copyWith(selectedLabels: selected));
               }),
               if (labels.isEmpty)
-                const Padding(
-                  padding: EdgeInsets.all(16),
-                  child: Text('No labels', style: TextStyle(fontSize: PlaneTheme.fontSection)),
+                Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Text('No labels',
+                      style: Theme.of(ctx).textTheme.bodySmall),
                 ),
               ...labels.map((l) => CheckboxListTile(
                     value: selected.contains(l.id),
@@ -412,8 +413,8 @@ class FilterBar extends StatelessWidget {
                         shape: BoxShape.circle,
                       ),
                     ),
-                    title:
-                        Text(l.name, style: const TextStyle(fontSize: PlaneTheme.fontBody)),
+                    title: Text(l.name,
+                        style: Theme.of(ctx).textTheme.bodyLarge),
                     controlAffinity: ListTileControlAffinity.trailing,
                     dense: true,
                   )),
@@ -431,16 +432,15 @@ class FilterBar extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Padding(
-              padding: EdgeInsets.all(16),
-              child: Text('Sort by',
-                  style:
-                      TextStyle(fontSize: PlaneTheme.fontBody, fontWeight: FontWeight.w500)),
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child:
+                  Text('Sort by', style: Theme.of(ctx).textTheme.titleMedium),
             ),
             ListTile(
               leading: const Icon(Icons.calendar_today, size: PlaneTheme.iconLarge),
-              title: const Text('Created at',
-                  style: TextStyle(fontSize: PlaneTheme.fontBody)),
+              title: Text('Created at',
+                  style: Theme.of(ctx).textTheme.bodyLarge),
               trailing: filterState.sortField == SortField.createdAt
                   ? const Icon(Icons.check, size: PlaneTheme.iconLarge)
                   : null,
@@ -455,8 +455,8 @@ class FilterBar extends StatelessWidget {
             ),
             ListTile(
               leading: const Icon(Icons.update, size: PlaneTheme.iconLarge),
-              title: const Text('Updated at',
-                  style: TextStyle(fontSize: PlaneTheme.fontBody)),
+              title: Text('Updated at',
+                  style: Theme.of(ctx).textTheme.bodyLarge),
               trailing: filterState.sortField == SortField.updatedAt
                   ? const Icon(Icons.check, size: PlaneTheme.iconLarge)
                   : null,
@@ -471,8 +471,8 @@ class FilterBar extends StatelessWidget {
             ),
             ListTile(
               leading: const Icon(Icons.flag_outlined, size: PlaneTheme.iconLarge),
-              title: const Text('Priority',
-                  style: TextStyle(fontSize: PlaneTheme.fontBody)),
+              title: Text('Priority',
+                  style: Theme.of(ctx).textTheme.bodyLarge),
               trailing: filterState.sortField == SortField.priority
                   ? const Icon(Icons.check, size: PlaneTheme.iconLarge)
                   : null,
@@ -498,16 +498,14 @@ class FilterBar extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Padding(
-              padding: EdgeInsets.all(16),
-              child: Text('Group by',
-                  style:
-                      TextStyle(fontSize: PlaneTheme.fontBody, fontWeight: FontWeight.w500)),
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child:
+                  Text('Group by', style: Theme.of(ctx).textTheme.titleMedium),
             ),
             ListTile(
               leading: const Icon(Icons.circle_outlined, size: PlaneTheme.iconLarge),
-              title:
-                  const Text('State', style: TextStyle(fontSize: PlaneTheme.fontBody)),
+              title: Text('State', style: Theme.of(ctx).textTheme.bodyLarge),
               trailing: filterState.groupBy == GroupByField.state
                   ? const Icon(Icons.check, size: PlaneTheme.iconLarge)
                   : null,
@@ -520,7 +518,7 @@ class FilterBar extends StatelessWidget {
             ListTile(
               leading: const Icon(Icons.flag_outlined, size: PlaneTheme.iconLarge),
               title:
-                  const Text('Priority', style: TextStyle(fontSize: PlaneTheme.fontBody)),
+                  Text('Priority', style: Theme.of(ctx).textTheme.bodyLarge),
               trailing: filterState.groupBy == GroupByField.priority
                   ? const Icon(Icons.check, size: PlaneTheme.iconLarge)
                   : null,
@@ -533,7 +531,7 @@ class FilterBar extends StatelessWidget {
             ListTile(
               leading: const Icon(Icons.person_outline, size: PlaneTheme.iconLarge),
               title:
-                  const Text('Assignee', style: TextStyle(fontSize: PlaneTheme.fontBody)),
+                  Text('Assignee', style: Theme.of(ctx).textTheme.bodyLarge),
               trailing: filterState.groupBy == GroupByField.assignee
                   ? const Icon(Icons.check, size: PlaneTheme.iconLarge)
                   : null,
@@ -545,8 +543,7 @@ class FilterBar extends StatelessWidget {
             ),
             ListTile(
               leading: const Icon(Icons.label_outline, size: PlaneTheme.iconLarge),
-              title:
-                  const Text('Label', style: TextStyle(fontSize: PlaneTheme.fontBody)),
+              title: Text('Label', style: Theme.of(ctx).textTheme.bodyLarge),
               trailing: filterState.groupBy == GroupByField.label
                   ? const Icon(Icons.check, size: PlaneTheme.iconLarge)
                   : null,
@@ -567,9 +564,7 @@ class FilterBar extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       child: Row(
         children: [
-          Text(title,
-              style: const TextStyle(
-                  fontSize: PlaneTheme.fontBody, fontWeight: FontWeight.w500)),
+          Text(title, style: Theme.of(ctx).textTheme.titleMedium),
           const Spacer(),
           TextButton(onPressed: onDone, child: const Text('Done')),
         ],

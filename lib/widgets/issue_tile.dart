@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../config/m3e/motion.dart';
 import '../config/m3e/shapes.dart';
+import '../config/m3e/typography.dart';
 import '../config/theme.dart';
 import '../models/issue.dart';
 import '../models/label.dart';
@@ -152,12 +153,7 @@ class IssueTile extends StatelessWidget {
                         issue.name,
                         maxLines: maxTitleLines,
                         overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          fontSize: PlaneTheme.fontBody,
-                          fontWeight: PlaneTheme.fontBodyWeight,
-                          color: theme.colorScheme.onSurface,
-                          height: 1.3,
-                        ),
+                        style: theme.textTheme.titleMedium,
                       ),
                       // Label pills
                       if (showLabels && issueLabels.isNotEmpty) ...[
@@ -176,11 +172,8 @@ class IssueTile extends StatelessWidget {
                                 ),
                                 child: Text(
                                   l.name,
-                                  style: TextStyle(
-                                    fontSize: PlaneTheme.fontSmall,
-                                    color: _parseColor(l.color),
-                                    fontWeight: FontWeight.w500,
-                                  ),
+                                  style: theme.textTheme.labelSmall
+                                      ?.copyWith(color: _parseColor(l.color)),
                                 ),
                               )).toList(),
                         ),
@@ -198,8 +191,8 @@ class IssueTile extends StatelessWidget {
                           size: PlaneTheme.iconSmall, color: secondary),
                       const SizedBox(width: 2),
                       Text('${issue.subIssuesCount}',
-                          style: TextStyle(
-                              fontSize: PlaneTheme.fontSmall, color: secondary)),
+                          style: theme.textTheme.labelSmall
+                              ?.copyWith(color: secondary)),
                       const SizedBox(width: 8),
                     ],
                     // Due date indicators
@@ -245,8 +238,8 @@ class IssueTile extends StatelessWidget {
                     // Sequence ID on the right (when not showing full identifier)
                     if (showId && projectIdentifier == null) ...[
                       Text('${issue.sequenceId}',
-                          style: TextStyle(
-                              fontSize: PlaneTheme.fontSmall, color: secondary)),
+                          style: theme.textTheme.labelSmall
+                              ?.copyWith(color: secondary)),
                     ],
                   ],
                 ),
@@ -302,13 +295,12 @@ class IssueTile extends StatelessWidget {
                           issue.name,
                           maxLines: maxTitleLines,
                           overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            fontSize: PlaneTheme.fontBody,
-                            fontWeight: isUnread
-                                ? FontWeight.w600
-                                : PlaneTheme.fontBodyWeight,
-                            color: theme.colorScheme.onSurface,
-                          ),
+                          // An unread row is the one thing in the inbox that
+                          // must dominate, which is what the emphasized cut is
+                          // for.
+                          style: isUnread
+                              ? M3EType.emphasized(theme.textTheme.titleMedium!)
+                              : theme.textTheme.titleMedium,
                         ),
                       ),
                     ],
@@ -328,19 +320,15 @@ class IssueTile extends StatelessWidget {
                           subtitle!,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            fontSize: PlaneTheme.fontSection,
-                            color: theme.colorScheme.onSurfaceVariant,
-                          ),
+                          style: theme.textTheme.bodySmall,
                         ),
                       ),
                       if (timeAgo != null) ...[
                         Text(
                           ' \u2022 $timeAgo',
-                          style: TextStyle(
-                            fontSize: PlaneTheme.fontSection,
-                            // outline is the border role; the timestamp is text
-                            // that should simply sit below the subtitle.
+                          // outline is the border role; the timestamp is text
+                          // that should simply sit below the subtitle.
+                          style: theme.textTheme.bodySmall?.copyWith(
                             color: theme.colorScheme.onSurfaceVariant
                                 .withValues(alpha: 0.7),
                           ),
@@ -360,12 +348,9 @@ class IssueTile extends StatelessWidget {
   /// One treatment for the issue identifier in both layouts — the inbox row
   /// used to render the same string two points larger and in monospace, which
   /// made the two lists look like different products.
-  static TextStyle _identifierStyle(ThemeData theme) => TextStyle(
-        fontSize: PlaneTheme.fontSmall,
-        fontWeight: FontWeight.w500,
-        color: theme.colorScheme.onSurfaceVariant,
-        letterSpacing: 0.5,
-      );
+  static TextStyle _identifierStyle(ThemeData theme) =>
+      theme.textTheme.labelSmall!
+          .copyWith(color: theme.colorScheme.onSurfaceVariant);
 
   static Color _parseColor(String hex) {
     hex = hex.replaceFirst('#', '');
@@ -405,7 +390,8 @@ class _MiniAvatar extends StatelessWidget {
       child: Text(
         (member.displayName.isNotEmpty ? member.displayName : '?')[0]
             .toUpperCase(),
-        style: TextStyle(fontSize: 10, color: theme.colorScheme.primary),
+        style: theme.textTheme.labelSmall
+            ?.copyWith(color: theme.colorScheme.primary),
       ),
     );
   }

@@ -61,9 +61,9 @@ Future<void> showDisplayOptions(BuildContext context, DisplayState ds, VoidCallb
               padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
               child: Row(
                 children: [
-                  Text(label, style: const TextStyle(fontSize: PlaneTheme.fontBody)),
+                  Text(label, style: theme.textTheme.bodyLarge),
                   const Spacer(),
-                  Text(value, style: TextStyle(fontSize: PlaneTheme.fontCaption, color: secondary)),
+                  Text(value, style: theme.textTheme.bodySmall),
                   const SizedBox(width: 4),
                   Icon(Icons.unfold_more, size: PlaneTheme.iconMedium, color: secondary),
                 ],
@@ -134,8 +134,8 @@ Future<void> showDisplayOptions(BuildContext context, DisplayState ds, VoidCallb
                   padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 6),
                   child: Row(
                     children: [
-                      const Text('Show sub-issues',
-                          style: TextStyle(fontSize: PlaneTheme.fontBody)),
+                      Text('Show sub-issues',
+                          style: theme.textTheme.bodyLarge),
                       const Spacer(),
                       // The switch sits in a Row next to its caption, so it
                       // would otherwise be an unnamed node for automation.
@@ -169,8 +169,8 @@ Future<void> showDisplayOptions(BuildContext context, DisplayState ds, VoidCallb
                   child: Row(
                     children: [
                       Text('Row properties',
-                          style: TextStyle(
-                              fontSize: PlaneTheme.fontSection, color: secondary)),
+                          style: theme.textTheme.titleSmall
+                              ?.copyWith(color: secondary)),
                       const Spacer(),
                       // A TextButton rather than a tapped Text: it carries the
                       // 48dp target and the label for free, which the bare
@@ -182,8 +182,8 @@ Future<void> showDisplayOptions(BuildContext context, DisplayState ds, VoidCallb
                           onChanged();
                         },
                         child: Text('Reset',
-                            style: TextStyle(
-                                fontSize: PlaneTheme.fontSection, color: secondary)),
+                            style: theme.textTheme.labelMedium
+                                ?.copyWith(color: secondary)),
                       ),
                     ],
                   ),

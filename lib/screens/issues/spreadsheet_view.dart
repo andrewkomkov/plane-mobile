@@ -80,7 +80,7 @@ class SpreadsheetView extends StatelessWidget {
                         width: 80,
                         child: Text(
                           '$projectIdentifier-${issue.sequenceId}',
-                          style: TextStyle(fontSize: 12, color: secondary),
+                          style: theme.textTheme.bodySmall,
                         ),
                       ),
                       // Title
@@ -105,7 +105,7 @@ class SpreadsheetView extends StatelessWidget {
                             issue.name,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(fontSize: 13),
+                            style: theme.textTheme.titleSmall,
                           ),
                         ),
                       ),
@@ -136,7 +136,8 @@ class SpreadsheetView extends StatelessWidget {
                                     state?.name ?? 'Unknown',
                                     maxLines: 1,
                                     overflow: TextOverflow.ellipsis,
-                                    style: const TextStyle(fontSize: 12),
+                                    style: theme.textTheme.bodySmall?.copyWith(
+                                        color: theme.colorScheme.onSurface),
                                   ),
                                 ),
                               ],
@@ -167,7 +168,8 @@ class SpreadsheetView extends StatelessWidget {
                                 Text(
                                   issue.priority[0].toUpperCase() +
                                       issue.priority.substring(1),
-                                  style: const TextStyle(fontSize: 12),
+                                  style: theme.textTheme.bodySmall?.copyWith(
+                                      color: theme.colorScheme.onSurface),
                                 ),
                               ],
                             ),
@@ -183,8 +185,7 @@ class SpreadsheetView extends StatelessWidget {
                               : assigneeNames,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            fontSize: 12,
+                          style: theme.textTheme.bodySmall?.copyWith(
                             color: assigneeNames.isEmpty
                                 ? secondary
                                 : theme.colorScheme.onSurface,
@@ -196,8 +197,7 @@ class SpreadsheetView extends StatelessWidget {
                         width: 110,
                         child: Text(
                           issue.targetDate ?? '-',
-                          style: TextStyle(
-                            fontSize: 12,
+                          style: theme.textTheme.bodySmall?.copyWith(
                             color: issue.isOverdue
                                 ? PlaneTheme.urgent
                                 : secondary,
@@ -227,7 +227,7 @@ class SpreadsheetView extends StatelessWidget {
                         color: PlaneTheme.stateGroupColor(context, s.group),
                         size: 18),
                     title: Text(s.name,
-                        style: const TextStyle(fontSize: 14)),
+                        style: Theme.of(ctx).textTheme.bodyMedium),
                     onTap: () async {
                       Navigator.pop(ctx);
                       await IssueService.updateIssue(
@@ -253,7 +253,7 @@ class SpreadsheetView extends StatelessWidget {
                     leading: Icon(PlaneTheme.priorityIcon(p),
                         color: PlaneTheme.priorityColor(context, p), size: 18),
                     title: Text(p[0].toUpperCase() + p.substring(1),
-                        style: const TextStyle(fontSize: 14)),
+                        style: Theme.of(ctx).textTheme.bodyMedium),
                     onTap: () async {
                       Navigator.pop(ctx);
                       await IssueService.updateIssue(
@@ -282,9 +282,7 @@ class _HeaderCell extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
       child: Text(
         label,
-        style: TextStyle(
-          fontSize: 12,
-          fontWeight: FontWeight.w600,
+        style: theme.textTheme.labelMedium?.copyWith(
           color: theme.colorScheme.onSurfaceVariant,
         ),
       ),

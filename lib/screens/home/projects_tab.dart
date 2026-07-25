@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../config/theme.dart';
 import '../../models/project.dart';
 import '../../providers/data_providers.dart';
 import '../project/project_screen.dart';
@@ -12,6 +11,7 @@ import '../../widgets/m3e/text_field.dart';
 import '../../widgets/section_header.dart';
 import '../../config/m3e/shapes.dart';
 import '../../config/m3e/motion.dart';
+import '../../config/m3e/typography.dart';
 
 class ProjectsTab extends ConsumerStatefulWidget {
   final String workspaceSlug;
@@ -173,12 +173,10 @@ class _ProjectsTabState extends ConsumerState<ProjectsTab>
                                         child: Center(
                                           child: Text(
                                             p.identifier,
-                                            style: TextStyle(
-                                              fontSize: 13,
-                                              fontWeight: FontWeight.w700,
-                                              color: _badgeColor(i),
-                                              letterSpacing: -0.3,
-                                            ),
+                                            style: M3EType.emphasized(
+                                                    theme.textTheme.titleSmall!)
+                                                .copyWith(
+                                                    color: _badgeColor(i)),
                                           ),
                                         ),
                                       ),
@@ -193,19 +191,12 @@ class _ProjectsTabState extends ConsumerState<ProjectsTab>
                                               p.name,
                                               maxLines: 1,
                                               overflow: TextOverflow.ellipsis,
-                                              style: TextStyle(
-                                                fontSize: PlaneTheme.fontBody,
-                                                fontWeight: PlaneTheme.fontBodyWeight,
-                                                color: theme.colorScheme.onSurface,
-                                              ),
+                                              style: theme.textTheme.titleMedium,
                                             ),
                                             const SizedBox(height: 2),
                                             Text(
                                               '${_issueCounts[p.id] ?? 0} active issues',
-                                              style: TextStyle(
-                                                fontSize: PlaneTheme.fontCaption,
-                                                color: theme.colorScheme.onSurfaceVariant,
-                                              ),
+                                              style: theme.textTheme.bodySmall,
                                             ),
                                           ],
                                         ),

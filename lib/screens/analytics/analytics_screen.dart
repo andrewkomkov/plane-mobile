@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../config/m3e/shapes.dart';
+import '../../config/m3e/typography.dart';
 import '../../widgets/m3e/app_bar.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../config/theme.dart';
@@ -183,11 +184,7 @@ class _AnalyticsScreenState extends ConsumerState<AnalyticsScreen> {
   }
 
   Widget _buildSectionTitle(String title, ThemeData theme) {
-    return Text(title,
-        style: TextStyle(
-            fontSize: PlaneTheme.fontBody,
-            fontWeight: FontWeight.w600,
-            color: theme.colorScheme.onSurface));
+    return Text(title, style: theme.textTheme.titleMedium);
   }
 
   Widget _buildBarChart(Map<String, int> data,
@@ -214,8 +211,7 @@ class _AnalyticsScreenState extends ConsumerState<AnalyticsScreen> {
                 width: 80,
                 child: Text(
                   _capitalize(entry.key),
-                  style: TextStyle(
-                      fontSize: PlaneTheme.fontSection,
+                  style: theme.textTheme.titleSmall?.copyWith(
                       color: theme.colorScheme.onSurfaceVariant),
                 ),
               ),
@@ -242,11 +238,10 @@ class _AnalyticsScreenState extends ConsumerState<AnalyticsScreen> {
               const SizedBox(width: 8),
               SizedBox(
                 width: 32,
+                // The count is the one thing that must read louder than the
+                // category beside it, so it takes the emphasized cut.
                 child: Text('${entry.value}',
-                    style: TextStyle(
-                        fontSize: PlaneTheme.fontSection,
-                        fontWeight: PlaneTheme.fontSectionWeight,
-                        color: theme.colorScheme.onSurface)),
+                    style: M3EType.emphasized(theme.textTheme.titleSmall!)),
               ),
             ],
           ),
@@ -275,13 +270,12 @@ class _AnalyticsScreenState extends ConsumerState<AnalyticsScreen> {
               child: Text(issue.name,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(fontSize: PlaneTheme.fontSection)),
+                  style: theme.textTheme.titleSmall),
             ),
             const SizedBox(width: 8),
             Text(
               _shortDate(issue.updatedAt),
-              style: TextStyle(
-                  fontSize: PlaneTheme.fontSmall,
+              style: theme.textTheme.labelSmall?.copyWith(
                   color: theme.colorScheme.onSurfaceVariant),
             ),
           ],
@@ -334,15 +328,12 @@ class _StatCard extends StatelessWidget {
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Text(value,
-              style: TextStyle(
-                  fontSize: PlaneTheme.fontTitle,
-                  fontWeight: PlaneTheme.fontTitleWeight,
-                  color: color)),
+              style: theme.textTheme.headlineMedium
+                  ?.copyWith(color: color)),
           const SizedBox(height: 4),
           Text(label,
-              style: TextStyle(
-                  fontSize: PlaneTheme.fontSection,
-                  color: theme.colorScheme.onSurfaceVariant)),
+              style: theme.textTheme.titleSmall
+                  ?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
         ],
       ),
     );

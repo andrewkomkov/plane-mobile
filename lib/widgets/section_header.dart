@@ -58,11 +58,10 @@ class SectionHeader extends StatelessWidget {
               ),
               child: Text(
                 '$count',
-                style: TextStyle(
-                  fontSize: 10,
-                  fontWeight: FontWeight.w600,
-                  color: theme.colorScheme.onSurfaceVariant,
-                ),
+                // Emphasized: the pill is small and low-contrast, and the
+                // design asked for a heavier cut than labelSmall's w500.
+                style: M3EType.emphasized(theme.textTheme.labelSmall!)
+                    .copyWith(color: theme.colorScheme.onSurfaceVariant),
               ),
             ),
           ],

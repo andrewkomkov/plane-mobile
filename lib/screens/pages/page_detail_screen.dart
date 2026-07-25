@@ -5,6 +5,7 @@ import '../../widgets/m3e/loading_indicator.dart';
 import '../../widgets/m3e/text_field.dart';
 import '../../config/m3e/motion.dart';
 import '../../config/m3e/shapes.dart';
+import '../../config/m3e/typography.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../services/page_service.dart';
@@ -97,24 +98,11 @@ class _PageDetailScreenState extends ConsumerState<PageDetailScreen> {
                   child: MarkdownBody(
                     data: htmlToMarkdown(_page!.descriptionHtml!),
                     styleSheet: MarkdownStyleSheet(
-                      p: TextStyle(
-                          fontSize: 15,
-                          height: 1.7,
-                          color: theme.colorScheme.onSurface),
-                      h1: TextStyle(
-                          fontSize: 22,
-                          fontWeight: FontWeight.w600,
-                          color: theme.colorScheme.onSurface),
-                      h2: TextStyle(
-                          fontSize: 19,
-                          fontWeight: FontWeight.w600,
-                          color: theme.colorScheme.onSurface),
-                      h3: TextStyle(
-                          fontSize: 17,
-                          fontWeight: FontWeight.w500,
-                          color: theme.colorScheme.onSurface),
-                      code: TextStyle(
-                        fontSize: 13,
+                      p: theme.textTheme.bodyLarge,
+                      h1: theme.textTheme.headlineSmall,
+                      h2: theme.textTheme.titleLarge,
+                      h3: theme.textTheme.titleMedium,
+                      code: theme.textTheme.bodyMedium?.copyWith(
                         color: theme.colorScheme.primary,
                         backgroundColor: theme.colorScheme.primary
                             .withValues(alpha: 0.08),
@@ -135,19 +123,15 @@ class _PageDetailScreenState extends ConsumerState<PageDetailScreen> {
                       ),
                       blockquotePadding:
                           const EdgeInsets.fromLTRB(12, 4, 0, 4),
-                      listBullet: TextStyle(
-                          fontSize: 15,
-                          color: theme.colorScheme.onSurface),
+                      listBullet: theme.textTheme.bodyLarge,
                     ),
                     selectable: true,
                   ),
                 )
               : Center(
                   child: Text('No content',
-                      style: TextStyle(
-                          fontSize: 15,
-                          color:
-                              theme.colorScheme.onSurfaceVariant)),
+                      style: theme.textTheme.bodyLarge?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant)),
                 ),
     );
   }
@@ -292,11 +276,9 @@ class _PageEditScreenState extends State<PageEditScreen> {
                       ),
                       child: Text(
                         'Save',
-                        style: TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w600,
-                          color:
-                              Theme.of(context).colorScheme.onPrimaryContainer,
+                        style: M3EType.emphasized(theme.textTheme.labelLarge!)
+                            .copyWith(
+                          color: theme.colorScheme.onPrimaryContainer,
                         ),
                       ),
                     ),

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../config/m3e/shapes.dart';
+import '../../config/m3e/typography.dart';
 import '../../widgets/m3e/app_bar.dart';
 import '../../widgets/m3e/icon_button.dart';
 import '../../widgets/m3e/text_field.dart';
@@ -142,9 +143,8 @@ class _ModuleDetailScreenState extends ConsumerState<ModuleDetailScreen> {
                       horizontal: 16, vertical: 12),
                   child: Row(
                     children: [
-                      const Text('Add issues',
-                          style: TextStyle(
-                              fontSize: 16, fontWeight: FontWeight.w500)),
+                      Text('Add issues',
+                          style: Theme.of(ctx).textTheme.titleMedium),
                       const Spacer(),
                       TextButton(
                         onPressed: selected.isEmpty
@@ -200,7 +200,7 @@ class _ModuleDetailScreenState extends ConsumerState<ModuleDetailScreen> {
                         title: Text(issue.name,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(fontSize: 14)),
+                            style: Theme.of(ctx).textTheme.bodyMedium),
                         secondary: Icon(
                           PlaneTheme.priorityIcon(issue.priority),
                           size: 16,
@@ -434,8 +434,8 @@ class _ModuleDetailScreenState extends ConsumerState<ModuleDetailScreen> {
                                 mod.description!.isNotEmpty) ...[
                               const SizedBox(height: 12),
                               Text(mod.description!,
-                                  style: TextStyle(
-                                      fontSize: PlaneTheme.fontBody, color: secondary)),
+                                  style: theme.textTheme.bodyLarge
+                                      ?.copyWith(color: secondary)),
                             ],
                             const SizedBox(height: 12),
                             // Date range
@@ -450,8 +450,7 @@ class _ModuleDetailScreenState extends ConsumerState<ModuleDetailScreen> {
                                     [mod.startDate, mod.targetDate]
                                         .where((d) => d != null)
                                         .join(' - '),
-                                    style: TextStyle(
-                                        fontSize: PlaneTheme.fontSection, color: secondary),
+                                    style: theme.textTheme.bodySmall,
                                   ),
                                 ],
                               ),
@@ -477,8 +476,7 @@ class _ModuleDetailScreenState extends ConsumerState<ModuleDetailScreen> {
                                 const SizedBox(width: 12),
                                 Text(
                                   '${mod.completedIssues}/${mod.totalIssues}',
-                                  style: TextStyle(
-                                      fontSize: PlaneTheme.fontSection, color: secondary),
+                                  style: theme.textTheme.bodySmall,
                                 ),
                               ],
                             ),
@@ -497,14 +495,12 @@ class _ModuleDetailScreenState extends ConsumerState<ModuleDetailScreen> {
                         child: Row(
                           children: [
                             Text('Issues',
-                                style: TextStyle(
-                                    fontSize: PlaneTheme.fontSection,
-                                    fontWeight: PlaneTheme.fontSectionWeight,
-                                    color: secondary)),
+                                style: M3EType.emphasized(theme
+                                    .textTheme.titleSmall!
+                                    .copyWith(color: secondary))),
                             const SizedBox(width: 6),
                             Text('${_issues.length}',
-                                style: TextStyle(
-                                    fontSize: PlaneTheme.fontCaption, color: secondary)),
+                                style: theme.textTheme.bodySmall),
                             const Spacer(),
                             M3EIconButton(
                               icon: Icons.add,
@@ -520,8 +516,7 @@ class _ModuleDetailScreenState extends ConsumerState<ModuleDetailScreen> {
                           padding: const EdgeInsets.all(24),
                           child: Center(
                             child: Text('No issues in this module',
-                                style: TextStyle(
-                                    fontSize: PlaneTheme.fontSection, color: secondary)),
+                                style: theme.textTheme.bodySmall),
                           ),
                         ),
                       ..._issues.map((issue) => Dismissible(
@@ -577,8 +572,8 @@ class _ModuleDetailScreenState extends ConsumerState<ModuleDetailScreen> {
           children: [
             ListTile(
               leading: const Icon(Icons.edit_outlined, size: 20),
-              title: const Text('Edit module',
-                  style: TextStyle(fontSize: 14)),
+              title: Text('Edit module',
+                  style: Theme.of(ctx).textTheme.bodyMedium),
               onTap: () {
                 Navigator.pop(ctx);
                 _showEditModuleDialog();
@@ -587,8 +582,11 @@ class _ModuleDetailScreenState extends ConsumerState<ModuleDetailScreen> {
             ListTile(
               leading: const Icon(Icons.delete_outline,
                   color: Colors.red, size: 20),
-              title: const Text('Delete module',
-                  style: TextStyle(color: Colors.red, fontSize: 14)),
+              title: Text('Delete module',
+                  style: Theme.of(ctx)
+                      .textTheme
+                      .bodyMedium
+                      ?.copyWith(color: Colors.red)),
               onTap: () {
                 Navigator.pop(ctx);
                 _confirmDelete();

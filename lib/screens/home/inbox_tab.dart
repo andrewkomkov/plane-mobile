@@ -167,7 +167,7 @@ class _InboxTabState extends ConsumerState<InboxTab>
             ListTile(
               leading: Icon(isRead ? Icons.mark_email_unread_outlined : Icons.mark_email_read_outlined, size: 20),
               title: Text(isRead ? 'Mark as unread' : 'Mark as read',
-                  style: const TextStyle(fontSize: 14)),
+                  style: Theme.of(ctx).textTheme.bodyMedium),
               onTap: () {
                 Navigator.pop(ctx);
                 if (isRead) {
@@ -179,7 +179,7 @@ class _InboxTabState extends ConsumerState<InboxTab>
             ),
             ListTile(
               leading: const Icon(Icons.delete_outline, size: 20),
-              title: const Text('Dismiss', style: TextStyle(fontSize: 14)),
+              title: Text('Dismiss', style: Theme.of(ctx).textTheme.bodyMedium),
               onTap: () {
                 Navigator.pop(ctx);
                 _dismiss(notificationId);

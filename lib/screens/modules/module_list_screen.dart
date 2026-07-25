@@ -240,7 +240,6 @@ class _ModuleCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final secondary = theme.colorScheme.onSurfaceVariant;
 
     return M3EPressable(
       pressedScale: 0.975,
@@ -259,8 +258,7 @@ class _ModuleCard extends StatelessWidget {
                     module.name,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                        fontSize: PlaneTheme.fontBody, fontWeight: PlaneTheme.fontBodyWeight),
+                    style: theme.textTheme.titleMedium,
                   ),
                 ),
                 const SizedBox(width: 8),
@@ -289,12 +287,12 @@ class _ModuleCard extends StatelessWidget {
                     [module.startDate, module.targetDate]
                         .where((d) => d != null)
                         .join(' - '),
-                    style: TextStyle(fontSize: PlaneTheme.fontSmall, color: secondary),
+                    style: theme.textTheme.bodySmall,
                   ),
                 const Spacer(),
                 Text(
                   '${module.completedIssues}/${module.totalIssues}',
-                  style: TextStyle(fontSize: PlaneTheme.fontCaption, color: secondary),
+                  style: theme.textTheme.bodySmall,
                 ),
               ],
             ),

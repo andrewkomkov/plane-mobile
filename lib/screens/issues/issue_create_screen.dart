@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../config/m3e/shapes.dart';
 import '../../config/m3e/motion.dart';
+import '../../config/m3e/typography.dart';
 import '../../widgets/m3e/app_bar.dart';
 import '../../widgets/m3e/loading_indicator.dart';
 import '../../widgets/m3e/text_field.dart';
@@ -113,9 +114,7 @@ class _IssueCreateScreenState extends State<IssueCreateScreen> {
                       ),
                       child: Text(
                         'Create',
-                        style: TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w600,
+                        style: theme.textTheme.labelLarge?.copyWith(
                           color: theme.colorScheme.onPrimaryContainer,
                         ),
                       ),
@@ -152,12 +151,7 @@ class _IssueCreateScreenState extends State<IssueCreateScreen> {
                 const SizedBox(width: 6),
                 Text(
                   'MARKDOWN SUPPORTED',
-                  style: TextStyle(
-                    fontSize: PlaneTheme.fontSmall,
-                    fontWeight: FontWeight.w500,
-                    letterSpacing: 2.0,
-                    color: hintColor,
-                  ),
+                  style: M3EType.overline(hintColor),
                 ),
               ],
             ),
@@ -183,12 +177,7 @@ class _IssueCreateScreenState extends State<IssueCreateScreen> {
                         children: [
                           Text(
                             'STATUS',
-                            style: TextStyle(
-                              fontSize: PlaneTheme.fontSmall,
-                              fontWeight: FontWeight.w500,
-                              letterSpacing: 2.0,
-                              color: scheme.onSurfaceVariant,
-                            ),
+                            style: M3EType.overline(scheme.onSurfaceVariant),
                           ),
                           const SizedBox(height: 8),
                           Row(
@@ -207,11 +196,7 @@ class _IssueCreateScreenState extends State<IssueCreateScreen> {
                               Expanded(
                                 child: Text(
                                   _currentState?.name ?? 'Backlog',
-                                  style: TextStyle(
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.w500,
-                                    color: scheme.onSurface,
-                                  ),
+                                  style: theme.textTheme.labelLarge,
                                 ),
                               ),
                               Icon(Icons.expand_more,
@@ -241,12 +226,7 @@ class _IssueCreateScreenState extends State<IssueCreateScreen> {
                         children: [
                           Text(
                             'PRIORITY',
-                            style: TextStyle(
-                              fontSize: PlaneTheme.fontSmall,
-                              fontWeight: FontWeight.w500,
-                              letterSpacing: 2.0,
-                              color: scheme.onSurfaceVariant,
-                            ),
+                            style: M3EType.overline(scheme.onSurfaceVariant),
                           ),
                           const SizedBox(height: 8),
                           Row(
@@ -261,11 +241,7 @@ class _IssueCreateScreenState extends State<IssueCreateScreen> {
                                 child: Text(
                                   _selectedPriority[0].toUpperCase() +
                                       _selectedPriority.substring(1),
-                                  style: TextStyle(
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.w500,
-                                    color: scheme.onSurface,
-                                  ),
+                                  style: theme.textTheme.labelLarge,
                                 ),
                               ),
                               Icon(Icons.expand_more,
@@ -293,10 +269,10 @@ class _IssueCreateScreenState extends State<IssueCreateScreen> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Padding(
-              padding: EdgeInsets.all(16),
+            Padding(
+              padding: const EdgeInsets.all(16),
               child: Text('Status',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600)),
+                  style: Theme.of(ctx).textTheme.titleLarge),
             ),
             ...widget.states.values.map((s) => ListTile(
                   leading: Icon(
@@ -304,7 +280,8 @@ class _IssueCreateScreenState extends State<IssueCreateScreen> {
                     size: 18,
                     color: PlaneTheme.stateGroupColor(context, s.group),
                   ),
-                  title: Text(s.name, style: const TextStyle(fontSize: 14)),
+                  title: Text(s.name,
+                      style: Theme.of(ctx).textTheme.bodyMedium),
                   trailing: _selectedState == s.id
                       ? const Icon(Icons.check, size: 18)
                       : null,
@@ -326,10 +303,10 @@ class _IssueCreateScreenState extends State<IssueCreateScreen> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Padding(
-              padding: EdgeInsets.all(16),
+            Padding(
+              padding: const EdgeInsets.all(16),
               child: Text('Priority',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600)),
+                  style: Theme.of(ctx).textTheme.titleLarge),
             ),
             ...['urgent', 'high', 'medium', 'low', 'none'].map((p) => ListTile(
                   leading: Icon(
@@ -338,7 +315,7 @@ class _IssueCreateScreenState extends State<IssueCreateScreen> {
                     color: PlaneTheme.priorityColor(context, p),
                   ),
                   title: Text(p[0].toUpperCase() + p.substring(1),
-                      style: const TextStyle(fontSize: 14)),
+                      style: Theme.of(ctx).textTheme.bodyMedium),
                   trailing: _selectedPriority == p
                       ? const Icon(Icons.check, size: 18)
                       : null,

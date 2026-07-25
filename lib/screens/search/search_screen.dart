@@ -3,7 +3,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
-import '../../config/theme.dart';
+import '../../config/m3e/typography.dart';
 import '../../services/search_service.dart';
 import '../../widgets/loading_state.dart';
 import '../../widgets/m3e/icon_button.dart';
@@ -187,10 +187,8 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
           child: Row(
             children: [
               Text('Recent searches',
-                  style: TextStyle(
-                      fontSize: PlaneTheme.fontSection,
-                      fontWeight: PlaneTheme.fontSectionWeight,
-                      color: theme.colorScheme.onSurfaceVariant)),
+                  style: M3EType.emphasized(theme.textTheme.titleSmall!)
+                      .copyWith(color: theme.colorScheme.onSurfaceVariant)),
               const Spacer(),
               // Bare "Clear" collides with the field's clear button, so this
               // one spells out what it clears. A TextButton rather than a bare

@@ -57,10 +57,7 @@ class ItemTile extends StatelessWidget {
                       title,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        fontSize: PlaneTheme.fontBody,
-                        fontWeight: PlaneTheme.fontBodyWeight,
-                      ),
+                      style: theme.textTheme.titleMedium,
                     ),
                     if (subtitle != null) ...[
                       const SizedBox(height: 2),
@@ -68,10 +65,7 @@ class ItemTile extends StatelessWidget {
                         subtitle!,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          fontSize: PlaneTheme.fontCaption,
-                          color: secondary,
-                        ),
+                        style: theme.textTheme.bodySmall,
                       ),
                     ],
                   ],

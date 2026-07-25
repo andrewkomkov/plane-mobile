@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../config/m3e/motion.dart';
 import '../../config/m3e/shapes.dart';
+import '../../config/m3e/typography.dart';
 import '../../widgets/m3e/text_field.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../config/theme.dart';
@@ -152,7 +153,8 @@ class _CycleListScreenState extends ConsumerState<CycleListScreen>
                           startDate != null
                               ? _formatDate(startDate!)
                               : 'Start date',
-                          style: const TextStyle(fontSize: 13),
+                          style: M3EType.emphasized(
+                              Theme.of(ctx).textTheme.labelMedium!),
                         ),
                       ),
                     ),
@@ -174,7 +176,8 @@ class _CycleListScreenState extends ConsumerState<CycleListScreen>
                           endDate != null
                               ? _formatDate(endDate!)
                               : 'End date',
-                          style: const TextStyle(fontSize: 13),
+                          style: M3EType.emphasized(
+                              Theme.of(ctx).textTheme.labelMedium!),
                         ),
                       ),
                     ),
@@ -314,7 +317,6 @@ class _CycleCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final secondary = theme.colorScheme.onSurfaceVariant;
 
     return M3EPressable(
       pressedScale: 0.975,
@@ -333,13 +335,12 @@ class _CycleCard extends StatelessWidget {
                     cycle.name,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                        fontSize: PlaneTheme.fontBody, fontWeight: PlaneTheme.fontBodyWeight),
+                    style: theme.textTheme.titleMedium,
                   ),
                 ),
                 Text(
                   '${cycle.completedIssues}/${cycle.totalIssues}',
-                  style: TextStyle(fontSize: PlaneTheme.fontCaption, color: secondary),
+                  style: theme.textTheme.bodySmall,
                 ),
               ],
             ),
@@ -359,7 +360,7 @@ class _CycleCard extends StatelessWidget {
                 [cycle.startDate, cycle.endDate]
                     .where((d) => d != null)
                     .join(' - '),
-                style: TextStyle(fontSize: PlaneTheme.fontSmall, color: secondary),
+                style: theme.textTheme.bodySmall,
               ),
             ],
           ],
