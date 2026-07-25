@@ -99,13 +99,8 @@ class _M3EFlexibleHeaderScaffoldState extends State<M3EFlexibleHeaderScaffold> {
                           opacity: 1 - inlineOpacity,
                           child: Text(
                             'Plane',
-                            style: TextStyle(
-                              fontFamily: M3EType.fontFamily,
-                              fontSize: 19,
-                              fontWeight: FontWeight.w700,
-                              letterSpacing: -0.5,
-                              color: scheme.primary,
-                            ),
+                            style: theme.textTheme.titleLarge
+                                ?.copyWith(color: scheme.primary),
                           ),
                         ),
                         Opacity(
@@ -114,13 +109,7 @@ class _M3EFlexibleHeaderScaffoldState extends State<M3EFlexibleHeaderScaffold> {
                             widget.title,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                              fontFamily: M3EType.fontFamily,
-                              fontSize: 17,
-                              fontWeight: FontWeight.w600,
-                              letterSpacing: -0.3,
-                              color: scheme.onSurface,
-                            ),
+                            style: theme.textTheme.headlineSmall,
                           ),
                         ),
                       ],
@@ -161,13 +150,8 @@ class _M3EFlexibleHeaderScaffoldState extends State<M3EFlexibleHeaderScaffold> {
                       widget.title,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        fontFamily: M3EType.fontFamily,
-                        fontSize: titleSize,
-                        fontWeight: FontWeight.w700,
-                        letterSpacing: -0.4,
-                        color: scheme.onSurface,
-                      ),
+                      style: theme.textTheme.headlineMedium
+                          ?.copyWith(fontSize: titleSize),
                     ),
                   ),
                 ),
@@ -182,8 +166,7 @@ class _M3EFlexibleHeaderScaffoldState extends State<M3EFlexibleHeaderScaffold> {
                 padding: const EdgeInsets.fromLTRB(20, 2, 20, 0),
                 child: Text(
                   widget.overline!,
-                  style: M3EType.overline(scheme.onSurfaceVariant)
-                      .copyWith(letterSpacing: 1.6),
+                  style: M3EType.overline(scheme.onSurfaceVariant),
                 ),
               ),
             ),

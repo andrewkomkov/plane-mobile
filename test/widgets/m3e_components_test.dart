@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:plane_mobile/config/m3e/motion.dart';
+import 'package:plane_mobile/config/theme.dart';
 import 'package:plane_mobile/config/m3e/shapes.dart';
 import 'package:plane_mobile/widgets/m3e/app_bar.dart';
 import 'package:plane_mobile/widgets/m3e/button_group.dart';
@@ -180,7 +181,12 @@ void main() {
   group('M3EFlexibleHeaderScaffold', () {
     testWidgets('collapses the large title once content scrolls under it',
         (tester) async {
+      // Under the app's own theme, not Material's defaults: the header now
+      // takes its sizes from textTheme, and stock Material sizes headlineSmall
+      // at 24 too — so a foreign theme makes the 24dp predicate ambiguous and
+      // tests a widget the app never renders.
       await tester.pumpWidget(MaterialApp(
+        theme: PlaneTheme.dark(),
         home: Scaffold(
           body: M3EFlexibleHeaderScaffold(
             title: 'My issues',

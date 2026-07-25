@@ -341,8 +341,8 @@ class _NotificationScreenState extends ConsumerState<NotificationScreen> {
                       style: TextStyle(
                         fontSize: PlaneTheme.fontBody,
                         fontWeight: notification.isRead
-                            ? PlaneTheme.fontBodyWeight
-                            : FontWeight.w500,
+                            ? FontWeight.w400
+                            : FontWeight.w600,
                       ),
                     ),
                     if (notification.entityName != null) ...[

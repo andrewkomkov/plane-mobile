@@ -38,11 +38,15 @@ class SectionHeader extends StatelessWidget {
             ),
             const SizedBox(width: 8),
           ],
-          Text(
+          Flexible(
+            child: Text(
             label.toUpperCase(),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
             style: M3EType.overline(
               color != null ? effectiveColor : theme.colorScheme.onSurfaceVariant,
             ),
+          ),
           ),
           if (count != null) ...[
             const SizedBox(width: 8),

@@ -298,7 +298,7 @@ class _IssueCreateScreenState extends State<IssueCreateScreen> {
             const Padding(
               padding: EdgeInsets.all(16),
               child: Text('Status',
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500)),
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600)),
             ),
             ...widget.states.values.map((s) => ListTile(
                   leading: Icon(
@@ -331,7 +331,7 @@ class _IssueCreateScreenState extends State<IssueCreateScreen> {
             const Padding(
               padding: EdgeInsets.all(16),
               child: Text('Priority',
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500)),
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600)),
             ),
             ...['urgent', 'high', 'medium', 'low', 'none'].map((p) => ListTile(
                   leading: Icon(

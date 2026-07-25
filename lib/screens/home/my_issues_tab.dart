@@ -230,7 +230,7 @@ class _MyIssuesTabState extends ConsumerState<MyIssuesTab>
             const Padding(
               padding: EdgeInsets.all(16),
               child: Text('Select project',
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500)),
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600)),
             ),
             ...projects.map((p) => ListTile(
                   leading: const Icon(Icons.folder_outlined, size: 20),

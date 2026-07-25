@@ -216,7 +216,7 @@ class _M3EButtonGroupState extends State<M3EButtonGroup>
                 child: Text(
                   item.label,
                   maxLines: 1,
-                  overflow: TextOverflow.clip,
+                  overflow: TextOverflow.ellipsis,
                   softWrap: false,
                   style: TextStyle(
                     fontSize: 13,
