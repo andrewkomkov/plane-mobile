@@ -55,6 +55,10 @@ class _ProjectsTabState extends ConsumerState<ProjectsTab>
   }
 
   Future<void> _loadIssueCounts() async {
+    // Fired unawaited from _load once its own await has returned, so the tab
+    // can already be disposed here — and `_cache` is a ref.read, which throws
+    // on a disposed element.
+    if (!mounted) return;
     final cache = _cache;
     final projects = cache.getProjects(widget.workspaceSlug) ?? [];
     for (final p in projects) {

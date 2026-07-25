@@ -160,6 +160,11 @@ class _MyIssuesTabState extends ConsumerState<MyIssuesTab>
   }
 
   Future<void> _loadExtras(List projects) async {
+    // Reached from _load after an await, so the tab may already be gone by the
+    // time this runs — and `_cache` is a ref.read, which throws on a disposed
+    // element rather than returning null. The tail of this method already
+    // checks mounted; the head has to as well.
+    if (!mounted) return;
     final cache = _cache;
     final allLabels = <Label>[];
     final allMembers = <Member>[];
