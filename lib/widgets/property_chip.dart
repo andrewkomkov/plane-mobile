@@ -57,9 +57,17 @@ class PropertyChip extends StatelessWidget {
       // without dominating it. When it is tappable the hit area is padded out
       // to 48dp instead, so the target is a fingertip even though the ink is
       // not.
+      //
+      // `widthFactor` is what keeps that vertical-only. A bare Center takes the
+      // full width it is offered, which in the Wrap these sit in makes every
+      // pill a full-width row — six chips stacked down the screen instead of
+      // flowing across it.
       child: onTap == null
           ? chip
-          : SizedBox(height: 48, child: Center(child: chip)),
+          : SizedBox(
+              height: 48,
+              child: Center(widthFactor: 1.0, child: chip),
+            ),
     );
   }
 }
