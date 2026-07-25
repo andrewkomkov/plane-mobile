@@ -122,6 +122,46 @@ void main() {
       await tester.pump();
       expect(tapped, isTrue);
     });
+
+    testWidgets('the corner morph is driven, not filtered', (tester) async {
+      // The corner used to be computed by a spring and then handed to an
+      // AnimatedContainer, whose own curve re-animated toward each value the
+      // spring produced — a filter on top of the physics, flattening the
+      // overshoot underneath it. Nothing between the spring and the box.
+      double cornerOf() {
+        final box = tester.widget<Container>(find.descendant(
+          of: find.byType(M3EChip),
+          matching: find.byType(Container),
+        ).first);
+        final decoration = box.decoration as BoxDecoration;
+        return (decoration.borderRadius as BorderRadius).topLeft.x;
+      }
+
+      await tester.pumpWidget(wrap(const M3EChip(label: 'Filter')));
+      final atRest = cornerOf();
+
+      await tester.pumpWidget(
+          wrap(const M3EChip(label: 'Filter', selected: true)));
+      await tester.pump(const Duration(milliseconds: 16));
+      final travelling = cornerOf();
+
+      await tester.pumpAndSettle();
+      final settled = cornerOf();
+
+      expect(travelling, isNot(atRest),
+          reason: 'the corner should be moving one frame in');
+      expect(settled, lessThan(atRest),
+          reason: 'a selected chip pulls its corners in');
+
+      expect(
+        find.descendant(
+          of: find.byType(M3EChip),
+          matching: find.byType(AnimatedContainer),
+        ),
+        findsNothing,
+        reason: 'an implicit animation here would filter the spring',
+      );
+    });
   });
 
   group('M3ESplitButton', () {
