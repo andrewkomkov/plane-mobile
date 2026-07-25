@@ -1,5 +1,9 @@
+import 'dart:io';
+
 import 'package:dio/dio.dart';
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:mime/mime.dart';
 import '../../config/m3e/shapes.dart';
 import '../../widgets/m3e/app_bar.dart';
 import '../../widgets/m3e/icon_button.dart';
@@ -13,6 +17,7 @@ import '../../config/theme.dart';
 import '../../services/project_service.dart';
 import '../../services/module_service.dart';
 import '../../services/issue_service.dart';
+import '../../services/attachment_service.dart';
 import '../../services/comment_service.dart';
 import '../../services/label_service.dart';
 import '../../services/member_service.dart';
@@ -62,6 +67,10 @@ class _IssueDetailScreenState extends ConsumerState<IssueDetailScreen> {
   List<Map<String, dynamic>> _relations = [];
   List<Activity> _activities = [];
   List<Attachment> _attachments = [];
+
+  /// Name of the file currently uploading, or null. Drives both the row in the
+  /// attachments list and the disabled state of the attach button.
+  String? _uploadingAttachment;
   String? _moduleName;
   String? _cycleName;
   List<IssueLink> _links = [];
@@ -203,6 +212,38 @@ class _IssueDetailScreenState extends ConsumerState<IssueDetailScreen> {
         widget.workspaceSlug, widget.projectId, widget.issueId, '<p>$text</p>');
     _commentController.clear();
     _load();
+  }
+
+  Future<void> _attachFile() async {
+    final picked = await FilePicker.pickFiles();
+    final path = picked?.files.single.path;
+    if (path == null || !mounted) return;
+
+    final file = File(path);
+    final name = picked!.files.single.name;
+
+    setState(() => _uploadingAttachment = name);
+    try {
+      await AttachmentService.upload(
+        widget.workspaceSlug,
+        widget.projectId,
+        widget.issueId,
+        file: file,
+        name: name,
+        // The presigned policy pins the content type, so a wrong guess here is
+        // rejected by the store rather than silently stored mislabelled.
+        mimeType: lookupMimeType(path) ?? 'application/octet-stream',
+      );
+      if (!mounted) return;
+      _load();
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Could not attach $name: $e')),
+      );
+    } finally {
+      if (mounted) setState(() => _uploadingAttachment = null);
+    }
   }
 
   Future<void> _deleteIssue() async {
@@ -557,9 +598,12 @@ class _IssueDetailScreenState extends ConsumerState<IssueDetailScreen> {
                   const SizedBox(width: 4),
                   M3EIconButton(
                     icon: Icons.attach_file,
-                    tooltip: 'Attach file to comment',
+                    tooltip: 'Attach a file',
                     size: M3EIconButtonSize.small,
-                    onPressed: () {},
+                    // Disabled while one is in flight: the picker would
+                    // happily start a second upload over the first.
+                    onPressed:
+                        _uploadingAttachment == null ? _attachFile : null,
                   ),
                   M3EIconButton(
                     icon: Icons.send,
@@ -698,7 +742,35 @@ class _IssueDetailScreenState extends ConsumerState<IssueDetailScreen> {
           ],
         ),
         const SizedBox(height: 8),
-        if (_attachments.isEmpty)
+        // The upload is a three-call round trip to object storage, so it is
+        // long enough to need saying. It sits in the list rather than in a
+        // toast, where the file will appear for real once it lands.
+        if (_uploadingAttachment != null)
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 4),
+            child: Row(
+              children: [
+                SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: secondary,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'Uploading $_uploadingAttachment…',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.bodySmall,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        if (_attachments.isEmpty && _uploadingAttachment == null)
           Text('No attachments', style: theme.textTheme.bodySmall)
         else
           ..._attachments.map((a) => Padding(
