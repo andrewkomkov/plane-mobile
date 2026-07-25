@@ -224,7 +224,10 @@ class _CalendarViewState extends State<CalendarView> {
                                     ? FontWeight.w600
                                     : FontWeight.w400,
                                 color: isToday
-                                    ? Colors.white
+                                    // Dark `primary` is a light lavender, so
+                                    // white on it is 1.70:1. Roles come in
+                                    // pairs for exactly this reason.
+                                    ? theme.colorScheme.onPrimary
                                     : theme.colorScheme.onSurface,
                               ),
                             ),

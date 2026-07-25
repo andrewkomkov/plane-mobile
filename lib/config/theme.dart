@@ -285,6 +285,21 @@ class PlaneTheme {
           borderRadius: BorderRadius.circular(M3EShape.large),
         ),
       ),
+      // Without this the unselected thumb resolves to `outline` and the track
+      // to `surfaceContainerHighest`, which in the light palette were the same
+      // grey — an off switch rendered as an empty pill at 1.00:1.
+      switchTheme: SwitchThemeData(
+        thumbColor: WidgetStateProperty.resolveWith((states) =>
+            states.contains(WidgetState.selected)
+                ? scheme.onPrimary
+                : scheme.onSurfaceVariant),
+        trackColor: WidgetStateProperty.resolveWith((states) =>
+            states.contains(WidgetState.selected)
+                ? scheme.primary
+                : scheme.surfaceContainerHighest),
+        trackOutlineColor:
+            WidgetStateProperty.resolveWith((_) => scheme.outline),
+      ),
       bottomSheetTheme: BottomSheetThemeData(
         backgroundColor: scheme.surfaceContainer,
         elevation: 0,

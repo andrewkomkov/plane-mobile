@@ -43,9 +43,9 @@ class SectionHeader extends StatelessWidget {
             label.toUpperCase(),
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
-            style: M3EType.overline(
-              color != null ? effectiveColor : theme.colorScheme.onSurfaceVariant,
-            ),
+            // The hue stays on the bar above, which is a non-text element and
+            // only owes 3:1. As 11px text these same hues fall to 1.92:1.
+            style: M3EType.overline(theme.colorScheme.onSurfaceVariant),
           ),
           ),
           if (count != null) ...[

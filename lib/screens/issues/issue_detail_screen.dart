@@ -306,7 +306,7 @@ class _IssueDetailScreenState extends ConsumerState<IssueDetailScreen> {
                             fontSize: 13,
                             fontWeight: FontWeight.w500,
                             letterSpacing: 0.5,
-                            color: PlaneTheme.onSurfaceVariant,
+                            color: theme.colorScheme.onSurfaceVariant,
                           ),
                         ),
                         Container(
@@ -322,20 +322,14 @@ class _IssueDetailScreenState extends ConsumerState<IssueDetailScreen> {
                           'Created ${_timeAgoFromDate(issue.createdAt)}',
                           style: TextStyle(
                             fontSize: 13,
-                            color: PlaneTheme.onSurfaceVariant,
+                            color: theme.colorScheme.onSurfaceVariant,
                           ),
                         ),
                       ],
                     ),
                     const SizedBox(height: 10),
                     // Title
-                    Text(issue.name,
-                        style: const TextStyle(
-                            fontSize: 22,
-                            fontWeight: FontWeight.w700,
-                            letterSpacing: -0.3,
-                            height: 1.3,
-                            color: PlaneTheme.onSurface)),
+                    Text(issue.name, style: theme.textTheme.headlineMedium),
                     const SizedBox(height: 20),
                     // Chips row
                     Wrap(
@@ -562,7 +556,7 @@ class _IssueDetailScreenState extends ConsumerState<IssueDetailScreen> {
           Container(
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
             decoration: BoxDecoration(
-              color: PlaneTheme.background.withValues(alpha: 0.80),
+              color: theme.colorScheme.surface.withValues(alpha: 0.80),
               border: Border(
                   top: BorderSide(
                       color: theme.colorScheme.outlineVariant, width: 0.5)),
@@ -578,7 +572,7 @@ class _IssueDetailScreenState extends ConsumerState<IssueDetailScreen> {
                     radius: 14,
                     backgroundColor: PlaneTheme.surfaceContainerHighest,
                     child: Icon(Icons.person,
-                        size: 14, color: PlaneTheme.onSurfaceVariant),
+                        size: 14, color: theme.colorScheme.onSurfaceVariant),
                   ),
                   const SizedBox(width: 10),
                   Expanded(
