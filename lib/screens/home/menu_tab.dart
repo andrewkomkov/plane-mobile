@@ -57,6 +57,7 @@ class _MenuTabState extends ConsumerState<MenuTab> {
           .where((w) => w.slug == widget.workspaceSlug)
           .firstOrNull;
     } catch (_) {}
+    if (!mounted) return;
     setState(() => _loadingWorkspaces = false);
   }
 

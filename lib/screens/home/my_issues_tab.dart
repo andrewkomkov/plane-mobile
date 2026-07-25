@@ -111,6 +111,7 @@ class _MyIssuesTabState extends ConsumerState<MyIssuesTab>
 
       _loadExtras(projects);
     } catch (e) {
+      if (!mounted) return;
       setState(() {
         _error = e.toString();
         _loading = false;

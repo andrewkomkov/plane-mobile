@@ -46,6 +46,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     try {
       _user = await AuthService.getCurrentUser();
     } catch (_) {}
+    if (!mounted) return;
     setState(() {});
     _drainWriteQueue();
   }
