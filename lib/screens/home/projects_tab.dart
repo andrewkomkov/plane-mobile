@@ -143,7 +143,6 @@ class _ProjectsTabState extends ConsumerState<ProjectsTab>
                             padding: const EdgeInsets.symmetric(
                                 horizontal: 16, vertical: 3),
                             child: M3EPressable(
-                              pressedScale: 0.975,
                               onTap: () => Navigator.push(
                                 context,
                                 MaterialPageRoute(

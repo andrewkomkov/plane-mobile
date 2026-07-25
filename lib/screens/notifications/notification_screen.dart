@@ -298,7 +298,6 @@ class _NotificationScreenState extends ConsumerState<NotificationScreen> {
       ),
       onDismissed: (_) => _archive(notification),
       child: M3EPressable(
-        pressedScale: 0.985,
         onTap: () => _onTap(notification),
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 9),

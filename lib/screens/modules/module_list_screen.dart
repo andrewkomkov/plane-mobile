@@ -242,7 +242,6 @@ class _ModuleCard extends StatelessWidget {
     final theme = Theme.of(context);
 
     return M3EPressable(
-      pressedScale: 0.975,
       onTap: onTap,
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),

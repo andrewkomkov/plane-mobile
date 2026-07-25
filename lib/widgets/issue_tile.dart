@@ -100,7 +100,6 @@ class IssueTile extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 2),
       child: M3EPressable(
-        pressedScale: 0.975,
         onTap: onTap,
         semanticLabel: _semanticLabelFor(issueMembers, issueLabels),
         child: DecoratedBox(
@@ -254,7 +253,6 @@ class IssueTile extends StatelessWidget {
   Widget _buildInboxLayout(
       BuildContext context, ThemeData theme, Color secondary) {
     return M3EPressable(
-      pressedScale: 0.985,
       onTap: onTap,
       semanticLabel: _semanticLabelFor(const [], const []),
       child: Container(

@@ -32,7 +32,6 @@ class ItemTile extends StatelessWidget {
     final effectiveIconColor = iconColor ?? secondary;
 
     return M3EPressable(
-      pressedScale: 0.98,
       onTap: onTap,
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 2),
