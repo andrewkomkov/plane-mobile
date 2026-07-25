@@ -114,6 +114,40 @@ class PlaneTheme {
   static Color pendingColor(BuildContext context) =>
       _isLight(context) ? _pendingLight : _pending;
 
+  // Identifier badges, cycled by list position. These draw the identifier as
+  // text over a 20%-alpha wash of themselves, so they carry a text contrast
+  // requirement, not an icon one.
+  //
+  // The single set they replaced was a row of dark-theme scheme values written
+  // out as hex, and it failed in both directions: three of them landed near
+  // 2:1 on dark and the green managed 2.15:1 on light. Two sets, each measured
+  // at 4.5:1 or better against its own surfaces.
+  static const _badgeDark = [
+    Color(0xFF8B93E8), // indigo
+    Color(0xFFE3A008), // amber
+    Color(0xFF2DD4BF), // teal
+    Color(0xFFFB7185), // rose
+    Color(0xFFC084FC), // violet
+    Color(0xFF4ADE80), // green
+  ];
+
+  static const _badgeLight = [
+    Color(0xFF4338CA),
+    Color(0xFFA16207),
+    Color(0xFF0F766E),
+    Color(0xFFBE123C),
+    Color(0xFF7E22CE),
+    Color(0xFF15803D),
+  ];
+
+  static Color projectBadgeColor(BuildContext context, int index) {
+    final set = _isLight(context) ? _badgeLight : _badgeDark;
+    return set[index % set.length];
+  }
+
+  /// How many distinct badge hues exist, so a test can walk all of them.
+  static int get projectBadgeCount => _badgeDark.length;
+
   /// Pairs with [pendingColor] as a fill. The two ambers sit on opposite sides
   /// of the range, so what reads on one is invisible on the other.
   static Color onPendingColor(BuildContext context) =>

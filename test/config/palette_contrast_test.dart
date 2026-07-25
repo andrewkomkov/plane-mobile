@@ -119,6 +119,27 @@ void main() {
       });
     }
 
+    for (final entry in {
+      'light': PlaneTheme.light(),
+      'dark': PlaneTheme.dark(),
+    }.entries) {
+      testWidgets('${entry.key} project badges clear the text threshold',
+          (tester) async {
+        final theme = entry.value;
+        final context = await _contextFor(tester, theme);
+
+        // These draw the identifier as text, not as an icon, so 4.5:1 applies
+        // rather than 3:1.
+        for (var i = 0; i < PlaneTheme.projectBadgeCount; i++) {
+          final badge = PlaneTheme.projectBadgeColor(context, i);
+          final ratio = _contrast(badge, theme.colorScheme.surfaceContainerLow);
+          expect(ratio, greaterThanOrEqualTo(4.5),
+              reason: 'badge $i on ${entry.key} measures '
+                  '${ratio.toStringAsFixed(2)}:1');
+        }
+      });
+    }
+
     testWidgets('every state group has its own glyph', (tester) async {
       final icons = groups.map(PlaneTheme.stateIcon).toSet();
       expect(icons.length, groups.length,

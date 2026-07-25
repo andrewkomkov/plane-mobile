@@ -12,6 +12,7 @@ import '../../widgets/section_header.dart';
 import '../../config/m3e/shapes.dart';
 import '../../config/m3e/motion.dart';
 import '../../config/m3e/typography.dart';
+import '../../config/theme.dart';
 
 class ProjectsTab extends ConsumerStatefulWidget {
   final String workspaceSlug;
@@ -81,18 +82,8 @@ class _ProjectsTabState extends ConsumerState<ProjectsTab>
         .toList();
   }
 
-  // Compute a bg color for the identifier badge based on index
-  static const _badgeColors = [
-    Color(0xFF5E6AD2), // primary indigo
-    Color(0xFFA56500), // tertiary
-    Color(0xFF42466E), // secondary
-    Color(0xFF93000A), // error
-    Color(0xFF454652), // outline variant
-    Color(0xFF22C55E), // green
-  ];
-
-  Color _badgeColor(int index) =>
-      _badgeColors[index % _badgeColors.length];
+  Color _badgeColor(BuildContext context, int index) =>
+      PlaneTheme.projectBadgeColor(context, index);
 
   @override
   Widget build(BuildContext context) {
@@ -166,7 +157,7 @@ class _ProjectsTabState extends ConsumerState<ProjectsTab>
                                         width: 40,
                                         height: 40,
                                         decoration: BoxDecoration(
-                                          color: _badgeColor(i).withValues(alpha: 0.20),
+                                          color: _badgeColor(context, i).withValues(alpha: 0.20),
                                           borderRadius: BorderRadius.circular(M3EShape.medium),
                                         ),
                                         child: Center(
@@ -175,7 +166,7 @@ class _ProjectsTabState extends ConsumerState<ProjectsTab>
                                             style: M3EType.emphasized(
                                                     theme.textTheme.titleSmall!)
                                                 .copyWith(
-                                                    color: _badgeColor(i)),
+                                                    color: _badgeColor(context, i)),
                                           ),
                                         ),
                                       ),
