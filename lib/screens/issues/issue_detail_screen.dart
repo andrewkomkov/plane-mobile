@@ -215,7 +215,7 @@ class _IssueDetailScreenState extends ConsumerState<IssueDetailScreen> {
   }
 
   Future<void> _attachFile() async {
-    final picked = await FilePicker.pickFiles();
+    final picked = await FilePicker.platform.pickFiles();
     final path = picked?.files.single.path;
     if (path == null || !mounted) return;
 
