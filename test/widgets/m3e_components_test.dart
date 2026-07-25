@@ -68,11 +68,14 @@ void main() {
         ),
       )));
 
+      // The nearest Container ancestor is the button's own painted box. It
+      // used to be an AnimatedContainer; the width response never came from
+      // that widget, so what this measures is unchanged.
       double widthOf(String label) =>
           tester.getSize(find.ancestor(
             of: find.text(label),
-            matching: find.byType(AnimatedContainer),
-          )).width;
+            matching: find.byType(Container),
+          ).first).width;
 
       final restingFirst = widthOf('One');
       final restingSecond = widthOf('Two');

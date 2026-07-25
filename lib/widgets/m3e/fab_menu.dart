@@ -3,6 +3,13 @@ import 'package:flutter/material.dart';
 import '../../config/m3e/motion.dart';
 import '../../config/m3e/shapes.dart';
 
+/// Open and close run on a controller rather than a spring: the overlay
+/// staggers several items against one clock, and a stagger needs a shared
+/// timeline to be staggered against. Closing is quicker than opening, which is
+/// the usual asymmetry — dismissal should feel like getting out of the way.
+const Duration _openDuration = Duration(milliseconds: 420);
+const Duration _closeDuration = Duration(milliseconds: 260);
+
 class M3EFabAction {
   final String label;
   final IconData icon;
@@ -54,8 +61,8 @@ class _M3EFabMenuState extends State<M3EFabMenu>
     super.initState();
     _controller = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 420),
-      reverseDuration: const Duration(milliseconds: 260),
+      duration: _openDuration,
+      reverseDuration: _closeDuration,
     );
   }
 
@@ -234,8 +241,13 @@ class _FabMenuOverlay extends StatelessWidget {
     required ColorScheme scheme,
   }) {
     // The bottom-most item leads; each one above it starts slightly later.
+    //
+    // The gap is the scheme's stagger token expressed as a fraction of the
+    // open duration, so the two stay in step: retuning the open no longer
+    // silently retunes how far apart the items land.
     final reverseIndex = total - 1 - index;
-    final delay = reverseIndex * 0.08;
+    final delay = reverseIndex *
+        (M3EMotion.stagger.inMilliseconds / _openDuration.inMilliseconds);
     final progress = ((t - delay) / (1 - delay)).clamp(0.0, 1.0);
     final eased = Curves.easeOutBack.transform(progress);
 

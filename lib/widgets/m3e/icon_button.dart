@@ -83,28 +83,29 @@ class M3EIconButton extends StatelessWidget {
     final isSelected = selected ?? false;
     final enabled = onPressed != null;
 
-    final Color background;
-    final Color foreground;
+    // Both ends of the selection transition, rather than the resolved value:
+    // the springs below interpolate between them, so the fill and the corner
+    // travel instead of switching.
+    final Color restBackground;
+    final Color selectedBackground;
+    final Color restForeground;
+    final Color selectedForeground;
     switch (style) {
       case M3EIconButtonStyle.filled:
-        background = scheme.primaryContainer;
-        foreground = scheme.onPrimaryContainer;
+        // A filled button is already filled; selection has nothing to say.
+        restBackground = selectedBackground = scheme.primaryContainer;
+        restForeground = selectedForeground = scheme.onPrimaryContainer;
       case M3EIconButtonStyle.outlined:
-        background = isSelected
-            ? scheme.primary.withValues(alpha: 0.14)
-            : Colors.transparent;
-        foreground = isSelected ? scheme.primary : scheme.onSurfaceVariant;
       case M3EIconButtonStyle.standard:
-        background = isSelected
-            ? scheme.primary.withValues(alpha: 0.14)
-            : Colors.transparent;
-        foreground = isSelected ? scheme.primary : scheme.onSurfaceVariant;
+        restBackground = Colors.transparent;
+        selectedBackground = scheme.primary.withValues(alpha: 0.14);
+        restForeground = scheme.onSurfaceVariant;
+        selectedForeground = scheme.primary;
     }
 
-    final resolved = color ?? foreground;
-
     // Corner morph: round at rest, squarer when selected.
-    final corner = isSelected ? M3EShape.medium : size.container / 2;
+    final restCorner = size.container / 2;
+    const selectedCorner = M3EShape.medium;
 
     return M3EPressable(
       pressedScale: 0.86,
@@ -117,22 +118,44 @@ class M3EIconButton extends StatelessWidget {
         width: size.container < 48 ? 48 : size.container,
         height: size.container < 48 ? 48 : size.container,
         child: Center(
-          child: AnimatedContainer(
-            duration: const Duration(milliseconds: 180),
-            curve: Easing.standard,
-            width: size.container,
-            height: size.container,
-            decoration: BoxDecoration(
-              color: background,
-              borderRadius: BorderRadius.circular(corner),
-              border: style == M3EIconButtonStyle.outlined
-                  ? Border.all(color: scheme.outline, width: 0.8)
-                  : null,
-            ),
-            child: Icon(
-              icon,
-              size: size.icon,
-              color: enabled ? resolved : resolved.withValues(alpha: 0.38),
+          // Shape rides a spatial spring and is allowed to overshoot; the fill
+          // rides a critically damped effects spring, because a colour that
+          // overshoots reads as a glitch. A single duration curve could
+          // express neither.
+          child: M3ESpringBuilder(
+            value: isSelected ? 1 : 0,
+            spring: M3EMotion.fastSpatial,
+            builder: (context, shapeT, _) => M3ESpringBuilder(
+              value: isSelected ? 1 : 0,
+              spring: M3EMotion.defaultEffects,
+              builder: (context, tintT, __) {
+                final t = tintT.clamp(0.0, 1.0);
+                final background =
+                    Color.lerp(restBackground, selectedBackground, t)!;
+                final resolved = color ??
+                    Color.lerp(restForeground, selectedForeground, t)!;
+                final corner = restCorner +
+                    (selectedCorner - restCorner) * shapeT.clamp(0.0, 1.0);
+
+                return Container(
+                  width: size.container,
+                  height: size.container,
+                  decoration: BoxDecoration(
+                    color: background,
+                    borderRadius: BorderRadius.circular(corner),
+                    border: style == M3EIconButtonStyle.outlined
+                        ? Border.all(color: scheme.outline, width: 0.8)
+                        : null,
+                  ),
+                  child: Icon(
+                    icon,
+                    size: size.icon,
+                    color: enabled
+                        ? resolved
+                        : resolved.withValues(alpha: 0.38),
+                  ),
+                );
+              },
             ),
           ),
         ),

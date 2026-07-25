@@ -180,10 +180,10 @@ class _M3EButtonGroupState extends State<M3EButtonGroup>
     // checked state fills with `primary`, not `primaryContainer`. Using the
     // container role here made the Dart group and the Compose-backed one render
     // visibly different colours for the same state on the same screen.
-    final background =
-        isSelected ? scheme.primary : scheme.surfaceContainerHigh;
-    final foreground =
-        isSelected ? scheme.onPrimary : scheme.onSurfaceVariant;
+    final restBackground = scheme.surfaceContainerHigh;
+    final selectedBackground = scheme.primary;
+    final restForeground = scheme.onSurfaceVariant;
+    final selectedForeground = scheme.onPrimary;
 
     return M3EPressable(
       pressedScale: 1.0, // width already responds; scaling too would double up
@@ -195,39 +195,56 @@ class _M3EButtonGroupState extends State<M3EButtonGroup>
         if (widget.onSelected != null) widget.onSelected!(index);
         item.onPressed?.call();
       },
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 180),
-        curve: Easing.standard,
-        decoration: BoxDecoration(
-          color: background,
-          borderRadius: _cornersFor(index),
-        ),
-        alignment: Alignment.center,
-        child: ClipRect(
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              if (item.icon != null) ...[
-                Icon(item.icon, size: 18, color: foreground),
-                const SizedBox(width: 6),
-              ],
-              Flexible(
-                child: Text(
-                  item.label,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  softWrap: false,
-                  style: TextStyle(
-                    fontSize: 13,
-                    fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
-                    color: foreground,
+      // The corners here are fixed per position, so selection changes nothing
+      // but colour — one effects spring, critically damped, rather than a
+      // hand-picked 180ms curve.
+      child: M3ESpringBuilder(
+        value: isSelected ? 1 : 0,
+        spring: M3EMotion.defaultEffects,
+        builder: (context, tintT, _) {
+          final t = tintT.clamp(0.0, 1.0);
+          final background =
+              Color.lerp(restBackground, selectedBackground, t)!;
+          final foreground =
+              Color.lerp(restForeground, selectedForeground, t)!;
+
+          return Container(
+            decoration: BoxDecoration(
+              color: background,
+              borderRadius: _cornersFor(index),
+            ),
+            alignment: Alignment.center,
+            child: ClipRect(
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (item.icon != null) ...[
+                    Icon(item.icon, size: 18, color: foreground),
+                    const SizedBox(width: 6),
+                  ],
+                  Flexible(
+                    child: Text(
+                      item.label,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      softWrap: false,
+                      style: Theme.of(context)
+                          .textTheme
+                          .titleSmall
+                          ?.copyWith(
+                            fontWeight: isSelected
+                                ? FontWeight.w600
+                                : FontWeight.w500,
+                            color: foreground,
+                          ),
+                    ),
                   ),
-                ),
+                ],
               ),
-            ],
-          ),
-        ),
+            ),
+          );
+        },
       ),
     );
   }

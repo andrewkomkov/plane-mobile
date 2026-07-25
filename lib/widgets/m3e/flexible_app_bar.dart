@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../config/m3e/motion.dart';
 import '../../config/m3e/typography.dart';
 
 /// Material 3 Expressive **flexible app bar**.
@@ -124,9 +125,15 @@ class _M3EFlexibleHeaderScaffoldState extends State<M3EFlexibleHeaderScaffold> {
           // ─── Divider: only once content is underneath ───
           Padding(
             padding: const EdgeInsets.only(top: 8),
-            child: AnimatedOpacity(
-              opacity: t > 0.02 ? 1 : 0,
-              duration: const Duration(milliseconds: 150),
+            // Opacity is a non-spatial property, so it takes an effects
+            // spring: it must not overshoot past opaque and settle back.
+            child: M3ESpringBuilder(
+              value: t > 0.02 ? 1 : 0,
+              spring: M3EMotion.fastEffects,
+              builder: (context, opacity, child) => Opacity(
+                opacity: opacity.clamp(0.0, 1.0),
+                child: child,
+              ),
               child: Container(
                 height: 0.5,
                 color: scheme.outlineVariant.withValues(alpha: 0.6),
