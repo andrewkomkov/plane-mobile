@@ -1,6 +1,7 @@
 plugins {
     id "com.android.application"
     id "kotlin-android"
+    id "org.jetbrains.kotlin.plugin.compose"
     id "dev.flutter.flutter-gradle-plugin"
     id "com.google.gms.google-services"
 }
@@ -25,7 +26,9 @@ if (flutterVersionName == null) {
 
 android {
     namespace "com.slimshaggy.plane_mobile"
-    compileSdk flutter.compileSdkVersion
+    // Compose 1.12 (pulled in by material3 1.5.0-alpha24) requires API 37,
+    // above the flutter.compileSdkVersion default.
+    compileSdk 37
     ndkVersion flutter.ndkVersion
 
     compileOptions {
@@ -35,10 +38,19 @@ android {
 
     kotlinOptions {
         jvmTarget = '17'
+        // Kotlin 2.1 crashes lowering Compose's ComposableSingletons holder when
+        // it emits lambdas via invokedynamic (LambdaMetafactory). Compiling
+        // lambdas as classes is the documented workaround and is what the
+        // Compose compiler plugin expects anyway.
+        freeCompilerArgs += ['-Xlambdas=class']
     }
 
     sourceSets {
         main.java.srcDirs += 'src/main/kotlin'
+    }
+
+    buildFeatures {
+        compose true
     }
 
     defaultConfig {
@@ -65,4 +77,15 @@ flutter {
     source '../..'
 }
 
-dependencies {}
+dependencies {
+    // Material 3 Expressive. This is a Jetpack Compose artifact, so it is
+    // consumed the only way Flutter can consume Compose: the components below
+    // are rendered inside a ComposeView hosted in an Android platform view.
+    // See android/app/src/main/kotlin/.../M3ExpressiveViews.kt.
+    implementation "androidx.compose.material3:material3:1.5.0-alpha24"
+    implementation "androidx.compose.ui:ui:1.12.0-beta01"
+    // Tooling for the platform-view host; the ComposeView needs a lifecycle
+    // owner, which FlutterFragmentActivity provides.
+    implementation "androidx.lifecycle:lifecycle-runtime-ktx:2.8.7"
+    implementation "androidx.savedstate:savedstate-ktx:1.2.1"
+}
