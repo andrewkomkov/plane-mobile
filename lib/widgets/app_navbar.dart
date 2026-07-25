@@ -169,6 +169,23 @@ class AppNavBar extends StatelessWidget {
   }
 }
 
+/// Nav bar geometry. The indicator travels in a Stack while the icons live in
+/// a Row, so both have to derive their vertical placement from the same
+/// numbers — otherwise the pill drifts off the icon it is meant to sit behind.
+class _NavMetrics {
+  const _NavMetrics._();
+
+  static const double barHeight = 60;
+  static const double indicatorWidth = 56;
+  static const double indicatorHeight = 32;
+
+  /// Top of the indicator, and therefore of the icon box.
+  static const double iconTop = 7;
+
+  /// Gap between the indicator and the label beneath it.
+  static const double labelGap = 2;
+}
+
 /// The destinations row plus the travelling indicator.
 class _NavRow extends StatelessWidget {
   final List<NavItem> items;
@@ -198,7 +215,7 @@ class _NavRow extends StatelessWidget {
         final slotWidth = constraints.maxWidth / slotCount;
 
         return Stack(
-          alignment: Alignment.center,
+          alignment: Alignment.topLeft,
           children: [
             // Active indicator — springs to the selected slot.
             if (activeSlot >= 0)
@@ -206,13 +223,17 @@ class _NavRow extends StatelessWidget {
                 value: activeSlot.toDouble(),
                 spring: M3EMotion.defaultSpatial,
                 builder: (context, position, _) {
-                  const indicatorWidth = 56.0;
+                  // Pinned to the icon box rather than centred in the bar. The
+                  // M3 indicator wraps the ICON only; the label belongs below
+                  // it. Centring it on the whole column made both the icon and
+                  // a long label like "My Tasks" spill past the pill's edges.
                   return Positioned(
+                    top: _NavMetrics.iconTop,
                     left: position * slotWidth +
-                        (slotWidth - indicatorWidth) / 2,
+                        (slotWidth - _NavMetrics.indicatorWidth) / 2,
                     child: Container(
-                      width: indicatorWidth,
-                      height: 34,
+                      width: _NavMetrics.indicatorWidth,
+                      height: _NavMetrics.indicatorHeight,
                       decoration: BoxDecoration(
                         color: scheme.primary.withValues(alpha: 0.16),
                         borderRadius: BorderRadius.circular(M3EShape.full),
@@ -276,27 +297,38 @@ class _NavDestination extends StatelessWidget {
       semanticLabel: item.label,
       selected: isActive,
       child: SizedBox(
-        height: 60,
+        height: _NavMetrics.barHeight,
         child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
+          // Top-aligned, not centred: the icon has to land in the same box the
+          // indicator is pinned to, and it must not move when the label
+          // appears or the icons would jump on every selection change.
+          mainAxisAlignment: MainAxisAlignment.start,
           children: [
-            Icon(
-              isActive ? item.activeIcon : item.icon,
-              size: 22,
-              color: color,
+            SizedBox(
+              height: _NavMetrics.iconTop + _NavMetrics.indicatorHeight,
+              child: Center(
+                child: Icon(
+                  isActive ? item.activeIcon : item.icon,
+                  size: 22,
+                  color: color,
+                ),
+              ),
             ),
             // Label appears only for the active destination — M3E's way of
-            // keeping the bar quiet while still naming where you are.
+            // keeping the bar quiet while still naming where you are. It sits
+            // BELOW the indicator, so it may be wider than the pill.
             AnimatedSize(
               duration: const Duration(milliseconds: 220),
               curve: Easing.emphasizedDecelerate,
+              alignment: Alignment.topCenter,
               child: isActive
                   ? Padding(
-                      padding: const EdgeInsets.only(top: 3),
+                      padding:
+                          const EdgeInsets.only(top: _NavMetrics.labelGap),
                       child: Text(
                         item.label,
                         maxLines: 1,
-                        overflow: TextOverflow.clip,
+                        overflow: TextOverflow.ellipsis,
                         softWrap: false,
                         style: TextStyle(
                           fontSize: 10,
@@ -306,7 +338,7 @@ class _NavDestination extends StatelessWidget {
                         ),
                       ),
                     )
-                  : const SizedBox(width: 0, height: 0),
+                  : const SizedBox.shrink(),
             ),
           ],
         ),
