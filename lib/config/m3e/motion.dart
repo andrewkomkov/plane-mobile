@@ -218,13 +218,26 @@ class _M3EPressableState extends State<M3EPressable> {
     if (widget.semanticLabel == null && widget.selected == null) {
       return gesture;
     }
+
+    final labelled = widget.semanticLabel != null;
     return Semantics(
       label: widget.semanticLabel,
       button: widget.onTap != null,
       selected: widget.selected,
-      // The label replaces whatever the subtree would have produced, so an
-      // icon-only control reports one clean node instead of nothing.
-      container: widget.semanticLabel != null,
+      container: labelled,
+      // An explicit label REPLACES the subtree's, rather than being appended to
+      // it. Without excluding, a control that both carries a label and renders
+      // that same word as visible text — the active nav destination — reports
+      // "Projects\nProjects": announced twice by a screen reader, and missed by
+      // any automation matching the label exactly, on the one destination a
+      // navigation script cares about most.
+      //
+      // Excluding the subtree would also drop the child GestureDetector's tap
+      // action, so the action is re-declared on this node to keep the control
+      // operable from assistive tech.
+      excludeSemantics: labelled,
+      onTap: labelled ? widget.onTap : null,
+      onLongPress: labelled ? widget.onLongPress : null,
       child: gesture,
     );
   }
