@@ -70,7 +70,7 @@ class AppNavBar extends StatelessWidget {
           children: [
             Expanded(
               child: M3EGlassContainer(
-                height: 60,
+                height: _NavMetrics.barHeightFor(context),
                 child: _NavRow(
                   items: visible,
                   currentIndex: currentIndex,
@@ -84,7 +84,7 @@ class AppNavBar extends StatelessWidget {
             if (pendingWrites > 0) ...[
               const SizedBox(width: 8),
               M3EGlassContainer(
-                height: 60,
+                height: _NavMetrics.barHeightFor(context),
                 width: 56,
                 child: Center(child: _PendingBadge(count: pendingWrites)),
               ),
@@ -99,7 +99,7 @@ class AppNavBar extends StatelessWidget {
                 child: GestureDetector(
                   onDoubleTap: onSearchDoubleTap,
                   child: M3EGlassContainer(
-                    height: 60,
+                    height: _NavMetrics.barHeightFor(context),
                     width: 56,
                     child: Center(
                       child: Icon(
@@ -176,6 +176,26 @@ class _NavMetrics {
   const _NavMetrics._();
 
   static const double barHeight = 60;
+
+  /// Bar height for the current text scale.
+  ///
+  /// The label is real text, so it grows with the system font setting while a
+  /// fixed 60dp bar does not — at 1.5x the label overflowed the bar outright.
+  /// Rather than clamping the text (which would ignore the very setting the
+  /// user asked for), the bar grows to fit it.
+  static double barHeightFor(BuildContext context) {
+    // Multiplied by labelLineHeight, not used raw: a Text with no explicit
+    // height inherits Material's body leading of 1.45 from the Scaffold's
+    // DefaultTextStyle, so the line box is far taller than the font size. The
+    // label below pins that leading so this arithmetic and the layout agree.
+    final scaled = MediaQuery.textScalerOf(context).scale(labelFontSize);
+    final needed =
+        iconTop + indicatorHeight + labelGap + scaled * labelLineHeight + 4;
+    return needed > barHeight ? needed : barHeight;
+  }
+
+  static const double labelFontSize = 10;
+  static const double labelLineHeight = 1.25;
   static const double indicatorWidth = 56;
   static const double indicatorHeight = 32;
 
@@ -297,7 +317,7 @@ class _NavDestination extends StatelessWidget {
       semanticLabel: item.label,
       selected: isActive,
       child: SizedBox(
-        height: _NavMetrics.barHeight,
+        height: _NavMetrics.barHeightFor(context),
         child: Column(
           // Top-aligned, not centred: the icon has to land in the same box the
           // indicator is pinned to, and it must not move when the label
@@ -331,7 +351,8 @@ class _NavDestination extends StatelessWidget {
                         overflow: TextOverflow.ellipsis,
                         softWrap: false,
                         style: TextStyle(
-                          fontSize: 10,
+                          fontSize: _NavMetrics.labelFontSize,
+                          height: _NavMetrics.labelLineHeight,
                           fontWeight: FontWeight.w600,
                           letterSpacing: 0.1,
                           color: color,
