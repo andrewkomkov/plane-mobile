@@ -8,6 +8,7 @@ import '../../services/search_service.dart';
 import '../../widgets/loading_state.dart';
 import '../../widgets/m3e/icon_button.dart';
 import '../../widgets/m3e/text_field.dart';
+import '../../utils/search_result_route.dart';
 import '../../widgets/section_header.dart';
 import '../../widgets/item_tile.dart';
 
@@ -247,7 +248,12 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
             return _SearchResultTile(
               type: entry.key,
               item: item,
-              onTap: () {},
+              onTap: () => openSearchResult(
+                context,
+                workspaceSlug: widget.workspaceSlug,
+                type: entry.key,
+                item: item,
+              ),
             );
           }
           current += entry.value.length;
@@ -289,9 +295,12 @@ class _SearchResultTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final name = item['name'] ?? item['title'] ?? '';
-    final identifier = item['identifier'] ?? '';
+    // An issue hit reports its project under `project_identifier`, not
+    // `identifier` — reading the latter meant the "XCDEV-8" subtitle never
+    // appeared on the results that were supposed to carry it.
+    final identifier = searchResultProjectIdentifier(item);
     final sequenceId = item['sequence_id'];
-    final subtitle = sequenceId != null && identifier.toString().isNotEmpty
+    final subtitle = sequenceId != null && identifier.isNotEmpty
         ? '$identifier-$sequenceId'
         : (item['description'] ?? '').toString();
 

@@ -7,6 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../services/search_service.dart';
 import '../../services/project_service.dart';
 import '../../models/project.dart';
+import '../../utils/search_result_route.dart';
 import '../../screens/issues/issue_create_screen.dart';
 import '../../screens/project/project_screen.dart';
 
@@ -181,7 +182,17 @@ class _CommandPaletteBodyState
             label: (item['name'] ?? item['title'] ?? '').toString(),
             subtitle: entry.key,
             type: _CommandType.result,
-            onTap: () => Navigator.pop(context),
+            // Dismiss the palette first, then route: the result opens over the
+            // screen that launched the palette, not over the palette itself.
+            onTap: () {
+              Navigator.pop(context);
+              openSearchResult(
+                context,
+                workspaceSlug: widget.workspaceSlug,
+                type: entry.key,
+                item: item,
+              );
+            },
           ));
         }
       }

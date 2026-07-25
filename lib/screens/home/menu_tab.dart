@@ -11,6 +11,8 @@ import '../../models/workspace.dart';
 import '../../models/member.dart';
 import '../../services/workspace_service.dart';
 import '../../providers/workspace_provider.dart';
+import '../../providers/data_providers.dart';
+import '../../utils/new_issue_flow.dart';
 import '../../widgets/loading_state.dart';
 import '../notifications/notification_screen.dart';
 import '../analytics/analytics_screen.dart';
@@ -189,7 +191,11 @@ class _MenuTabState extends ConsumerState<MenuTab> {
                   M3EIconButton(
                     icon: Icons.edit_square,
                     tooltip: 'New issue',
-                    onPressed: () {},
+                    onPressed: () => startNewIssue(
+                      context,
+                      cache: ref.read(dataCacheProvider),
+                      workspaceSlug: widget.workspaceSlug,
+                    ),
                   ),
                 ],
               ),
