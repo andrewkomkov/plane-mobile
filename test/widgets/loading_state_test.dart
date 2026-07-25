@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:plane_mobile/widgets/loading_state.dart';
+import 'package:plane_mobile/widgets/m3e/loading_indicator.dart';
 
 void main() {
   Widget wrapWidget(Widget child) {
@@ -8,9 +9,11 @@ void main() {
   }
 
   group('LoadingStateWidget', () {
-    testWidgets('shows a CircularProgressIndicator', (tester) async {
+    testWidgets('shows the expressive loading indicator', (tester) async {
       await tester.pumpWidget(wrapWidget(const LoadingStateWidget()));
-      expect(find.byType(CircularProgressIndicator), findsOneWidget);
+      expect(find.byType(M3ELoadingIndicator), findsOneWidget);
+      // The indicator animates forever; settle would time out.
+      await tester.pump(const Duration(milliseconds: 100));
     });
   });
 

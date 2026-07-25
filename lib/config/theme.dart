@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'm3e/shapes.dart';
+import 'm3e/typography.dart';
 
 class PlaneTheme {
   // ─── Design system colors (from mockup CSS) ───
@@ -38,7 +40,6 @@ class PlaneTheme {
   // Light theme legacy colors
   static const _bgLight = Color(0xFFFFFFFF);
   static const _surfaceLight = Color(0xFFF8F8F8);
-  static const _borderLight = Color(0xFFE8E8E8);
   static const _textPrimaryLight = Color(0xFF1A1A1A);
   static const _textSecondaryLight = Color(0xFF6B6B6B);
 
@@ -130,10 +131,10 @@ class PlaneTheme {
   static const _outlineLight = Color(0xFFE0E0E0);
   static const _outlineVariantLight = Color(0xFFD0D0D0);
 
-  static ThemeData light() => ThemeData(
+  static ThemeData light() => _build(
         brightness: Brightness.light,
-        scaffoldBackgroundColor: _bgLight,
-        colorScheme: ColorScheme.light(
+        scaffoldBackground: _bgLight,
+        scheme: const ColorScheme.light(
           primary: _accent,
           surface: _surfaceLight,
           surfaceContainerLowest: _bgLight,
@@ -147,81 +148,18 @@ class PlaneTheme {
           outlineVariant: _outlineVariantLight,
           primaryContainer: _accent,
           onPrimaryContainer: Colors.white,
-          error: const Color(0xFFBA1A1A),
-          errorContainer: const Color(0xFFFFDAD6),
-          secondary: const Color(0xFF5E6AD2),
-          secondaryContainer: const Color(0xFFDEE0FF),
-        ),
-        useMaterial3: true,
-        fontFamily: 'Inter',
-        appBarTheme: const AppBarTheme(
-          backgroundColor: _bgLight,
-          foregroundColor: _textPrimaryLight,
-          elevation: 0,
-          scrolledUnderElevation: 0,
-          centerTitle: false,
-          titleTextStyle: TextStyle(
-            fontFamily: 'Inter',
-            fontSize: 20,
-            fontWeight: FontWeight.w600,
-            color: _textPrimaryLight,
-          ),
-        ),
-        cardTheme: CardThemeData(
-          color: _bgLight,
-          elevation: 0,
-          margin: EdgeInsets.zero,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(8),
-            side: const BorderSide(color: _borderLight, width: 0.5),
-          ),
-        ),
-        dividerTheme: const DividerThemeData(
-          color: _borderLight,
-          thickness: 0.5,
-          space: 0,
-        ),
-        chipTheme: ChipThemeData(
-          backgroundColor: _surfaceLight,
-          side: const BorderSide(color: _borderLight, width: 0.5),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
-          labelStyle: const TextStyle(fontSize: 12, color: _textPrimaryLight),
-          padding: const EdgeInsets.symmetric(horizontal: 4),
-        ),
-        inputDecorationTheme: InputDecorationTheme(
-          filled: true,
-          fillColor: _surfaceLight,
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(8),
-            borderSide: const BorderSide(color: _borderLight),
-          ),
-          enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(8),
-            borderSide: const BorderSide(color: _borderLight),
-          ),
-          contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-          isDense: true,
-        ),
-        floatingActionButtonTheme: FloatingActionButtonThemeData(
-          backgroundColor: _accent,
-          foregroundColor: Colors.white,
-          elevation: 0,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        ),
-        bottomNavigationBarTheme: const BottomNavigationBarThemeData(
-          backgroundColor: _bgLight,
-          selectedItemColor: _textPrimaryLight,
-          unselectedItemColor: _textSecondaryLight,
-          type: BottomNavigationBarType.fixed,
-          elevation: 0,
+          error: Color(0xFFBA1A1A),
+          errorContainer: Color(0xFFFFDAD6),
+          secondary: Color(0xFF5E6AD2),
+          secondaryContainer: Color(0xFFDEE0FF),
         ),
       );
 
-  static ThemeData dark() => ThemeData(
+  static ThemeData dark() => _build(
         brightness: Brightness.dark,
-        scaffoldBackgroundColor: background,
-        colorScheme: ColorScheme.dark(
-          primary: _accent,
+        scaffoldBackground: background,
+        scheme: const ColorScheme.dark(
+          primary: primary,
           surface: surface,
           surfaceContainerLowest: surfaceContainerLowest,
           surfaceContainerLow: surfaceContainerLow,
@@ -230,7 +168,7 @@ class PlaneTheme {
           surfaceContainerHighest: surfaceContainerHighest,
           onSurface: onSurface,
           onSurfaceVariant: onSurfaceVariant,
-          outline: outlineVariant,
+          outline: outline,
           outlineVariant: outlineVariant,
           primaryContainer: primaryContainer,
           onPrimaryContainer: onPrimaryContainer,
@@ -239,68 +177,153 @@ class PlaneTheme {
           secondary: secondaryColor,
           secondaryContainer: secondaryContainer,
         ),
-        useMaterial3: true,
-        fontFamily: 'Inter',
-        appBarTheme: const AppBarTheme(
-          backgroundColor: background,
-          foregroundColor: onSurface,
-          elevation: 0,
-          scrolledUnderElevation: 0,
-          centerTitle: false,
-          titleTextStyle: TextStyle(
-            fontFamily: 'Inter',
-            fontSize: 20,
-            fontWeight: FontWeight.w600,
-            color: onSurface,
-          ),
-        ),
-        cardTheme: CardThemeData(
-          color: surface,
-          elevation: 0,
-          margin: EdgeInsets.zero,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(8),
-            side: const BorderSide(color: outlineVariant, width: 0.5),
-          ),
-        ),
-        dividerTheme: const DividerThemeData(
-          color: outlineVariant,
-          thickness: 0.5,
-          space: 0,
-        ),
-        chipTheme: ChipThemeData(
-          backgroundColor: surface,
-          side: const BorderSide(color: outlineVariant, width: 0.5),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
-          labelStyle: const TextStyle(fontSize: 12, color: onSurface),
-          padding: const EdgeInsets.symmetric(horizontal: 4),
-        ),
-        inputDecorationTheme: InputDecorationTheme(
-          filled: true,
-          fillColor: surface,
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(8),
-            borderSide: const BorderSide(color: outlineVariant),
-          ),
-          enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(8),
-            borderSide: const BorderSide(color: outlineVariant),
-          ),
-          contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-          isDense: true,
-        ),
-        floatingActionButtonTheme: FloatingActionButtonThemeData(
-          backgroundColor: _accent,
-          foregroundColor: Colors.white,
-          elevation: 0,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        ),
-        bottomNavigationBarTheme: const BottomNavigationBarThemeData(
-          backgroundColor: background,
-          selectedItemColor: onSurface,
-          unselectedItemColor: onSurfaceVariant,
-          type: BottomNavigationBarType.fixed,
-          elevation: 0,
-        ),
       );
+
+  /// Single builder for both themes.
+  ///
+  /// Component shapes come from the M3 Expressive corner scale — noticeably
+  /// rounder than the 6–8px this app used before, which is the most visible
+  /// part of the expressive language. Everything else stays deliberately flat:
+  /// zero elevation, hairline outlines, no tinted overlays. That restraint is
+  /// what keeps it reading as Linear rather than as stock Material.
+  static ThemeData _build({
+    required Brightness brightness,
+    required Color scaffoldBackground,
+    required ColorScheme scheme,
+  }) {
+    final textTheme =
+        M3EType.textTheme(scheme.onSurface, scheme.onSurfaceVariant);
+
+    return ThemeData(
+      brightness: brightness,
+      scaffoldBackgroundColor: scaffoldBackground,
+      colorScheme: scheme,
+      useMaterial3: true,
+      fontFamily: M3EType.fontFamily,
+      textTheme: textTheme,
+      splashFactory: InkSparkle.splashFactory,
+      appBarTheme: AppBarTheme(
+        backgroundColor: scaffoldBackground,
+        foregroundColor: scheme.onSurface,
+        elevation: 0,
+        scrolledUnderElevation: 0,
+        centerTitle: false,
+        titleTextStyle: textTheme.headlineSmall,
+      ),
+      cardTheme: CardThemeData(
+        color: scheme.surfaceContainerLow,
+        elevation: 0,
+        margin: EdgeInsets.zero,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(M3EShape.large),
+        ),
+      ),
+      dividerTheme: DividerThemeData(
+        color: scheme.outlineVariant,
+        thickness: 0.5,
+        space: 0,
+      ),
+      chipTheme: ChipThemeData(
+        backgroundColor: Colors.transparent,
+        side: BorderSide(color: scheme.outlineVariant, width: 0.8),
+        shape: const StadiumBorder(),
+        labelStyle: textTheme.labelMedium,
+        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      ),
+      inputDecorationTheme: InputDecorationTheme(
+        filled: true,
+        fillColor: scheme.surfaceContainerLow,
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(M3EShape.large),
+          borderSide: BorderSide(color: scheme.outlineVariant),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(M3EShape.large),
+          borderSide: BorderSide(color: scheme.outlineVariant),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(M3EShape.large),
+          borderSide: BorderSide(color: scheme.primary, width: 1.2),
+        ),
+        contentPadding:
+            const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        isDense: true,
+      ),
+      // Buttons adopt the expressive pill shape and heavier label weight.
+      filledButtonTheme: FilledButtonThemeData(
+        style: FilledButton.styleFrom(
+          shape: const StadiumBorder(),
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+          textStyle: textTheme.labelLarge?.copyWith(fontWeight: FontWeight.w600),
+        ),
+      ),
+      outlinedButtonTheme: OutlinedButtonThemeData(
+        style: OutlinedButton.styleFrom(
+          shape: const StadiumBorder(),
+          side: BorderSide(color: scheme.outlineVariant),
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+          textStyle: textTheme.labelLarge?.copyWith(fontWeight: FontWeight.w600),
+        ),
+      ),
+      textButtonTheme: TextButtonThemeData(
+        style: TextButton.styleFrom(
+          shape: const StadiumBorder(),
+          textStyle: textTheme.labelLarge?.copyWith(fontWeight: FontWeight.w600),
+        ),
+      ),
+      floatingActionButtonTheme: FloatingActionButtonThemeData(
+        backgroundColor: scheme.primaryContainer,
+        foregroundColor: scheme.onPrimaryContainer,
+        elevation: 0,
+        focusElevation: 0,
+        hoverElevation: 0,
+        highlightElevation: 0,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(M3EShape.large),
+        ),
+      ),
+      bottomSheetTheme: BottomSheetThemeData(
+        backgroundColor: scheme.surfaceContainer,
+        elevation: 0,
+        showDragHandle: true,
+        dragHandleColor: scheme.onSurfaceVariant.withValues(alpha: 0.3),
+        shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(
+            top: Radius.circular(M3EShape.extraLargeIncreased),
+          ),
+        ),
+      ),
+      dialogTheme: DialogThemeData(
+        backgroundColor: scheme.surfaceContainerHigh,
+        elevation: 0,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(M3EShape.extraLarge),
+        ),
+      ),
+      snackBarTheme: SnackBarThemeData(
+        backgroundColor: scheme.surfaceContainerHighest,
+        contentTextStyle: textTheme.bodyMedium,
+        behavior: SnackBarBehavior.floating,
+        elevation: 0,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(M3EShape.large),
+        ),
+      ),
+      popupMenuTheme: PopupMenuThemeData(
+        color: scheme.surfaceContainerHigh,
+        elevation: 0,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(M3EShape.large),
+          side: BorderSide(color: scheme.outlineVariant, width: 0.5),
+        ),
+      ),
+      bottomNavigationBarTheme: BottomNavigationBarThemeData(
+        backgroundColor: scaffoldBackground,
+        selectedItemColor: scheme.primary,
+        unselectedItemColor: scheme.onSurfaceVariant,
+        type: BottomNavigationBarType.fixed,
+        elevation: 0,
+      ),
+    );
+  }
 }
