@@ -3,147 +3,124 @@
 What the mobile app does and does not implement, measured against the Plane
 server this deployment actually runs.
 
-> **Correction — read this before the tables below.** This document was first
-> written against the server's *internal* API (`apps/api/plane/app/urls/`).
-> That is the wrong reference. Both login paths end in
-> `setup_screen.dart:_handleAuthSuccess`, which stores an API token and sets
-> `authMethod = 'api_key'`; `api_client.dart` then points the base URL at
-> `{base}/api/v1`. The session branch is dead code, so the app in fact talks to
-> Plane's *external* v1 API (`apps/api/plane/api/urls/`), which is a much
-> smaller surface. 17 endpoints the app calls do not exist there at all.
->
-> Consequences confirmed on a device, not inferred: opening any work item shows
-> "Failed to load issue", and the Views screen shows "Failed to load views".
-> Saved views have no v1 equivalent under any name. So some rows below marked
-> covered describe code that is wired but dead. Tracked as task #17, which has
-> to be decided before most of the remaining work is worth doing.
->
-> Rows corrected since that finding are marked **(v1-checked)**.
-
 **Reference:** `~/PycharmProjects/Plane.so`, Plane **v1.2.0** — a fork, not
-stock (it carries local commits adding workspace-level Pages and a v1 pages
-API). The feature list below is derived from that server's own route table
-(`apps/api/plane/app/urls/*.py`, ~250 routes across 20 modules), not from
-Plane's public documentation, so it reflects what this instance can do.
+stock. The feature list is derived from that server's own route table, not from
+Plane's public documentation.
 
-**Method:** static. Every path literal in `lib/` was extracted and matched
-against the server routes — 55 client paths against ~250 server routes. This
-finds absent capability. It does not find broken capability: a feature listed
-as covered here is *wired*, not *verified working*. Anything marked ⚠ is a
-correctness risk found by reading, not by running.
+**The reference is `apps/api/plane/app/urls/` — the internal API.** That is what
+the app talks to. It did not always: the app authenticates with an API token,
+which only reaches Plane's external v1 API, and it was calling the internal
+API's route names against it. `plane-mobile-api` now exchanges the token for a
+real Plane session and proxies through, so the internal surface — and Plane's
+own permission classes — apply. See `lib/config/api_client.dart`.
 
-**Not counted as gaps.** Much of the server surface is not user-facing
-feature: `user-properties`, `home-preferences`, `sidebar-preferences`,
-`recent-visits`, `tour-completed`, `onboard`, `project-deploy-boards`,
-`instance-admin`. Missing those is not a coverage hole, and they are left out
-of the table rather than padding it.
+**Method:** every path literal in `lib/` extracted and matched against the
+server routes. 50 client paths; exactly one has no internal route
+(`github-repositories/`). Behaviour marked *verified* was exercised on a
+Galaxy S20 FE against the live instance; *wired* means the code exists and
+compiles but no one has watched it work.
 
 ## Summary
 
 | | Areas |
 |---|---|
-| Covered | 9 |
-| Partial | 11 |
-| Missing | 13 |
+| Covered | 18 |
+| Partial | 5 |
+| Missing | 9 |
 
-The shape of the gap: the app is a solid **work-item client** — issues,
-cycles, modules, views, labels, states, comments, attachments and
-notifications are all real. What it does not have is (a) the **collaboration
-layer** on top of work items — reactions, subscribers, relations, comment
-editing; (b) **anything archived, deleted or drafted**; and (c) the
-**workspace-administration** surface — members, invitations, estimates,
-webhooks, exports.
+Everything that was structurally unreachable is now reachable. What remains
+missing is missing because nobody has built it, not because the transport
+forbids it — which was not true of this document's first two versions.
 
 ## Covered
 
 | Area | Notes |
 |---|---|
-| Work items — core CRUD | list / detail / create / update / delete, `issue_service.dart` |
-| Work item views | List, Board (kanban), Table (spreadsheet), Calendar — four of Plane's five |
-| Cycles | CRUD plus add/remove issues, `cycle_service.dart` |
-| Modules | CRUD plus add/remove issues, `module_service.dart` |
-| States | full CRUD including per-project state management |
-| Labels | full CRUD |
+| Work items — core | list / detail / create / update / delete — *verified* |
+| Work item views | List, Board, Table, Calendar — four of Plane's five |
+| Work item properties | state, priority, assignees, labels, parent, dates, **estimate**, **cycle**, **module** |
+| Reactions | on work items and on comments — *verified*, round-trips and removes |
+| Subscription | subscribe/unsubscribe on a work item |
+| Relations | read and write, all four kinds, plus sub-issue create and adopt |
+| Comments | list, add, edit, delete, reactions |
 | Attachments | list / upload / delete |
-| Project views | saved views CRUD at project level |
+| Activity feed | *verified* — requires `activity_type`, see below |
+| Archive | work items, cycles, modules, pages; archived listings — *verified* |
+| Cycles | CRUD, issues, archive |
+| Modules | CRUD, issues, archive |
+| Pages | CRUD including delete, archive |
+| States | full CRUD |
+| Labels | full CRUD |
+| Saved views | project-level CRUD — *verified* (this was the screen that failed outright) |
+| Members | roles, invite, change role, remove, leave, pending invitations — *verified* |
 | Notifications | list, read/unread, archive, mark-all-read, preferences |
 
 ## Partial
 
 | Area | Has | Missing | Pri |
 |---|---|---|---|
-| Work item fields | state, priority, assignees, labels, parent, start/target date | **estimate point**, cycle and module assignment from the item itself | P1 |
-| Comments | list, add | **edit, delete**, reactions | P1 |
-| Sub-issues | read; can set `parent` on an item | creating/linking a sub-issue from the parent | P2 |
-| Issue relations | read (`getIssueRelations`) | **add/remove** — blocks/blocked-by/duplicate/relates-to are read-only | P2 |
-| Issue links | list, add | **edit, delete** | P3 |
-| Pages | list, get, create, update, delete — all on Plane's own `pages/` routes | versions, lock, archive, duplicate, access control | P2 |
-| Projects | list, detail, update settings | **create** (deliberate — see M3_EXPRESSIVE.md), archive, join, leave | P2 |
-| Members | read workspace + project members | **invite, remove, change role** | P2 |
-| Workspaces | list, switch, update | invitations, themes, slug check | P3 |
-| Intake | list, get and triage via `intake-issues/` (`intake_service.dart`) | no UI is wired to it — the service has no caller, and the "Inbox" tab is the notification feed, not this queue | P2 |
-| Analytics | a screen that computes counts client-side from fetched issues | the server's own `analytics/`, `advance-analytics*`, `project-stats`, `export-analytics` — so numbers are limited to what the app already paged in, and will disagree with web on large projects | P1 |
+| Analytics | works, and every figure states whether it came from the server or was counted on device | still sweeps every work item to the phone. Plane's analytics API is reachable now and should replace it — task #18 | P1 |
+| Intake | `intake_service.dart` is correct and current | **no UI reaches it.** The "Inbox" tab is the notification feed, not this queue | P2 |
+| Search | works through the shim's own SQL endpoint | not on Plane's `search/` routes, so it bypasses Plane's permission checks | P2 |
+| Estimates | a work item's estimate point can be set | estimate *scales* cannot be created or managed | P3 |
+| Projects | list, detail, settings, members | **create** (deliberate), archive, join, leave | P3 |
 
 ## Missing
 
 | Area | What it is | Pri |
 |---|---|---|
-| **Reactions** | emoji reactions on work items and comments (`issues/{}/reactions/`, `comments/{}/reactions/`). No trace in `lib/` | P1 |
-| **Subscribers** | subscribe/unsubscribe to a work item (`issue-subscribers/`, `subscribe/`). Drives who gets notified — the app has push notifications but no way to control subscription | P1 |
-| **Archive** | archiving and archived listings for work items, cycles, modules, pages (`archived-issues/`, `archived-cycles/`, `archived-modules/`, `{}/archive/`). Archived content is invisible and uncreatable on mobile | P1 |
+| **Workspace-level rollups** | `workspaces/{}/issues/`, `views/`, `cycles/`, `modules/` — cross-project views. Mobile is project-scoped | P2 |
+| **Favorites** | `user-favorites/` and the per-entity favorite routes | P2 |
+| **Draft work items** | `draft-issues/`, `draft-to-issue/{}/`. Drafts made on web are invisible here | P2 |
 | **Trash / restore** | `deleted-issues/`, asset restore. Deleting on mobile is unrecoverable there | P2 |
-| **Draft work items** | `workspaces/{}/draft-issues/`, `draft-to-issue/{}/`. Drafts made on web are invisible on mobile | P2 |
-| **Estimates** | estimate definitions and points (`estimates/`, `estimate-points/`). `display_options.dart` references estimates for display only; they cannot be set or managed | P2 |
-| **Workspace-level views & issues** | `workspaces/{}/views/`, `workspaces/{}/issues/`, `workspaces/{}/cycles/`, `workspaces/{}/modules/` — cross-project rollups. Mobile is project-scoped only | P2 |
-| **Favorites** | `user-favorites/`, per-entity favorite endpoints for projects, cycles, modules, views, pages. Nothing in `lib/` | P2 |
+| **Description history** | `issues/{}/versions/`, `work-items/{}/description-versions/`. The activity feed is covered; description history is not | P3 |
 | **Exports** | `export-issues/`, `export-analytics/`, `user-activity/{}/export/` | P3 |
-| **Home widgets** | stickies (`stickies/`), quick links (`quick-links/`), the workspace home dashboard | P3 |
-| **Webhooks & API tokens** | `webhooks/`, `webhook-logs/`, `service-api-tokens/`. The app creates a token for its own auth but exposes no management UI | P3 |
-| **Work item history versions** | `issues/{}/versions/`, `work-items/{}/description-versions/`. Activity feed is covered; description history is not | P3 |
+| **Home widgets** | stickies, quick links, the workspace home dashboard | P3 |
+| **Webhooks & API tokens** | management UI. The app mints a token for its own auth and exposes nothing | P3 |
 | **Bulk operations** | `bulk-archive-issues/`, `bulk-delete-issues/`, `bulk-create-labels/` | P3 |
 
-Also absent, deliberately or reasonably: **Gantt** (the fifth view type — the
-other four exist), **AI assistant** (`ai-assistant/`), **Unsplash** covers,
-**Slack/GitHub integrations** beyond read-only GitHub repo listing.
+Also absent, reasonably: **Gantt** (the fifth view type), **AI assistant**,
+**Unsplash** covers, and GitHub integration beyond a read-only repo list —
+`github-repositories/` is the one path the app calls that no internal route
+serves, so it fails today.
 
-## Architectural risk worth flagging
+## Server defects found while building this
 
-The app does not talk only to Plane. Three capabilities route through the
-separate `plane-mobile-api` FastAPI service, which reaches into Plane's
-**PostgreSQL directly** rather than through Plane's API:
+These are bugs in Plane, not in the app. Each is worked around, and the
+workaround is commented where it lives.
 
-| Path | Feature |
+| Defect | Consequence |
 |---|---|
-| `/auth/mobile/{slug}/search/` | global search |
-| `/auth/mobile/{slug}/notifications/` | notification list, read, dismiss |
-| `/auth/mobile/register-device/`, `workspaces/`, `issue-info/` | auth, push, workspace list |
+| `issues/{id}/history/` 500s without `activity_type` | the view sorts unserialised model instances as dicts. The app always passes it |
+| Cycle archive with no end date 500s | `end_date` is nullable and compared unguarded. `Cycle.canArchive` stops the app sending one |
+| `archived-cycles/{id}/`, `archived-modules/{id}/` look writable | their `post`/`delete` take an argument the URL never supplies. Both directions go to `.../{id}/archive/` |
+| `pages/` never filters `archived_at` | archived pages have always been mixed into the mobile page list |
+| `DELETE pages/{id}/` requires prior archiving | the delete action added earlier failed on every live page |
+| `fields=` is discarded in `DynamicBaseSerializer` | `projects/{id}/members/` returns `member` as a bare id, so every Member had an empty name and assignee lookups matched nothing. Fixed by joining the workspace list, as Plane's web client does |
+| Project invitation endpoint 500s twice | reads `.role` off a queryset, calls `.delay` on a list. Invite-by-email is offered only at workspace level |
+| Comment PATCH/DELETE guarded by `ProjectLitePermission` alone | any project member may rewrite anyone's comment. The app gates on authorship instead |
+| `ProjectMemberViewSet.partial_update` admits guests | a project guest can demote a project admin. The app gates on admin |
 
-Two consequences. First, those features bypass Plane's permission checks and
-serialisers, so they can drift from what the web app enforces. Second, a Plane
-schema change breaks them silently — the service's own history shows this
-(`fix pages SQL: use project_pages join table instead of project_id column`).
+## Architectural risk
 
-Pages used to be on that list and are not any more: this fork carries a v1
-pages API, so `page_service.dart` now goes to `/workspaces/{}/projects/{}/pages/`
-only. The shim's page handlers authorised nothing beyond "is this a real API
-key", so any token could read or rewrite pages in projects its owner was not a
-member of. Search and notifications still have that shape.
+Three capabilities still route through `plane-mobile-api`'s own SQL handlers
+rather than the proxy: **search**, the **Inbox notification feed**, and
+`issue-info`, plus auth and device registration.
 
-## What to do about it
+Those handlers authenticate but do not authorise. This was demonstrated, not
+suspected: the page handlers filtered by `project_id` with no membership check,
+and `get_page` filtered on page id alone, so any valid token in the instance
+could read or rewrite any page in any workspace. Pages were moved onto Plane's
+API and those handlers deleted. **Search and notifications still have that
+shape** and should follow.
 
-Filed as tasks, highest value first:
+The proxy is the pattern to prefer for anything new: it cannot have this class
+of bug, because the authorisation is not ours to get wrong.
 
-1. Reactions + subscribers — the two most-used collaboration features, both
-   entirely absent, both small (one service each).
-2. Archive support — currently a whole class of content is unreachable.
-3. Comment edit/delete — users can create comments they cannot fix.
-4. Estimate point on the work item, plus cycle/module assignment from the item.
-5. Analytics against the server's endpoints instead of client-side counting.
-6. ~~Intake: migrate to the `intakes/` routes before the legacy ones go.~~ Done
-   — `intake_service.dart` is on `intake-issues/`. Still needs a screen.
-7. Issue relations write path.
-8. Members: invite / remove / role.
-9. ~~Settle pages on one backend.~~ Done — Plane's own API, shim dropped.
+## Known gaps in this document
 
-P3 items above are recorded here but not filed — they are real gaps, not
-planned work.
+Coverage here is *capability*, established by reading routes and by exercising
+the app on a device. It is not a test suite. An area marked covered can still
+be wrong in ways only a user will find — which is exactly how the process-killing
+ButtonGroup crash and the dead work-item screen survived earlier rounds of
+"verified on device".
