@@ -194,8 +194,12 @@ class _NavMetrics {
     // DefaultTextStyle, so the line box is far taller than the font size. The
     // label below pins that leading so this arithmetic and the layout agree.
     final scaled = MediaQuery.textScalerOf(context).scale(labelFontSize);
+    // Padding is counted twice so the gap under the label matches the gap
+    // above the indicator. Previously the top inset was a constant and the
+    // bottom was whatever slack happened to be left over, which is what made
+    // the row look like it was sitting too high in its own pill.
     final needed =
-        iconTop + indicatorHeight + labelGap + scaled * labelLineHeight + 4;
+        iconTop * 2 + indicatorHeight + labelGap + scaled * labelLineHeight;
     return needed > barHeight ? needed : barHeight;
   }
 
@@ -204,11 +208,12 @@ class _NavMetrics {
   static const double indicatorWidth = 56;
   static const double indicatorHeight = 32;
 
-  /// Top of the indicator, and therefore of the icon box.
-  static const double iconTop = 7;
+  /// Top of the indicator, and therefore of the icon box. Also the inset under
+  /// the label — the two are the same number on purpose.
+  static const double iconTop = 8;
 
   /// Gap between the indicator and the label beneath it.
-  static const double labelGap = 2;
+  static const double labelGap = 3;
 }
 
 /// The destinations row plus the travelling indicator.
@@ -324,13 +329,16 @@ class _NavDestination extends StatelessWidget {
       child: SizedBox(
         height: _NavMetrics.barHeightFor(context),
         child: Column(
-          // Top-aligned, not centred: the icon has to land in the same box the
-          // indicator is pinned to, and it must not move when the label
-          // appears or the icons would jump on every selection change.
           mainAxisAlignment: MainAxisAlignment.start,
           children: [
+            // The icon box is exactly the indicator box, offset by the same
+            // inset the indicator is pinned to. It used to be one box of
+            // `iconTop + indicatorHeight` with the icon centred in it, which
+            // put the glyph three and a half points above the middle of the
+            // pill drawn behind it.
+            const SizedBox(height: _NavMetrics.iconTop),
             SizedBox(
-              height: _NavMetrics.iconTop + _NavMetrics.indicatorHeight,
+              height: _NavMetrics.indicatorHeight,
               child: Center(
                 child: Icon(
                   isActive ? item.activeIcon : item.icon,
@@ -339,32 +347,28 @@ class _NavDestination extends StatelessWidget {
                 ),
               ),
             ),
-            // Label appears only for the active destination — M3E's way of
-            // keeping the bar quiet while still naming where you are. It sits
-            // BELOW the indicator, so it may be wider than the pill.
-            AnimatedSize(
-              duration: const Duration(milliseconds: 220),
-              curve: Easing.emphasizedDecelerate,
-              alignment: Alignment.topCenter,
-              child: isActive
-                  ? Padding(
-                      padding:
-                          const EdgeInsets.only(top: _NavMetrics.labelGap),
-                      child: Text(
-                        item.label,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        softWrap: false,
-                        style: TextStyle(
-                          fontSize: _NavMetrics.labelFontSize,
-                          height: _NavMetrics.labelLineHeight,
-                          fontWeight: FontWeight.w600,
-                          letterSpacing: 0.1,
-                          color: color,
-                        ),
-                      ),
-                    )
-                  : const SizedBox.shrink(),
+            // Every destination is labelled, not just the selected one.
+            // Showing the label only on the active item left one word floating
+            // under an otherwise empty band, so the row read as lopsided and
+            // the label looked like it had slipped out of the pill. Naming all
+            // of them costs nothing here — the bar is already tall enough for
+            // the line — and it is what makes the row scan as even.
+            const SizedBox(height: _NavMetrics.labelGap),
+            Text(
+              item.label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              softWrap: false,
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: _NavMetrics.labelFontSize,
+                height: _NavMetrics.labelLineHeight,
+                // Weight carries the selection, so the label does not change
+                // width when it is picked and the row never reflows.
+                fontWeight: isActive ? FontWeight.w600 : FontWeight.w500,
+                letterSpacing: 0.1,
+                color: color,
+              ),
             ),
           ],
         ),
