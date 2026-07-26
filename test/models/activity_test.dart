@@ -49,6 +49,25 @@ void main() {
       expect(activity.actorDetail, 'user-uuid');
     });
 
+    // The other half of the same rule. Plane relates the actor by primary key
+    // on some endpoints and expands it on others, so both fields may hold a
+    // UUID — and a raw identifier where a person's name belongs is worse than
+    // the "Someone" fallback.
+    test('does not pass a uuid off as a name', () {
+      final fromActor = Activity.fromJson({
+        'id': 'act-4',
+        'actor': '22b8e309-601e-4377-89ce-288936a5f337',
+      });
+      expect(fromActor.actorDetail, isNull);
+      expect(fromActor.formattedDescription, startsWith('Someone'));
+
+      final fromDetail = Activity.fromJson({
+        'id': 'act-5',
+        'actor_detail': '22b8e309-601e-4377-89ce-288936a5f337',
+      });
+      expect(fromDetail.actorDetail, isNull);
+    });
+
     test('handles empty JSON', () {
       final activity = Activity.fromJson(<String, dynamic>{});
       expect(activity.id, '');

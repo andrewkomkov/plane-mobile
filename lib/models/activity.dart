@@ -82,9 +82,8 @@ class Activity {
           detail['email'] as String?;
     }
     // actor_detail might be a string (name or ID)
-    if (detail is String && !RegExp(r'^[0-9a-f-]{36}$').hasMatch(detail)) {
-      return detail;
-    }
+    if (_nameOrNull(detail) != null) return _nameOrNull(detail);
+
     // Try actor field
     final actor = json['actor'];
     if (actor is Map) {
@@ -92,8 +91,29 @@ class Activity {
           actor['first_name'] as String? ??
           actor['email'] as String?;
     }
-    return null;
+    // A plain `actor` string gets the same treatment as a plain
+    // `actor_detail` one. It used to be ignored entirely, so a feed that
+    // named its actor there showed "Someone" for every entry. Both fields
+    // carry either a name or an id depending on the endpoint, which is why
+    // neither can simply be trusted — see [_nameOrNull].
+    return _nameOrNull(actor);
   }
+
+  /// A display name, or null if the value is an id rather than a name.
+  ///
+  /// Plane's serialisers relate the actor by primary key on some endpoints and
+  /// expand it on others, so both `actor` and `actor_detail` may hold a UUID.
+  /// Rendering one would put a raw identifier where a person's name belongs,
+  /// which is worse than the "Someone" fallback.
+  static String? _nameOrNull(dynamic value) {
+    if (value is! String || value.isEmpty) return null;
+    return _uuid.hasMatch(value) ? null : value;
+  }
+
+  static final RegExp _uuid = RegExp(
+    r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-'
+    r'[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$',
+  );
 
   static String formatFieldName(String field) {
     switch (field) {
