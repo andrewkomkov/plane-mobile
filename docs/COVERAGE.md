@@ -61,7 +61,7 @@ forbids it — which was not true of this document's first two versions.
 | Area | Has | Missing | Pri |
 |---|---|---|---|
 | Analytics | every figure is now server-computed — `advance-analytics/`, `advance-analytics-charts/`, `advance-analytics-stats/`, and `default-analytics/` for the overdue count. Five requests where the sweep took up to 45. A panel the server does not answer for is named as missing rather than drawn as a zero | the date-range and per-dimension filters Plane's own analytics page offers (assignee, label, cycle, estimate); `export-analytics/` | P3 |
-| Intake | `intake_service.dart` is correct and current | **no UI reaches it.** The "Inbox" tab is the notification feed, not this queue | P2 |
+| Intake | the triage queue has a screen: Open/Closed tabs, and the server's whole action set — accept, decline, snooze, un-snooze, mark duplicate. Reached from a badged app-bar action on the project screen, shown only where `intake_view` is on. Note the "Inbox" tab is the notification feed, not this queue | submitting *into* intake from the app (`POST intake-issues/`), deleting an entry, and the per-property filters Plane's own intake sidebar offers | P3 |
 | Search | on Plane's own `workspaces/{slug}/search/` through the proxy, so `GlobalSearchEndpoint` filters every entity on project membership — *verified* | `entity-search/` and the per-project `search-issues/` are not used | P3 |
 | Estimates | a work item's estimate point can be set | estimate *scales* cannot be created or managed | P3 |
 | Projects | list, detail, settings, members | **create** (deliberate), archive, join, leave | P3 |
