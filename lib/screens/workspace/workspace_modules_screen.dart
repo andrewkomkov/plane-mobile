@@ -2,11 +2,15 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../config/theme.dart';
+import '../../models/favorite.dart';
 import '../../models/module.dart';
 import '../../models/project.dart';
 import '../../models/workspace_rollup.dart';
+import '../../providers/favorites_provider.dart';
 import '../../services/project_service.dart';
 import '../../services/workspace_rollup_service.dart';
+import '../../widgets/favorite_toggle.dart';
+import '../../widgets/list_count_header.dart';
 import '../../widgets/loading_state.dart';
 import '../../widgets/m3e/app_bar.dart';
 import '../../widgets/plane_row.dart';
@@ -46,6 +50,9 @@ class _WorkspaceModulesScreenState
       _loading = true;
       _error = null;
     });
+    // Fired rather than awaited, like the cycle rollup: the rows render either
+    // way, they just start unstarred.
+    ref.read(favoritesProvider.notifier).load(widget.workspaceSlug);
     try {
       final results = await Future.wait([
         WorkspaceRollupService.getModules(widget.workspaceSlug),
@@ -74,11 +81,14 @@ class _WorkspaceModulesScreenState
   @override
   Widget build(BuildContext context) {
     final count = _visibleCount;
+    // Starred modules to the front, matching the project-level module list.
+    final ordered = ref
+        .watch(favoritesProvider)
+        .favoritesFirst(FavoriteEntity.module, _modules, (e) => e.item.id);
     return Scaffold(
       appBar: M3EAppBar(
         title: 'All modules',
-        subtitle:
-            _loading ? null : '$count ${count == 1 ? 'module' : 'modules'}',
+        subtitle: _loading ? null : ListCountHeader.label(count, 'module'),
       ),
       body: _loading
           ? const LoadingStateWidget()
@@ -88,7 +98,7 @@ class _WorkspaceModulesScreenState
               : RefreshIndicator(
                   onRefresh: _load,
                   child: ProjectGroupedList<Module>(
-                    items: _modules,
+                    items: ordered,
                     projects: _projects,
                     emptyState: const EmptyStateWidget(
                       message: 'No modules in this workspace',
@@ -136,6 +146,15 @@ class _WorkspaceModulesScreenState
         '$count issues done',
         if (dates.isNotEmpty) dates,
       ].join(', '),
+      // Present on the project-level module list and missing here, so the same
+      // module could be starred from one and not the other.
+      trailing: FavoriteToggle(
+        workspaceSlug: widget.workspaceSlug,
+        entity: FavoriteEntity.module,
+        entityId: module.id,
+        entityName: module.name,
+        projectId: project.id,
+      ),
       onTap: () => Navigator.push(
         context,
         MaterialPageRoute(

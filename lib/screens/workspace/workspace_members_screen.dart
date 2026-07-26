@@ -7,8 +7,10 @@ import '../../widgets/loading_state.dart';
 import '../../widgets/m3e/app_bar.dart';
 import '../../widgets/m3e/icon_button.dart';
 import '../../widgets/m3e/text_field.dart';
+import '../../widgets/m3e/chip.dart';
 import '../../widgets/member_row.dart';
 import '../../widgets/plane_row.dart';
+import '../../widgets/section_header.dart';
 
 /// Everyone in the workspace, plus the invitations that have been sent and not
 /// yet answered.
@@ -119,18 +121,23 @@ class _WorkspaceMembersScreenState extends State<WorkspaceMembersScreen> {
                 keyboardType: TextInputType.emailAddress,
               ),
               const SizedBox(height: 12),
-              // A row of chips rather than a dropdown, so every role is a
-              // named, tappable node for the accessibility tree.
-              Row(
+              // Chips rather than a dropdown, so every role is a named,
+              // tappable node for the accessibility tree.
+              //
+              // `M3EChip`, not `ChoiceChip`: `chipTheme` pins a `StadiumBorder`
+              // for both states, so a stock chip expresses selection as a fill
+              // tint and nothing else, while every other chip in the app also
+              // pulls its corner in. And a `Wrap`, not a `Row`: three roles at
+              // a large text scale overflowed a row inside a dialog.
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
                 children: [
                   for (final r in allowed)
-                    Padding(
-                      padding: const EdgeInsets.only(right: 8),
-                      child: ChoiceChip(
-                        label: Text(MemberRole.label(r)),
-                        selected: role == r,
-                        onSelected: (_) => setDialogState(() => role = r),
-                      ),
+                    M3EChip(
+                      label: MemberRole.label(r),
+                      selected: role == r,
+                      onTap: () => setDialogState(() => role = r),
                     ),
                 ],
               ),
@@ -303,7 +310,6 @@ class _WorkspaceMembersScreenState extends State<WorkspaceMembersScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     return Scaffold(
       appBar: M3EAppBar(
         title: 'Workspace members',
@@ -337,12 +343,12 @@ class _WorkspaceMembersScreenState extends State<WorkspaceMembersScreen> {
                             actions: _memberActions(m),
                           )),
                       if (_invitations.isNotEmpty) ...[
-                        Padding(
-                          padding: const EdgeInsets.fromLTRB(16, 24, 16, 8),
-                          child: Text(
-                            'Pending invitations (${_invitations.length})',
-                            style: theme.textTheme.titleMedium,
-                          ),
+                        // The shared header, with the count in its pill rather
+                        // than folded into the string. This screen was one of
+                        // eight that invented its own section heading.
+                        SectionHeader(
+                          label: 'Pending invitations',
+                          count: _invitations.length,
                         ),
                         ..._invitations.map(_invitationRow),
                       ],

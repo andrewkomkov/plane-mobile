@@ -2,17 +2,26 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:dio/dio.dart';
 import '../../config/secure_storage.dart';
+import '../../config/theme.dart';
 import '../../models/issue.dart';
 import '../../models/state.dart';
 import '../../utils/time_ago.dart';
 import '../../database/sync_service.dart';
 import '../issues/issue_detail_screen.dart';
+import '../../widgets/bottom_sheet_picker.dart';
+import '../../widgets/confirm_dialog.dart';
 import '../../widgets/loading_state.dart';
 import '../../widgets/skeleton_loader.dart';
 import '../../config/m3e/shapes.dart';
 import '../../widgets/m3e/flexible_app_bar.dart';
 import '../../widgets/m3e/icon_button.dart';
 import '../../widgets/issue_row.dart';
+
+/// The actions the overflow sheet offers for the whole list.
+enum _BulkAction { markAllRead, dismissAll }
+
+/// The actions the overflow sheet offers for one notification.
+enum _RowAction { toggleRead, dismiss }
 
 class InboxTab extends ConsumerStatefulWidget {
   final String workspaceSlug;
@@ -27,6 +36,13 @@ class _InboxTabState extends ConsumerState<InboxTab>
   List<Map<String, dynamic>> _notifications = [];
   bool _loading = true;
   bool _loaded = false;
+
+  /// Set only when the fetch failed *and* there is nothing to show.
+  ///
+  /// A failed fetch used to fall straight through to "No notifications", so
+  /// being offline and being caught up looked identical — the one pair of
+  /// states an inbox must never confuse.
+  String? _error;
 
   @override
   bool get wantKeepAlive => true;
@@ -90,15 +106,22 @@ class _InboxTabState extends ConsumerState<InboxTab>
           _notifications = items;
           _loading = false;
           _loaded = true;
+          _error = null;
         });
       }
       // Write to SQLite in background
       SyncService.writeInboxItems(widget.workspaceSlug, items);
-    } catch (e) {
+    } catch (_) {
       if (mounted) {
         setState(() {
           _loading = false;
           _loaded = true;
+          // Only when nothing arrived at all. A refresh that fails over rows
+          // already on screen keeps the rows — stale is better than empty, and
+          // the cached read above is exactly that case.
+          if (_notifications.isEmpty) {
+            _error = 'Could not reach the server';
+          }
         });
       }
     }
@@ -230,142 +253,101 @@ class _InboxTabState extends ConsumerState<InboxTab>
         .showSnackBar(SnackBar(content: Text(message)));
   }
 
-  /// The screen's one bottom-sheet treatment.
+  Future<void> _refresh() async {
+    _loaded = false;
+    await _load();
+  }
+
+  /// Actions for the whole list.
   ///
-  /// M3E shape and a drag handle, matching the More sheet in app_navbar. The
-  /// per-item menu and the bulk menu share it so one screen does not grow two
-  /// different sheets.
-  Future<void> _showSheet(List<Widget> children) {
-    return showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.transparent,
-      builder: (ctx) {
-        final scheme = Theme.of(ctx).colorScheme;
-        return Container(
-          decoration: BoxDecoration(
-            color: scheme.surfaceContainer,
-            borderRadius: const BorderRadius.vertical(
-              top: Radius.circular(M3EShape.extraLargeIncreased),
-            ),
-            border: Border(
-              top: BorderSide(color: scheme.outlineVariant, width: 0.5),
-            ),
-          ),
-          child: SafeArea(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const SizedBox(height: 12),
-                Container(
-                  width: 32,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: scheme.onSurfaceVariant.withValues(alpha: 0.3),
-                    borderRadius: BorderRadius.circular(M3EShape.full),
-                  ),
-                ),
-                const SizedBox(height: 12),
-                ...children,
-                const SizedBox(height: 8),
-              ],
-            ),
-          ),
-        );
-      },
-    );
-  }
-
-  void _showBulkOptions() {
+  /// Both this and the per-row menu are [BottomSheetPicker] now. What they
+  /// replace was a hand-rolled sheet that overrode the background to
+  /// transparent, rebuilt the surface itself, painted a *second* drag handle
+  /// under the one `bottomSheetTheme` already draws, and filled itself with
+  /// `ListTile` ink — the last interaction surface on this screen that
+  /// answered a press with a ripple instead of the app's spring.
+  Future<void> _showBulkOptions() async {
     final unread = _notifications.where((n) => n['read_at'] == null).length;
-    _showSheet([
-      ListTile(
-        leading: const Icon(Icons.mark_email_read_outlined, size: 20),
-        title: Text('Mark all as read',
-            style: Theme.of(context).textTheme.bodyMedium),
-        // The count is the whole reason to reach for this rather than tapping
-        // rows, so it belongs on the control.
-        subtitle: Text(unread == 0 ? 'Nothing unread' : '$unread unread',
-            style: Theme.of(context).textTheme.bodySmall),
-        enabled: unread > 0,
-        onTap: () {
-          Navigator.pop(context);
-          _markAllRead();
-        },
-      ),
-      ListTile(
-        leading: Icon(Icons.delete_sweep_outlined,
-            size: 20, color: Theme.of(context).colorScheme.error),
-        title: Text('Dismiss all',
-            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: Theme.of(context).colorScheme.error,
-                )),
-        subtitle: Text('${_notifications.length} in the list',
-            style: Theme.of(context).textTheme.bodySmall),
-        onTap: () async {
-          Navigator.pop(context);
-          if (await _confirmDismissAll()) _dismissAll();
-        },
-      ),
-    ]);
-  }
-
-  Future<bool> _confirmDismissAll() async {
-    final scheme = Theme.of(context).colorScheme;
-    final ok = await showDialog<bool>(
+    final picked = await BottomSheetPicker.show<_BulkAction>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Dismiss all notifications?'),
-        content: Text(
-          'This clears the whole list. Individual notifications can only be '
-          'brought back from the web app.',
-          style: Theme.of(ctx).textTheme.bodyMedium,
+      title: 'All notifications',
+      subtitle: '${_notifications.length} in the list',
+      items: [
+        // Offered only when it would do something. The disabled `ListTile` it
+        // replaces still looked like a control and still took a tap.
+        if (unread > 0)
+          BottomSheetPickerItem(
+            value: _BulkAction.markAllRead,
+            label: 'Mark all as read',
+            // The count is the whole reason to reach for this rather than
+            // tapping rows, so it belongs on the control.
+            subtitle: '$unread unread',
+            icon: Icons.mark_email_read_outlined,
+          ),
+        const BottomSheetPickerItem(
+          value: _BulkAction.dismissAll,
+          label: 'Dismiss all',
+          subtitle: 'Only the web app can bring them back',
+          icon: Icons.delete_sweep_outlined,
+          destructive: true,
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            style: TextButton.styleFrom(foregroundColor: scheme.error),
-            child: const Text('Dismiss all'),
-          ),
-        ],
-      ),
+      ],
     );
-    return ok ?? false;
+    if (picked == null || !mounted) return;
+
+    switch (picked) {
+      case _BulkAction.markAllRead:
+        await _markAllRead();
+      case _BulkAction.dismissAll:
+        final ok = await confirmDestructive(
+          context,
+          title: 'Dismiss all notifications?',
+          message: 'This clears the whole list. Individual notifications can '
+              'only be brought back from the web app.',
+          confirmLabel: 'Dismiss all',
+        );
+        if (ok) await _dismissAll();
+    }
   }
 
-  void _showNotificationOptions(Map<String, dynamic> n) {
+  Future<void> _showNotificationOptions(Map<String, dynamic> n) async {
     final notificationId = n['id'] as String? ?? '';
     final isRead = n['read_at'] != null;
-    _showSheet([
-      ListTile(
-        leading: Icon(
-            isRead
-                ? Icons.mark_email_unread_outlined
-                : Icons.mark_email_read_outlined,
-            size: 20),
-        title: Text(isRead ? 'Mark as unread' : 'Mark as read',
-            style: Theme.of(context).textTheme.bodyMedium),
-        onTap: () {
-          Navigator.pop(context);
-          if (isRead) {
-            _markUnread(notificationId);
-          } else {
-            _markRead(notificationId);
-          }
-        },
-      ),
-      ListTile(
-        leading: const Icon(Icons.delete_outline, size: 20),
-        title: Text('Dismiss', style: Theme.of(context).textTheme.bodyMedium),
-        onTap: () {
-          Navigator.pop(context);
-          _dismiss(notificationId);
-        },
-      ),
-    ]);
+    final title = (n['title'] ?? '') as String;
+
+    final picked = await BottomSheetPicker.show<_RowAction>(
+      context: context,
+      // Named, because the sheet can be opened from any of a screenful of
+      // identical-looking rows.
+      title: title.isEmpty ? 'Notification' : title,
+      items: [
+        BottomSheetPickerItem(
+          value: _RowAction.toggleRead,
+          label: isRead ? 'Mark as unread' : 'Mark as read',
+          icon: isRead
+              ? Icons.mark_email_unread_outlined
+              : Icons.mark_email_read_outlined,
+        ),
+        const BottomSheetPickerItem(
+          value: _RowAction.dismiss,
+          label: 'Dismiss',
+          icon: Icons.delete_outline,
+          destructive: true,
+        ),
+      ],
+    );
+    if (picked == null) return;
+
+    switch (picked) {
+      case _RowAction.toggleRead:
+        if (isRead) {
+          await _markUnread(notificationId);
+        } else {
+          await _markRead(notificationId);
+        }
+      case _RowAction.dismiss:
+        await _dismiss(notificationId);
+    }
   }
 
   String _buildActivityText(Map<String, dynamic> n) {
@@ -403,22 +385,26 @@ class _InboxTabState extends ConsumerState<InboxTab>
       body: _loading && _notifications.isEmpty
           ? const InboxSkeleton()
           : RefreshIndicator(
-              onRefresh: () async {
-                _loaded = false;
-                await _load();
-              },
+              onRefresh: _refresh,
               child: _notifications.isEmpty
-                  ? ListView(children: [
-                      SizedBox(
-                          height: MediaQuery.of(context).size.height * 0.3),
-                      const Center(
-                        child: EmptyStateWidget(
+                  ? (_error != null
+                      // Offline and caught up are different answers and now
+                      // look different. Retry is here as well as the pull,
+                      // because a failed inbox is the one screen where a user
+                      // has no rows to pull against.
+                      ? ScrollableCenter(
+                          padding: const EdgeInsets.only(bottom: 100),
+                          child: ErrorStateWidget(
+                            message: _error,
+                            onRetry: _refresh,
+                          ),
+                        )
+                      : const ScrollableEmptyState(
                           message: 'No notifications',
                           icon: Icons.inbox_outlined,
                           subtitle: 'Activity on your issues will appear here',
-                        ),
-                      ),
-                    ])
+                          padding: EdgeInsets.only(bottom: 100),
+                        ))
                   // Rows are separated by the gap between their cards now, the
                   // same as every other list; a divider on top of that drew a
                   // line through the middle of the gap.
@@ -469,16 +455,29 @@ class _InboxTabState extends ConsumerState<InboxTab>
                         return Dismissible(
                           key: ValueKey(notificationId),
                           direction: DismissDirection.endToStart,
+                          // Shaped and inset to match the card it is revealed
+                          // behind. A square, full-bleed block extended past
+                          // the row's 16dp margins and its large corner, so
+                          // the red rectangle stuck out on all three sides.
+                          // `errorContainer` with `onErrorContainer` on it is
+                          // the paired role; a hand-mixed 20% `error` with
+                          // full-strength `error` drawn on top is not.
                           background: Container(
                             alignment: Alignment.centerRight,
+                            margin: const EdgeInsets.symmetric(
+                                horizontal: 16, vertical: 2),
                             padding: const EdgeInsets.only(right: 20),
-                            color: Theme.of(context)
-                                .colorScheme
-                                .error
-                                .withValues(alpha: 0.20),
+                            decoration: BoxDecoration(
+                              color:
+                                  Theme.of(context).colorScheme.errorContainer,
+                              borderRadius:
+                                  BorderRadius.circular(M3EShape.large),
+                            ),
                             child: Icon(Icons.delete_outline,
-                                color: Theme.of(context).colorScheme.error,
-                                size: 22),
+                                color: Theme.of(context)
+                                    .colorScheme
+                                    .onErrorContainer,
+                                size: PlaneTheme.iconLarge),
                           ),
                           onDismissed: (_) => _dismiss(notificationId),
                           // Dismissing and marking read were reachable only by

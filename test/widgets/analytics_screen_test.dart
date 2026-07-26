@@ -225,4 +225,103 @@ void main() {
     expect(find.text('Failed to load analytics'), findsOneWidget);
     expect(find.text('No work items yet'), findsNothing);
   });
+
+  // ───────────────────────────────────────────────────────────────────────────
+  //  The provenance, held to after the screen was moved onto the shared
+  //  widgets.
+  //
+  //  Moving `_NoData` onto `EmptyStateWidget` is the change most likely to lose
+  //  this quietly: the obvious next step is to move `_Unavailable` there too,
+  //  and then a panel the server never answered for is drawn in the same words,
+  //  the same colour and the same glyph as a panel that answered "none". Those
+  //  are different facts and the whole screen exists to keep them apart.
+  // ───────────────────────────────────────────────────────────────────────────
+
+  testWidgets('an empty panel and a missing panel do not read the same',
+      (tester) async {
+    // Priority answered, with nothing in it. State never answered.
+    _serve(
+      charts: (query) => query['x_axis'] == 'PRIORITY' ? _chart({}) : 403,
+    );
+
+    await tester.pumpWidget(_app());
+    await tester.pumpAndSettle();
+
+    // Only the state breakdown is named as missing; the empty priority chart
+    // is not, because nothing went wrong with it.
+    expect(
+      find.textContaining('did not answer for the state breakdown'),
+      findsOneWidget,
+    );
+
+    await tester.drag(find.byType(ListView), const Offset(0, -400));
+    await tester.pumpAndSettle();
+
+    expect(find.text('No data'), findsOneWidget);
+    expect(
+      find.text('Unavailable — the server did not answer for this'),
+      findsOneWidget,
+    );
+    // The missing panel keeps the warning glyph the note at the top uses for
+    // the same meaning; the empty one has no glyph at all. The note itself has
+    // scrolled off by now, so this is the panel's own.
+    expect(find.byIcon(Icons.warning_amber_outlined), findsOneWidget);
+  });
+
+  testWidgets('a project row still announces every count it draws',
+      (tester) async {
+    // The row is a PlaneRow now, and PlaneRow hands its label to M3EPressable,
+    // which *replaces* the subtree's semantics — so anything the label does not
+    // say is not said at all.
+    final handle = tester.ensureSemantics();
+    _serve();
+
+    await tester.pumpWidget(_app());
+    await tester.pumpAndSettle();
+    await tester.drag(find.byType(ListView), const Offset(0, -900));
+    await tester.pumpAndSettle();
+
+    expect(
+      find.bySemanticsLabel(
+        'Alpha, 12 work items, 4 completed, 3 Backlog, 1 Unstarted, '
+        '4 Started, 4 Completed',
+      ),
+      findsOneWidget,
+    );
+    handle.dispose();
+  });
+
+  testWidgets('a missing project panel gets no count pill', (tester) async {
+    // The shared SectionHeader draws a count in a pill. Passing a zero there
+    // for a panel that never answered would restate, in the heading, exactly
+    // the lie the cards below it refuse to tell.
+    _serve(stats: (_) => 500);
+
+    await tester.pumpWidget(_app());
+    await tester.pumpAndSettle();
+    await tester.drag(find.byType(ListView), const Offset(0, -900));
+    await tester.pumpAndSettle();
+
+    expect(find.text('WORK ITEMS BY PROJECT'), findsOneWidget);
+    expect(find.text('0'), findsNothing);
+    expect(
+      find.text('Unavailable — the server did not answer for this'),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('a panel that answered with no projects is an empty state',
+      (tester) async {
+    _serve(stats: (_) => []);
+
+    await tester.pumpWidget(_app());
+    await tester.pumpAndSettle();
+    await tester.drag(find.byType(ListView), const Offset(0, -900));
+    await tester.pumpAndSettle();
+
+    expect(find.text('No projects with work items'), findsOneWidget);
+    expect(find.textContaining('Unavailable'), findsNothing);
+    // The heading's pill is honest here: the server said zero.
+    expect(find.textContaining('did not answer'), findsNothing);
+  });
 }

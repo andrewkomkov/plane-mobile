@@ -1,10 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../models/favorite.dart';
 import '../../models/workspace_rollup.dart';
+import '../../providers/favorites_provider.dart';
 import '../../services/workspace_rollup_service.dart';
 import '../../utils/api_error.dart';
 import '../../utils/time_ago.dart';
+import '../../widgets/confirm_dialog.dart';
+import '../../widgets/favorite_toggle.dart';
+import '../../widgets/list_count_header.dart';
 import '../../widgets/loading_state.dart';
 import '../../widgets/m3e/app_bar.dart';
 import '../../widgets/m3e/icon_button.dart';
@@ -47,6 +52,7 @@ class _WorkspaceViewsScreenState extends ConsumerState<WorkspaceViewsScreen> {
       _loading = true;
       _error = null;
     });
+    ref.read(favoritesProvider.notifier).load(widget.workspaceSlug);
     try {
       final views = await WorkspaceRollupService.getViews(widget.workspaceSlug);
       if (!mounted) return;
@@ -64,24 +70,17 @@ class _WorkspaceViewsScreenState extends ConsumerState<WorkspaceViewsScreen> {
   }
 
   Future<void> _delete(WorkspaceView view) async {
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Delete view'),
-        content: Text('Delete "${view.name}"?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Delete'),
-          ),
-        ],
-      ),
+    // The dialog this replaces styled "Delete" exactly like "Cancel" — same
+    // colour, same weight — for an irreversible action. `confirmDestructive` is
+    // the one shape, and it puts the destructive button in the error role.
+    final ok = await confirmDestructive(
+      context,
+      title: 'Delete view',
+      message: 'Delete "${view.name}"? The work items it lists are not '
+          'affected, but the saved filters are gone.',
+      confirmLabel: 'Delete',
     );
-    if (ok != true) return;
+    if (!ok) return;
 
     try {
       await WorkspaceRollupService.deleteView(widget.workspaceSlug, view.id);
@@ -107,7 +106,7 @@ class _WorkspaceViewsScreenState extends ConsumerState<WorkspaceViewsScreen> {
     return Scaffold(
       appBar: M3EAppBar(
         title: 'Workspace views',
-        subtitle: _loading ? null : '$count ${count == 1 ? 'view' : 'views'}',
+        subtitle: _loading ? null : ListCountHeader.label(count, 'view'),
       ),
       body: _loading
           ? const LoadingStateWidget()
@@ -120,22 +119,28 @@ class _WorkspaceViewsScreenState extends ConsumerState<WorkspaceViewsScreen> {
 
   Widget _list() {
     if (_views.isEmpty) {
-      return ListView(children: [
-        SizedBox(height: MediaQuery.of(context).size.height * 0.25),
-        const Center(
-          child: EmptyStateWidget(
-            message: 'No workspace views',
-            icon: Icons.view_list_outlined,
-            subtitle: 'Views saved across all projects appear here',
-          ),
-        ),
-      ]);
+      // The magic `MediaQuery.height * 0.25` spacer is gone; the shared helper
+      // says what it was actually for, which is giving the list enough height
+      // to be pulled.
+      return const ScrollableEmptyState(
+        message: 'No workspace views',
+        icon: Icons.view_list_outlined,
+        subtitle: 'Views saved across all projects appear here',
+      );
     }
 
+    // Starred views to the front, as the project-level views list does.
+    final ordered = ref
+        .watch(favoritesProvider)
+        .favoritesFirst(FavoriteEntity.view, _views, (v) => v.id);
+
     return ListView.builder(
+      // A short list still has to be draggable, or pull to refresh does
+      // nothing on a workspace with two saved views.
+      physics: const AlwaysScrollableScrollPhysics(),
       padding: const EdgeInsets.only(bottom: 20),
-      itemCount: _views.length,
-      itemBuilder: (ctx, i) => _viewRow(_views[i]),
+      itemCount: ordered.length,
+      itemBuilder: (ctx, i) => _viewRow(ordered[i]),
     );
   }
 
@@ -167,13 +172,28 @@ class _WorkspaceViewsScreenState extends ConsumerState<WorkspaceViewsScreen> {
             text: '$filterCount',
           ),
       ],
-      // Named per view so repeated rows stay distinguishable to external
-      // automation, and in `trailing` so it keeps a semantics node of its own.
-      trailing: M3EIconButton(
-        icon: Icons.delete_outline,
-        tooltip: 'Delete view ${view.name}',
-        size: M3EIconButtonSize.small,
-        onPressed: () => _delete(view),
+      // Both named per view so repeated rows stay distinguishable to external
+      // automation, and both in `trailing`, the one slot outside the row's own
+      // semantics node — inside it they would be swallowed by the row's label.
+      trailing: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          FavoriteToggle(
+            workspaceSlug: widget.workspaceSlug,
+            entity: FavoriteEntity.view,
+            entityId: view.id,
+            entityName: view.name,
+            // No `projectId`: a workspace view is precisely the view that has
+            // no project, which is how the list finds them
+            // (`project__isnull=True`). The favourites row takes a null project.
+          ),
+          M3EIconButton(
+            icon: Icons.delete_outline,
+            tooltip: 'Delete view ${view.name}',
+            size: M3EIconButtonSize.small,
+            onPressed: () => _delete(view),
+          ),
+        ],
       ),
       onTap: () => Navigator.push(
         context,

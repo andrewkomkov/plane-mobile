@@ -3,10 +3,14 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../config/theme.dart';
 import '../../models/cycle.dart';
+import '../../models/favorite.dart';
 import '../../models/project.dart';
 import '../../models/workspace_rollup.dart';
+import '../../providers/favorites_provider.dart';
 import '../../services/project_service.dart';
 import '../../services/workspace_rollup_service.dart';
+import '../../widgets/favorite_toggle.dart';
+import '../../widgets/list_count_header.dart';
 import '../../widgets/loading_state.dart';
 import '../../widgets/m3e/app_bar.dart';
 import '../../widgets/plane_row.dart';
@@ -46,6 +50,10 @@ class _WorkspaceCyclesScreenState extends ConsumerState<WorkspaceCyclesScreen> {
       _loading = true;
       _error = null;
     });
+    // One request for the whole workspace, shared by every list that draws a
+    // star. Fired rather than awaited: the rows render either way, they just
+    // start unstarred.
+    ref.read(favoritesProvider.notifier).load(widget.workspaceSlug);
     try {
       final results = await Future.wait([
         WorkspaceRollupService.getCycles(widget.workspaceSlug),
@@ -76,10 +84,19 @@ class _WorkspaceCyclesScreenState extends ConsumerState<WorkspaceCyclesScreen> {
   @override
   Widget build(BuildContext context) {
     final count = _visibleCount;
+    // The project-level cycle list lifts its starred cycles to the front and
+    // this one did not, so the same cycle sat in a different place depending on
+    // which list you opened it from. Ordering the flat list before it is
+    // grouped keeps the lift inside each project's run of rows.
+    final ordered = ref
+        .watch(favoritesProvider)
+        .favoritesFirst(FavoriteEntity.cycle, _cycles, (e) => e.item.id);
     return Scaffold(
       appBar: M3EAppBar(
         title: 'All cycles',
-        subtitle: _loading ? null : '$count ${count == 1 ? 'cycle' : 'cycles'}',
+        // The same sentence the project lists put in a body header, so the two
+        // renderings of one count at least agree on the words.
+        subtitle: _loading ? null : ListCountHeader.label(count, 'cycle'),
       ),
       body: _loading
           ? const LoadingStateWidget()
@@ -89,7 +106,7 @@ class _WorkspaceCyclesScreenState extends ConsumerState<WorkspaceCyclesScreen> {
               : RefreshIndicator(
                   onRefresh: _load,
                   child: ProjectGroupedList<Cycle>(
-                    items: _cycles,
+                    items: ordered,
                     projects: _projects,
                     emptyState: const EmptyStateWidget(
                       message: 'No cycles in this workspace',
@@ -130,6 +147,17 @@ class _WorkspaceCyclesScreenState extends ConsumerState<WorkspaceCyclesScreen> {
         '$count issues done',
         if (dates.isNotEmpty) dates,
       ].join(', '),
+      // The four project-level lists all carry the star and the three workspace
+      // rollups did not, so a cycle could be starred from one list and not from
+      // the other. `trailing` is the only slot outside the row's own semantics
+      // node, which is what lets the star keep a name of its own.
+      trailing: FavoriteToggle(
+        workspaceSlug: widget.workspaceSlug,
+        entity: FavoriteEntity.cycle,
+        entityId: cycle.id,
+        entityName: cycle.name,
+        projectId: project.id,
+      ),
       onTap: () => Navigator.push(
         context,
         MaterialPageRoute(

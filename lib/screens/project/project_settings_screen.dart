@@ -19,8 +19,13 @@ import '../../services/member_service.dart';
 import '../../services/workspace_service.dart';
 import '../../services/integration_service.dart';
 import '../../utils/api_error.dart';
+import '../../widgets/bottom_sheet_picker.dart';
+import '../../widgets/confirm_dialog.dart';
 import '../../widgets/loading_state.dart';
+import '../../widgets/m3e/chip.dart';
 import '../../widgets/member_row.dart';
+import '../../widgets/plane_row.dart';
+import '../../widgets/section_header.dart';
 
 class ProjectSettingsScreen extends ConsumerStatefulWidget {
   final String workspaceSlug;
@@ -197,44 +202,23 @@ class _ProjectSettingsScreenState extends ConsumerState<ProjectSettingsScreen> {
       return;
     }
 
-    final chosen = await showModalBottomSheet<Membership>(
+    // The shared picker, not a fourth hand-rolled sheet: same header role as
+    // the role picker this flow opens next, same press physics as the rest of
+    // the app, and every row names itself for `tool/adb_drive.py`.
+    final chosen = await BottomSheetPicker.show<Membership>(
       context: context,
-      isScrollControlled: true,
-      builder: (ctx) {
-        final theme = Theme.of(ctx);
-        return SafeArea(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Padding(
-                padding: const EdgeInsets.all(16),
-                child: Text('Add a workspace member',
-                    style: theme.textTheme.titleMedium),
-              ),
-              Flexible(
-                child: ListView.builder(
-                  shrinkWrap: true,
-                  itemCount: candidates.length,
-                  itemBuilder: (_, i) {
-                    final c = candidates[i];
-                    return ListTile(
-                      title: Text(c.member.label,
-                          style: theme.textTheme.bodyLarge),
-                      subtitle: Text(
-                        c.member.email.isEmpty
-                            ? '${MemberRole.label(c.role)} in this workspace'
-                            : c.member.email,
-                        style: theme.textTheme.bodySmall,
-                      ),
-                      onTap: () => Navigator.pop(ctx, c),
-                    );
-                  },
-                ),
-              ),
-            ],
+      title: 'Add a workspace member',
+      subtitle: '${candidates.length} not in this project yet',
+      items: [
+        for (final c in candidates)
+          BottomSheetPickerItem<Membership>(
+            value: c,
+            label: c.member.label,
+            subtitle: c.member.email.isEmpty
+                ? '${MemberRole.label(c.role)} in this workspace'
+                : c.member.email,
           ),
-        );
-      },
+      ],
     );
     if (chosen == null || !mounted) return;
 
@@ -444,22 +428,15 @@ class _ProjectSettingsScreenState extends ConsumerState<ProjectSettingsScreen> {
   }
 
   Future<void> _deleteState(IssueState state) async {
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Delete State'),
-        content: Text('Delete "${state.name}"?'),
-        actions: [
-          TextButton(
-              onPressed: () => Navigator.pop(ctx, false),
-              child: const Text('Cancel')),
-          TextButton(
-              onPressed: () => Navigator.pop(ctx, true),
-              child: const Text('Delete')),
-        ],
-      ),
+    // Was an `AlertDialog` whose "Delete" was styled exactly like its "Cancel".
+    final ok = await confirmDestructive(
+      context,
+      title: 'Delete state',
+      message: 'Delete "${state.name}"? Work items in it move to the '
+          'project\'s default state.',
+      confirmLabel: 'Delete',
     );
-    if (ok == true) {
+    if (ok) {
       try {
         await IssueService.deleteState(
             widget.workspaceSlug, widget.project.id, state.id);
@@ -578,22 +555,14 @@ class _ProjectSettingsScreenState extends ConsumerState<ProjectSettingsScreen> {
   }
 
   Future<void> _deleteLabel(Label label) async {
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Delete Label'),
-        content: Text('Delete "${label.name}"?'),
-        actions: [
-          TextButton(
-              onPressed: () => Navigator.pop(ctx, false),
-              child: const Text('Cancel')),
-          TextButton(
-              onPressed: () => Navigator.pop(ctx, true),
-              child: const Text('Delete')),
-        ],
-      ),
+    final ok = await confirmDestructive(
+      context,
+      title: 'Delete label',
+      message: 'Delete "${label.name}"? It is removed from every work item '
+          'carrying it.',
+      confirmLabel: 'Delete',
     );
-    if (ok == true) {
+    if (ok) {
       try {
         await LabelService.deleteLabel(
             widget.workspaceSlug, widget.project.id, label.id);
@@ -625,7 +594,13 @@ class _ProjectSettingsScreenState extends ConsumerState<ProjectSettingsScreen> {
   Color _parseColor(String hex) {
     var h = hex.replaceFirst('#', '');
     if (h.length == 6) h = 'FF$h';
-    return Color(int.tryParse(h, radix: 16) ?? 0xFF999999);
+    final parsed = int.tryParse(h, radix: 16);
+    // A hex the server sent that will not parse is not a colour. `outline` is
+    // this app's neutral for exactly that, rather than a literal grey that
+    // belongs to neither theme.
+    return parsed == null
+        ? Theme.of(context).colorScheme.outline
+        : Color(parsed);
   }
 
   @override
@@ -640,12 +615,10 @@ class _ProjectSettingsScreenState extends ConsumerState<ProjectSettingsScreen> {
           // carries its own margin — nesting it inside a padded list would
           // indent the cards twice as far as everything above them.
           : ListView(
-              padding: const EdgeInsets.symmetric(vertical: 16),
+              padding: const EdgeInsets.only(bottom: 16),
               children: [
+                const SectionHeader(label: 'General'),
                 _inset([
-                  // General section
-                  _sectionHeader('General', theme),
-                  const SizedBox(height: 12),
                   M3ETextField(
                     label: 'Project name',
                     controller: _nameController,
@@ -678,22 +651,29 @@ class _ProjectSettingsScreenState extends ConsumerState<ProjectSettingsScreen> {
                     ),
                   ),
                   const SizedBox(height: 12),
-                  Row(
+                  // `M3EChip`, not `ChoiceChip`: `chipTheme` pins a
+                  // `StadiumBorder` for both states, so a stock chip carries
+                  // selection in a fill tint alone. Every other chip in the app
+                  // also pulls its corner in, which is the whole reason
+                  // `M3EChip` exists. `Wrap` so two chips and a label do not
+                  // overflow at a large text scale.
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    crossAxisAlignment: WrapCrossAlignment.center,
                     children: [
-                      Text('Network: ',
+                      Text('Network',
                           style: theme.textTheme.bodyMedium?.copyWith(
                               color: theme.colorScheme.onSurfaceVariant)),
-                      const SizedBox(width: 8),
-                      ChoiceChip(
-                        label: const Text('Secret'),
+                      M3EChip(
+                        label: 'Secret',
                         selected: _network == 0,
-                        onSelected: (_) => setState(() => _network = 0),
+                        onTap: () => setState(() => _network = 0),
                       ),
-                      const SizedBox(width: 8),
-                      ChoiceChip(
-                        label: const Text('Public'),
+                      M3EChip(
+                        label: 'Public',
                         selected: _network == 2,
-                        onSelected: (_) => setState(() => _network = 2),
+                        onTap: () => setState(() => _network = 2),
                       ),
                     ],
                   ),
@@ -709,24 +689,18 @@ class _ProjectSettingsScreenState extends ConsumerState<ProjectSettingsScreen> {
                   ),
                 ]),
 
-                // Members section
-                const SizedBox(height: 28),
-                _inset([
-                  Row(
-                    children: [
-                      _sectionHeader('Members (${_members.length})', theme),
-                      const Spacer(),
-                      if (_permissions.canAddProjectMembers)
-                        M3EIconButton(
+                _headerRow(
+                  label: 'Members',
+                  count: _members.length,
+                  action: !_permissions.canAddProjectMembers
+                      ? null
+                      : M3EIconButton(
                           icon: Icons.person_add_alt,
                           tooltip: 'Add member',
                           size: M3EIconButtonSize.small,
                           onPressed: _addMember,
                         ),
-                    ],
-                  ),
-                ]),
-                const SizedBox(height: 8),
+                ),
                 ..._members.map((m) => MemberRow(
                       member: m.member,
                       role: m.role,
@@ -734,58 +708,48 @@ class _ProjectSettingsScreenState extends ConsumerState<ProjectSettingsScreen> {
                       actions: _memberActions(m),
                     )),
 
-                _inset([
-                  // States section
-                  const SizedBox(height: 28),
-                  Row(
-                    children: [
-                      _sectionHeader('States (${_states.length})', theme),
-                      const Spacer(),
-                      M3EIconButton(
-                        icon: Icons.add,
-                        tooltip: 'Add state',
-                        size: M3EIconButtonSize.small,
-                        onPressed: _addState,
-                      ),
-                    ],
+                _headerRow(
+                  label: 'States',
+                  count: _states.length,
+                  action: M3EIconButton(
+                    icon: Icons.add,
+                    tooltip: 'Add state',
+                    size: M3EIconButtonSize.small,
+                    onPressed: _addState,
                   ),
-                  const SizedBox(height: 8),
-                  ..._states.map((s) => ListTile(
-                        contentPadding: EdgeInsets.zero,
-                        leading: Icon(
-                          PlaneTheme.stateIcon(s.group),
-                          color: PlaneTheme.stateGroupColor(context, s.group),
-                          size: 20,
-                        ),
-                        title: Text(s.name, style: theme.textTheme.bodyMedium),
-                        subtitle:
-                            Text(s.group, style: theme.textTheme.bodySmall),
-                        // Named per state so repeated rows stay distinguishable
-                        // to external automation.
-                        trailing: M3EIconButton(
-                          icon: Icons.delete_outline,
-                          tooltip: 'Delete state ${s.name}',
-                          size: M3EIconButtonSize.small,
-                          color: theme.colorScheme.onSurfaceVariant,
-                          onPressed: () => _deleteState(s),
-                        ),
-                      )),
+                ),
+                // A state is a thing in a list, so it is a [PlaneRow] like the
+                // member rows above it rather than a stock `ListTile` with ink
+                // where the app has a spring.
+                ..._states.map((s) => PlaneRow(
+                      icon: PlaneTheme.stateIcon(s.group),
+                      iconColor: PlaneTheme.stateGroupColor(context, s.group),
+                      title: s.name,
+                      subtitle: s.group,
+                      semanticLabel: '${s.name}, ${s.group} state',
+                      // Named per state so repeated rows stay distinguishable
+                      // to external automation, and in `trailing`, the one slot
+                      // outside the row's own semantics node.
+                      trailing: M3EIconButton(
+                        icon: Icons.delete_outline,
+                        tooltip: 'Delete state ${s.name}',
+                        size: M3EIconButtonSize.small,
+                        color: theme.colorScheme.onSurfaceVariant,
+                        onPressed: () => _deleteState(s),
+                      ),
+                    )),
 
-                  // Labels section
-                  const SizedBox(height: 28),
-                  Row(
-                    children: [
-                      _sectionHeader('Labels (${_labels.length})', theme),
-                      const Spacer(),
-                      M3EIconButton(
-                        icon: Icons.add,
-                        tooltip: 'Add label',
-                        size: M3EIconButtonSize.small,
-                        onPressed: _addLabel,
-                      ),
-                    ],
+                _headerRow(
+                  label: 'Labels',
+                  count: _labels.length,
+                  action: M3EIconButton(
+                    icon: Icons.add,
+                    tooltip: 'Add label',
+                    size: M3EIconButtonSize.small,
+                    onPressed: _addLabel,
                   ),
-                  const SizedBox(height: 8),
+                ),
+                _inset([
                   Wrap(
                     spacing: 8,
                     runSpacing: 8,
@@ -812,59 +776,42 @@ class _ProjectSettingsScreenState extends ConsumerState<ProjectSettingsScreen> {
                       );
                     }).toList(),
                   ),
-
-                  // Integrations section
-                  const SizedBox(height: 28),
-                  _sectionHeader('Integrations', theme),
-                  const SizedBox(height: 8),
-                  if (_githubRepos.isEmpty)
-                    Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 8),
-                      child: Row(
-                        children: [
-                          Icon(Icons.info_outline,
-                              size: 16,
-                              color: theme.colorScheme.onSurfaceVariant),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: Text(
-                              'Set up integrations in the web app',
-                              style: theme.textTheme.bodySmall,
-                            ),
-                          ),
-                        ],
-                      ),
-                    )
-                  else
-                    ..._githubRepos.map((repo) {
-                      final name = repo['repo_detail']?['name'] ??
-                          repo['name'] ??
-                          'Unknown repo';
-                      final owner =
-                          repo['repo_detail']?['owner'] ?? repo['owner'] ?? '';
-                      return ListTile(
-                        contentPadding: EdgeInsets.zero,
-                        leading: const Icon(Icons.code, size: 20),
-                        title: Text(name.toString(),
-                            style: theme.textTheme.bodyMedium),
-                        subtitle: owner.toString().isNotEmpty
-                            ? Text(owner.toString(),
-                                style: theme.textTheme.bodySmall)
-                            : null,
-                      );
-                    }),
-
-                  // Features section
-                  const SizedBox(height: 28),
-                  _sectionHeader('Features', theme),
-                  const SizedBox(height: 8),
-                  _featureRow('Cycles', true, theme),
-                  _featureRow('Modules', true, theme),
-                  _featureRow('Views', true, theme),
-                  _featureRow('Pages', true, theme),
-
-                  const SizedBox(height: 40),
                 ]),
+
+                const SectionHeader(label: 'Integrations'),
+                if (_githubRepos.isEmpty)
+                  const EmptyStateWidget(
+                    message: 'No integrations',
+                    icon: Icons.extension_outlined,
+                    subtitle: 'Set them up in the web app',
+                  )
+                else
+                  ..._githubRepos.map((repo) {
+                    final name = repo['repo_detail']?['name'] ??
+                        repo['name'] ??
+                        'Unknown repo';
+                    final owner =
+                        repo['repo_detail']?['owner'] ?? repo['owner'] ?? '';
+                    return PlaneRow(
+                      icon: Icons.code,
+                      title: name.toString(),
+                      subtitle:
+                          owner.toString().isEmpty ? null : owner.toString(),
+                      semanticLabel: owner.toString().isEmpty
+                          ? '$name repository'
+                          : '$name repository, owned by $owner',
+                    );
+                  }),
+
+                // The "Features" section is gone rather than fixed. It drew a
+                // green check and the word "Enabled" beside Cycles, Modules,
+                // Views and Pages from a hardcoded `true` — `Project` carries
+                // no such field, so the `false` branch was unreachable and the
+                // section reported the same four answers for every project in
+                // every workspace. Reading the real flags needs them on the
+                // model first; until then, saying nothing beats saying
+                // something false. See the report.
+                const SizedBox(height: 40),
               ],
             ),
     );
@@ -880,27 +827,22 @@ class _ProjectSettingsScreenState extends ConsumerState<ProjectSettingsScreen> {
         ),
       );
 
-  Widget _sectionHeader(String title, ThemeData theme) {
-    return Text(title, style: theme.textTheme.titleMedium);
-  }
-
-  Widget _featureRow(String name, bool enabled, ThemeData theme) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
-      child: Row(
+  /// [SectionHeader] with the section's own control beside it.
+  ///
+  /// The four headings on this screen were plain `Text(titleMedium)` with the
+  /// count folded into the string, which is a fifth rendering of a concept the
+  /// app already has one widget for. [SectionHeader] carries its own inset, so
+  /// this sits outside [_inset].
+  Widget _headerRow({
+    required String label,
+    int? count,
+    Widget? action,
+  }) =>
+      Row(
         children: [
-          Icon(
-            enabled ? Icons.check_circle : Icons.cancel,
-            size: 18,
-            color: enabled ? PlaneTheme.completed : PlaneTheme.cancelled,
-          ),
-          const SizedBox(width: 10),
-          Text(name, style: theme.textTheme.bodyMedium),
-          const Spacer(),
-          Text(enabled ? 'Enabled' : 'Disabled',
-              style: theme.textTheme.bodySmall),
+          Expanded(child: SectionHeader(label: label, count: count)),
+          if (action != null)
+            Padding(padding: const EdgeInsets.only(right: 8), child: action),
         ],
-      ),
-    );
-  }
+      );
 }

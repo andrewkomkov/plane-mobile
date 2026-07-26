@@ -1,13 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../config/m3e/motion.dart';
 import '../../config/m3e/shapes.dart';
-import '../../config/m3e/typography.dart';
 import '../../config/theme.dart';
 import '../../models/analytics.dart';
 import '../../services/analytics_service.dart';
 import '../../widgets/loading_state.dart';
 import '../../widgets/m3e/app_bar.dart';
+import '../../widgets/plane_row.dart';
+import '../../widgets/section_header.dart';
 
 /// Workspace analytics.
 ///
@@ -90,60 +92,56 @@ class _AnalyticsScreenState extends ConsumerState<AnalyticsScreen> {
 
     if (data.isEmpty) {
       // Pull-to-refresh has to work with nothing on screen too, so the empty
-      // state sits inside a scrollable that is always drag-able.
+      // state sits inside a scrollable that is always drag-able. The shared
+      // helper is that scrollable; the screens that hand-rolled it padded a
+      // ListView with a fraction of the viewport height instead, and picked
+      // three different fractions between them.
       return RefreshIndicator(
         onRefresh: _load,
-        child: LayoutBuilder(
-          builder: (context, constraints) => SingleChildScrollView(
-            physics: const AlwaysScrollableScrollPhysics(),
-            child: SizedBox(
-              height: constraints.maxHeight,
-              child: const EmptyStateWidget(
-                message: 'No work items yet',
-                icon: Icons.insights_outlined,
-                subtitle: 'Analytics appear once this workspace has issues',
-              ),
-            ),
-          ),
+        child: const ScrollableEmptyState(
+          message: 'No work items yet',
+          icon: Icons.insights_outlined,
+          subtitle: 'Analytics appear once this workspace has issues',
         ),
       );
     }
 
-    final theme = Theme.of(context);
     final projects = [...?data.projects]
       ..sort((a, b) => b.total.compareTo(a.total));
 
     return RefreshIndicator(
       onRefresh: _load,
       child: ListView(
-        padding: const EdgeInsets.all(20),
+        // [SectionHeader] and [PlaneRow] both carry their own inset, so the
+        // page margin is applied per block rather than to the whole list.
+        padding: const EdgeInsets.symmetric(vertical: 20),
         children: [
-          _ProvenanceNote(data: data),
+          _inset(_ProvenanceNote(data: data)),
           const SizedBox(height: 16),
-          _buildOverviewCards(data, theme),
-          const SizedBox(height: 24),
-          _buildSectionTitle('Work items by priority', theme),
-          const SizedBox(height: 12),
-          _ChartBars(
+          _inset(_buildOverviewCards(context, data)),
+          const SectionHeader(label: 'Work items by priority'),
+          _inset(_ChartBars(
             counts: data.byPriority,
             order: kPriorities,
             colorOf: (key) => PlaneTheme.priorityColor(context, key),
-          ),
-          const SizedBox(height: 24),
-          _buildSectionTitle('Work items by state', theme),
-          const SizedBox(height: 12),
-          _ChartBars(
+          )),
+          const SectionHeader(label: 'Work items by state'),
+          _inset(_ChartBars(
             counts: data.byStateGroup,
             order: kStateGroups,
             colorOf: (key) => PlaneTheme.stateGroupColor(context, key),
+          )),
+          SectionHeader(
+            label: 'Work items by project',
+            // No pill when the panel is missing: a zero there would read as
+            // "no projects", which is the one thing this screen must not say
+            // about a request that never answered.
+            count: data.projects?.length,
           ),
-          const SizedBox(height: 24),
-          _buildSectionTitle('Work items by project', theme),
-          const SizedBox(height: 12),
           if (data.projects == null)
-            const _Unavailable()
+            _inset(const _Unavailable())
           else if (projects.isEmpty)
-            const _NoData()
+            const EmptyStateWidget(message: 'No projects with work items')
           else
             ...projects.map((p) => _ProjectRow(project: p)),
           const SizedBox(height: 40),
@@ -152,14 +150,24 @@ class _AnalyticsScreenState extends ConsumerState<AnalyticsScreen> {
     );
   }
 
-  Widget _buildOverviewCards(WorkspaceAnalytics data, ThemeData theme) {
+  /// The page margin, for the blocks that are not full-bleed rows or headers.
+  Widget _inset(Widget child) => Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20), child: child);
+
+  Widget _buildOverviewCards(BuildContext context, WorkspaceAnalytics data) {
+    final theme = Theme.of(context);
     return GridView.count(
       crossAxisCount: 2,
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
       mainAxisSpacing: 12,
       crossAxisSpacing: 12,
-      childAspectRatio: 1.6,
+      // A grid cell's height comes from its width and this ratio, so it does
+      // not grow with the type inside it. Three stacked lines of text at a
+      // large accessibility scale overflow a fixed-height cell; letting the
+      // ratio fall as the scale rises gives them the room instead.
+      childAspectRatio:
+          1.6 / MediaQuery.textScalerOf(context).scale(1).clamp(1.0, 2.0),
       children: [
         _StatCard(
           label: 'Total work items',
@@ -185,10 +193,6 @@ class _AnalyticsScreenState extends ConsumerState<AnalyticsScreen> {
         ),
       ],
     );
-  }
-
-  Widget _buildSectionTitle(String title, ThemeData theme) {
-    return Text(title, style: theme.textTheme.titleMedium);
   }
 }
 
@@ -300,6 +304,13 @@ class _ChartBars extends StatelessWidget {
     final counts = this.counts;
     if (counts == null) return const _Unavailable();
 
+    // The two text columns hold the bars in line with each other across rows,
+    // so they cannot size to their own text — but at a fixed 80 and 44 they
+    // clipped the label and the count from a text scale of about 1.3 upward.
+    // Scaling the box by the same factor as the type inside it keeps the
+    // alignment and stops the clipping.
+    final scaler = MediaQuery.textScalerOf(context);
+
     // Fixed order first, then anything the server invented that this build does
     // not know about, so a new state group shows up rather than disappearing.
     final keys = <String>[
@@ -307,7 +318,9 @@ class _ChartBars extends StatelessWidget {
       ...counts.keys.where((k) => !order.contains(k) && counts[k]! > 0),
     ];
 
-    if (keys.isEmpty) return const _NoData();
+    // The server answered and the answer was nothing, which is the shared
+    // empty state and not a failure. The failure is `_Unavailable` above.
+    if (keys.isEmpty) return const EmptyStateWidget(message: 'No data');
 
     final maxValue =
         keys.map((k) => counts[k]!).reduce((a, b) => a > b ? a : b);
@@ -328,7 +341,7 @@ class _ChartBars extends StatelessWidget {
             child: Row(
               children: [
                 SizedBox(
-                  width: 80,
+                  width: scaler.scale(80),
                   child: Text(
                     _titleCase(key),
                     maxLines: 1,
@@ -339,16 +352,30 @@ class _ChartBars extends StatelessWidget {
                 ),
                 Expanded(
                   child: LayoutBuilder(
-                    builder: (ctx, constraints) => Container(
+                    builder: (ctx, constraints) => SizedBox(
                       height: 24,
-                      alignment: Alignment.centerLeft,
-                      child: AnimatedContainer(
-                        duration: const Duration(milliseconds: 300),
-                        width: constraints.maxWidth * ratio,
-                        height: 24,
-                        decoration: BoxDecoration(
-                          color: colorOf(key),
-                          borderRadius: BorderRadius.circular(M3EShape.small),
+                      child: Align(
+                        alignment: Alignment.centerLeft,
+                        // Width is a spatial property, so it takes a spatial
+                        // spring and is allowed to overshoot. What this
+                        // replaces was an AnimatedContainer running on its
+                        // default curve, which is `Curves.linear` — a bar that
+                        // starts and stops dead.
+                        child: M3ESpringBuilder(
+                          value: ratio,
+                          spring: M3EMotion.defaultSpatial,
+                          child: DecoratedBox(
+                            decoration: BoxDecoration(
+                              color: colorOf(key),
+                              borderRadius:
+                                  BorderRadius.circular(M3EShape.small),
+                            ),
+                          ),
+                          builder: (context, width, child) => SizedBox(
+                            width: constraints.maxWidth * width.clamp(0.0, 1.0),
+                            height: 24,
+                            child: child,
+                          ),
                         ),
                       ),
                     ),
@@ -356,11 +383,13 @@ class _ChartBars extends StatelessWidget {
                 ),
                 const SizedBox(width: 8),
                 SizedBox(
-                  width: 44,
-                  // The count is the one thing that must read louder than the
-                  // category beside it, so it takes the emphasized cut.
-                  child: Text('$value',
-                      style: M3EType.emphasized(theme.textTheme.titleSmall!)),
+                  width: scaler.scale(44),
+                  // Plain rather than emphasized: the category beside it is
+                  // already the quieter `onSurfaceVariant`, so the count reads
+                  // louder without spending the screen's emphasis on it. The
+                  // four figures in the overview cards are what the emphasis is
+                  // for, and there is one of those per screen, not one per bar.
+                  child: Text('$value', style: theme.textTheme.titleSmall),
                 ),
               ],
             ),
@@ -371,42 +400,50 @@ class _ChartBars extends StatelessWidget {
   }
 }
 
-/// The server answered, and the answer was nothing.
-class _NoData extends StatelessWidget {
-  const _NoData();
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Text(
-      'No data',
-      style: theme.textTheme.bodyMedium
-          ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
-    );
-  }
-}
-
-/// The server did not answer. Deliberately worded so it cannot be read as a
-/// count of zero, and coloured with the warning role so it does not read as a
-/// caption either.
+/// The server did not answer for this panel.
+///
+/// Not an [EmptyStateWidget], and deliberately so. An empty state says "there
+/// is nothing here", which is a statement about the workspace; this says "we do
+/// not know", which is a statement about the request. Conflating the two is the
+/// class of lie the whole screen is built to avoid, so it keeps the warning
+/// glyph and the warning colour that [_ProvenanceNote] uses for the same
+/// meaning at the top of the screen.
 class _Unavailable extends StatelessWidget {
   const _Unavailable();
 
   @override
-  Widget build(BuildContext context) => Text(
-        'Unavailable — the server did not answer for this',
-        style: Theme.of(context)
-            .textTheme
-            .bodyMedium
-            ?.copyWith(color: PlaneTheme.pendingColor(context)),
-      );
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final accent = PlaneTheme.pendingColor(context);
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Icon(Icons.warning_amber_outlined,
+            size: PlaneTheme.iconMedium, color: accent),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Text(
+            'Unavailable — the server did not answer for this',
+            style: theme.textTheme.bodyMedium?.copyWith(color: accent),
+          ),
+        ),
+      ],
+    );
+  }
 }
 
-/// One project, with its work items stacked by state group.
+/// One project, with its work items broken down by state group.
 ///
-/// A stacked bar rather than another length-versus-max bar: what is interesting
-/// about a project is the shape of its backlog-to-done split, and that only
-/// shows if the segments share one bar.
+/// This was a hand-rolled `Column` — its own title cut, its own emphasized
+/// total, its own stacked bar clipped at `extraSmall` where every other
+/// progress bar in the app is `full`. It is a thing in a list, so it is a
+/// [PlaneRow] now, and the progress bar, the corner and the press physics all
+/// come from there.
+///
+/// The stacked bar it replaces showed the backlog-to-done split as proportions.
+/// The same information is in `chips` as one [PlaneRowMeta] per state group,
+/// which is exact rather than approximate and — being a `Wrap` — is the one
+/// arrangement that survives a large text scale on a narrow phone.
 class _ProjectRow extends StatelessWidget {
   final ProjectAnalytics project;
 
@@ -414,60 +451,34 @@ class _ProjectRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     final counts = project.byStateGroup;
-    final segments = kStateGroups
-        .where((g) => (counts[g] ?? 0) > 0)
-        .map((g) => MapEntry(g, counts[g]!))
-        .toList();
+    final total = project.total;
+    final completed = counts['completed'] ?? 0;
+    final groups = kStateGroups.where((g) => (counts[g] ?? 0) > 0).toList();
 
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
-      child: Semantics(
-        container: true,
-        label: '${project.projectName}: ${project.total} work items, '
-            '${counts['completed'] ?? 0} completed',
-        // The name and the total are drawn as well as named; without the
-        // exclusion the row reports both copies.
-        excludeSemantics: true,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    project.projectName,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: theme.textTheme.titleSmall,
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Text('${project.total}',
-                    style: M3EType.emphasized(theme.textTheme.titleSmall!)),
-              ],
-            ),
-            const SizedBox(height: 6),
-            ClipRRect(
-              borderRadius: BorderRadius.circular(M3EShape.extraSmall),
-              child: SizedBox(
-                height: 8,
-                child: Row(
-                  children: segments
-                      .map((e) => Expanded(
-                            flex: e.value,
-                            child: ColoredBox(
-                              color: PlaneTheme.stateGroupColor(context, e.key),
-                            ),
-                          ))
-                      .toList(),
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
+    return PlaneRow(
+      title: project.projectName,
+      subtitle: '$total ${total == 1 ? 'work item' : 'work items'}',
+      subtitleTrailing: '$completed done',
+      progress: total == 0 ? 0 : completed / total,
+      progressColor: PlaneTheme.stateGroupColor(context, 'completed'),
+      chips: [
+        for (final g in groups)
+          PlaneRowMeta(
+            icon: PlaneTheme.stateIcon(g),
+            text: '${counts[g]}',
+            color: PlaneTheme.stateGroupColor(context, g),
+          ),
+      ],
+      // The row draws the name, both counts, the bar and one indicator per
+      // group, and [PlaneRow] hands this label to [M3EPressable], which
+      // replaces the whole subtree — so anything not said here is not said.
+      semanticLabel: [
+        project.projectName,
+        '$total work items',
+        '$completed completed',
+        for (final g in groups) '${counts[g]} ${_titleCase(g)}',
+      ].join(', '),
     );
   }
 }
@@ -477,6 +488,21 @@ String _titleCase(String s) {
   return s[0].toUpperCase() + s.substring(1);
 }
 
+/// One figure, its name and where it came from.
+///
+/// Kept bespoke, and this is the one place on the screen where that is a
+/// decision rather than an oversight. [PlaneRow] with `density: card` draws the
+/// same surface and would carry the semantics for free — but its primary slot
+/// is a `titleMedium` title, and the whole point of this card is a
+/// `headlineMedium` number with its name underneath. Putting the figure in the
+/// title slot would shrink the only thing anybody looks at.
+///
+/// What it does take from [PlaneRowDensity.card] is the surface itself: the
+/// same fill, the same hairline and the same corner, so four stat cards and a
+/// list of project rows read as one family. A shared card *surface* — the
+/// decoration without the row's slots — would retire this and five more
+/// hand-rolled copies of the same `BoxDecoration` elsewhere in the app; see the
+/// report.
 class _StatCard extends StatelessWidget {
   final String label;
 
@@ -513,6 +539,8 @@ class _StatCard extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
+          // `PlaneRowDensity.card`'s surface, token for token.
+          color: theme.colorScheme.surfaceContainerLow,
           borderRadius: BorderRadius.circular(M3EShape.large),
           border:
               Border.all(color: theme.colorScheme.outlineVariant, width: 0.8),

@@ -189,24 +189,21 @@ class _WorkspaceIssuesScreenState extends ConsumerState<WorkspaceIssuesScreen> {
 
   Widget _list() {
     if (_issues.isEmpty) {
-      return ListView(children: [
-        SizedBox(height: MediaQuery.of(context).size.height * 0.25),
-        Center(
-          child: EmptyStateWidget(
-            message: widget.view == null
-                ? 'No work items in this workspace'
-                : 'No work items match this view',
-            icon: Icons.check_circle_outline,
-            subtitle: widget.view == null
-                ? 'Work items from every project you belong to appear here'
-                : null,
-          ),
-        ),
-      ]);
+      return ScrollableEmptyState(
+        message: widget.view == null
+            ? 'No work items in this workspace'
+            : 'No work items match this view',
+        icon: Icons.check_circle_outline,
+        subtitle: widget.view == null
+            ? 'Work items from every project you belong to appear here'
+            : 'This view\'s filters match nothing right now',
+      );
     }
 
     return ListView.builder(
       controller: _scroll,
+      // A first page shorter than the viewport still has to be pullable.
+      physics: const AlwaysScrollableScrollPhysics(),
       padding: const EdgeInsets.only(bottom: 20),
       // One extra slot for the page-loading footer.
       itemCount: _issues.length + 1,

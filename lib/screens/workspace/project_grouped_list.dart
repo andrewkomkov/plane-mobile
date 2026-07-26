@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../models/project.dart';
 import '../../models/workspace_rollup.dart';
+import '../../widgets/loading_state.dart';
 import '../../widgets/section_header.dart';
 
 /// A workspace rollup laid out under one heading per project.
@@ -64,15 +65,20 @@ class ProjectGroupedList<T> extends StatelessWidget {
   Widget build(BuildContext context) {
     final groups = group<T>(items, projects);
     if (groups.isEmpty) {
-      return ListView(children: [
-        SizedBox(height: MediaQuery.of(context).size.height * 0.25),
-        Center(child: emptyState),
-      ]);
+      // What this replaces was `SizedBox(height: MediaQuery.height * 0.25)`
+      // above a `Center` — one of three magic fractions the app used to give a
+      // `ListView` enough height for the `RefreshIndicator` around it to fire.
+      // A viewport-height constraint says that directly.
+      return ScrollableCenter(child: emptyState);
     }
 
     // One header plus its rows per group, flattened into a single builder so
     // the whole thing stays lazy on a workspace with a lot of projects.
     return ListView.builder(
+      // The same reason the empty branch is scrollable: a workspace with two
+      // cycles in it does not fill the viewport, and a list that cannot scroll
+      // cannot be pulled to refresh.
+      physics: const AlwaysScrollableScrollPhysics(),
       padding: const EdgeInsets.only(bottom: 20),
       itemCount: groups.fold<int>(0, (sum, g) => sum + 1 + g.value.length),
       itemBuilder: (ctx, index) {

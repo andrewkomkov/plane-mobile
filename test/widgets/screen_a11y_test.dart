@@ -520,10 +520,19 @@ void main() {
       ));
       await tester.pump();
 
-      final switcher = nodeLabelled(tester, 'Switch workspace');
-      // "Plane" is drawn inside the control; before the exclusion it was
-      // appended to the label and reached the tree as a second name.
-      expect(labels(tester), isNot(contains('Plane')));
+      // Exactly one node, whose label is exactly this. The bug this guards
+      // against is a control that appends its label to the text drawn inside
+      // it — "Switch workspace, Plane" on one node — which announces twice and
+      // makes `adb_drive.py tap` ambiguous. `nodeLabelled` asserts the
+      // uniqueness and the exactness both.
+      //
+      // The switcher used to be a bare Row of glyphs in a hand-rolled header,
+      // whose only visible word was the workspace name. It is a PlaneRow in
+      // the list now, so the label names the action first and the current
+      // workspace second, and the word "Plane" belongs to the shared flexible
+      // header as its own non-interactive node — the same one the three
+      // sibling home tabs already publish.
+      final switcher = nodeLabelled(tester, 'Switch workspace, current: acme');
       expect(
           switcher.getSemanticsData().hasAction(SemanticsAction.tap), isTrue);
       expect(switcher.rect.height, greaterThanOrEqualTo(_minTarget));
