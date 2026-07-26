@@ -9,7 +9,9 @@ import '../../database/sync_service.dart';
 import '../issues/issue_detail_screen.dart';
 import '../../widgets/loading_state.dart';
 import '../../widgets/skeleton_loader.dart';
+import '../../config/m3e/shapes.dart';
 import '../../widgets/m3e/flexible_app_bar.dart';
+import '../../widgets/m3e/icon_button.dart';
 import '../../widgets/issue_row.dart';
 
 class InboxTab extends ConsumerStatefulWidget {
@@ -164,44 +166,206 @@ class _InboxTabState extends ConsumerState<InboxTab>
     }
   }
 
+  /// Mark everything currently listed as read.
+  ///
+  /// One request, not one per row: the shim keeps read state in a JSON file
+  /// and rewrites the whole thing on every write, so looping the per-item
+  /// route would rewrite it once per notification. The server derives "all"
+  /// from the same membership-scoped feed this screen shows, so a bulk action
+  /// can never touch a row the caller cannot see.
+  Future<void> _markAllRead() async {
+    final before = [
+      for (final n in _notifications) Map<String, dynamic>.from(n),
+    ];
+    setState(() {
+      for (final n in _notifications) {
+        n['read_at'] ??= 'stored';
+      }
+    });
+    try {
+      final dio = await _dio();
+      await dio
+          .post('/auth/mobile/${widget.workspaceSlug}/notifications/read-all/');
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _notifications
+          ..clear()
+          ..addAll(before);
+      });
+      _complain('Could not mark them read');
+    }
+  }
+
+  /// Dismiss everything currently listed.
+  ///
+  /// Kept behind a confirmation because it clears the whole screen and the
+  /// only way back is per-notification on the web.
+  Future<void> _dismissAll() async {
+    final removed = [
+      for (final n in _notifications) Map<String, dynamic>.from(n),
+    ];
+    setState(_notifications.clear);
+    try {
+      final dio = await _dio();
+      await dio.delete('/auth/mobile/${widget.workspaceSlug}/notifications/');
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _notifications.addAll(removed));
+      _complain('Could not dismiss them');
+    }
+  }
+
+  Future<Dio> _dio() async {
+    final baseUrl = await SecureStorage.getBaseUrl() ?? '';
+    final apiKey = await SecureStorage.getApiKey() ?? '';
+    return Dio(BaseOptions(
+      baseUrl: baseUrl,
+      headers: {'X-Api-Key': apiKey, 'Content-Type': 'application/json'},
+    ));
+  }
+
+  void _complain(String message) {
+    ScaffoldMessenger.of(context)
+        .showSnackBar(SnackBar(content: Text(message)));
+  }
+
+  /// The screen's one bottom-sheet treatment.
+  ///
+  /// M3E shape and a drag handle, matching the More sheet in app_navbar. The
+  /// per-item menu and the bulk menu share it so one screen does not grow two
+  /// different sheets.
+  Future<void> _showSheet(List<Widget> children) {
+    return showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) {
+        final scheme = Theme.of(ctx).colorScheme;
+        return Container(
+          decoration: BoxDecoration(
+            color: scheme.surfaceContainer,
+            borderRadius: const BorderRadius.vertical(
+              top: Radius.circular(M3EShape.extraLargeIncreased),
+            ),
+            border: Border(
+              top: BorderSide(color: scheme.outlineVariant, width: 0.5),
+            ),
+          ),
+          child: SafeArea(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const SizedBox(height: 12),
+                Container(
+                  width: 32,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: scheme.onSurfaceVariant.withValues(alpha: 0.3),
+                    borderRadius: BorderRadius.circular(M3EShape.full),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                ...children,
+                const SizedBox(height: 8),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  void _showBulkOptions() {
+    final unread = _notifications.where((n) => n['read_at'] == null).length;
+    _showSheet([
+      ListTile(
+        leading: const Icon(Icons.mark_email_read_outlined, size: 20),
+        title: Text('Mark all as read',
+            style: Theme.of(context).textTheme.bodyMedium),
+        // The count is the whole reason to reach for this rather than tapping
+        // rows, so it belongs on the control.
+        subtitle: Text(unread == 0 ? 'Nothing unread' : '$unread unread',
+            style: Theme.of(context).textTheme.bodySmall),
+        enabled: unread > 0,
+        onTap: () {
+          Navigator.pop(context);
+          _markAllRead();
+        },
+      ),
+      ListTile(
+        leading: Icon(Icons.delete_sweep_outlined,
+            size: 20, color: Theme.of(context).colorScheme.error),
+        title: Text('Dismiss all',
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  color: Theme.of(context).colorScheme.error,
+                )),
+        subtitle: Text('${_notifications.length} in the list',
+            style: Theme.of(context).textTheme.bodySmall),
+        onTap: () async {
+          Navigator.pop(context);
+          if (await _confirmDismissAll()) _dismissAll();
+        },
+      ),
+    ]);
+  }
+
+  Future<bool> _confirmDismissAll() async {
+    final scheme = Theme.of(context).colorScheme;
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Dismiss all notifications?'),
+        content: Text(
+          'This clears the whole list. Individual notifications can only be '
+          'brought back from the web app.',
+          style: Theme.of(ctx).textTheme.bodyMedium,
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: TextButton.styleFrom(foregroundColor: scheme.error),
+            child: const Text('Dismiss all'),
+          ),
+        ],
+      ),
+    );
+    return ok ?? false;
+  }
+
   void _showNotificationOptions(Map<String, dynamic> n) {
     final notificationId = n['id'] as String? ?? '';
     final isRead = n['read_at'] != null;
-    showModalBottomSheet(
-      context: context,
-      builder: (ctx) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ListTile(
-              leading: Icon(
-                  isRead
-                      ? Icons.mark_email_unread_outlined
-                      : Icons.mark_email_read_outlined,
-                  size: 20),
-              title: Text(isRead ? 'Mark as unread' : 'Mark as read',
-                  style: Theme.of(ctx).textTheme.bodyMedium),
-              onTap: () {
-                Navigator.pop(ctx);
-                if (isRead) {
-                  _markUnread(notificationId);
-                } else {
-                  _markRead(notificationId);
-                }
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.delete_outline, size: 20),
-              title: Text('Dismiss', style: Theme.of(ctx).textTheme.bodyMedium),
-              onTap: () {
-                Navigator.pop(ctx);
-                _dismiss(notificationId);
-              },
-            ),
-          ],
-        ),
+    _showSheet([
+      ListTile(
+        leading: Icon(
+            isRead
+                ? Icons.mark_email_unread_outlined
+                : Icons.mark_email_read_outlined,
+            size: 20),
+        title: Text(isRead ? 'Mark as unread' : 'Mark as read',
+            style: Theme.of(context).textTheme.bodyMedium),
+        onTap: () {
+          Navigator.pop(context);
+          if (isRead) {
+            _markUnread(notificationId);
+          } else {
+            _markRead(notificationId);
+          }
+        },
       ),
-    );
+      ListTile(
+        leading: const Icon(Icons.delete_outline, size: 20),
+        title: Text('Dismiss', style: Theme.of(context).textTheme.bodyMedium),
+        onTap: () {
+          Navigator.pop(context);
+          _dismiss(notificationId);
+        },
+      ),
+    ]);
   }
 
   String _buildActivityText(Map<String, dynamic> n) {
@@ -228,6 +392,14 @@ class _InboxTabState extends ConsumerState<InboxTab>
     return M3EFlexibleHeaderScaffold(
       title: 'Inbox',
       overline: 'PENDING NOTIFICATIONS',
+      actions: [
+        if (_notifications.isNotEmpty)
+          M3EIconButton(
+            icon: Icons.more_horiz,
+            tooltip: 'Bulk actions for all notifications',
+            onPressed: _showBulkOptions,
+          ),
+      ],
       body: _loading && _notifications.isEmpty
           ? const InboxSkeleton()
           : RefreshIndicator(
