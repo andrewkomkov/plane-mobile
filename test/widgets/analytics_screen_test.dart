@@ -5,15 +5,14 @@ import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:plane_mobile/models/project.dart';
 import 'package:plane_mobile/screens/analytics/analytics_screen.dart';
 import 'package:plane_mobile/services/analytics_service.dart';
 
-/// The screen's whole reason to exist after this rewrite is that it says where
-/// its numbers came from. These tests hold it to that: a figure the device
-/// counted must not be presented as though the server had.
+/// The screen's reason to exist beyond the charts is that it says where its
+/// numbers came from. These tests hold it to that: a panel the server never
+/// answered for must not be drawn as a zero.
 class _Adapter implements HttpClientAdapter {
-  final Map<String, dynamic> routes;
+  final Map<String, dynamic Function(Map<String, dynamic> query)> routes;
   _Adapter(this.routes);
 
   @override
@@ -22,9 +21,13 @@ class _Adapter implements HttpClientAdapter {
     Stream<Uint8List>? requestStream,
     Future<void>? cancelFuture,
   ) async {
-    final body = routes[options.path];
-    if (body == null) {
+    final handler = routes[options.path];
+    if (handler == null) {
       return ResponseBody.fromString('{}', 404, headers: _headers);
+    }
+    final body = handler(options.queryParameters);
+    if (body is int) {
+      return ResponseBody.fromString('{}', body, headers: _headers);
     }
     return ResponseBody.fromString(jsonEncode(body), 200, headers: _headers);
   }
@@ -37,34 +40,47 @@ class _Adapter implements HttpClientAdapter {
   void close({bool force = false}) {}
 }
 
-Project _project(String id, String name) => Project(
-      id: id,
-      name: name,
-      identifier: 'X',
-      network: 2,
-      totalMembers: 1,
-      isMember: true,
-      createdAt: DateTime(2025, 1, 1),
-    );
+Map<String, dynamic> _chart(Map<String, int> counts) => {
+      'data': [
+        for (final e in counts.entries) {'key': e.key, 'count': e.value},
+      ],
+      'schema': <String, dynamic>{},
+    };
 
-void _serve(
-    {required int totalCount, required List<Map<String, dynamic>> rows}) {
-  final dio = Dio(BaseOptions(baseUrl: 'https://plane.test/api/v1'));
+void _serve({
+  dynamic Function(Map<String, dynamic>)? charts,
+  dynamic Function(Map<String, dynamic>)? stats,
+  int total = 12,
+}) {
+  final dio = Dio(BaseOptions(baseUrl: 'https://plane.test/api'));
   dio.httpClientAdapter = _Adapter({
-    '/workspaces/acme/projects/p1/states/': [
-      {'id': 's1', 'group': 'started'},
-      {'id': 's2', 'group': 'completed'},
-    ],
-    '/workspaces/acme/projects/p1/issues/': {
-      'total_count': totalCount,
-      'count': rows.length,
-      'next_cursor': '',
-      'next_page_results': false,
-      'results': rows,
-    },
+    '/workspaces/acme/advance-analytics/': (_) => {
+          'total_work_items': {'count': total},
+          'backlog_work_items': {'count': 3},
+          'un_started_work_items': {'count': 1},
+          'started_work_items': {'count': 4},
+          'completed_work_items': {'count': 4},
+        },
+    '/workspaces/acme/advance-analytics-charts/': charts ??
+        (query) => query['x_axis'] == 'PRIORITY'
+            ? _chart({'urgent': 8, 'low': 4})
+            : _chart({'started': 8, 'completed': 4}),
+    '/workspaces/acme/advance-analytics-stats/': stats ??
+        (_) => [
+              {
+                'project_id': 'p1',
+                'project__name': 'Alpha',
+                'backlog_work_items': 3,
+                'un_started_work_items': 1,
+                'started_work_items': 4,
+                'completed_work_items': 4,
+                'cancelled_work_items': 0,
+              },
+            ],
+    '/workspaces/acme/default-analytics/': (_) =>
+        {'total_issues': total, 'open_issues': 2},
   });
   AnalyticsService.debugClient = dio;
-  AnalyticsService.debugProjectLoader = (_) async => [_project('p1', 'Alpha')];
 }
 
 Widget _app() => const ProviderScope(
@@ -74,65 +90,139 @@ Widget _app() => const ProviderScope(
 void main() {
   tearDown(() {
     AnalyticsService.debugClient = null;
-    AnalyticsService.debugProjectLoader = null;
   });
 
   testWidgets('labels each overview figure with where it came from',
       (tester) async {
-    _serve(totalCount: 2, rows: [
-      {'id': 'i1', 'state': 's1', 'priority': 'urgent'},
-      {'id': 'i2', 'state': 's2', 'priority': 'low'},
-    ]);
+    _serve();
 
     await tester.pumpWidget(_app());
     await tester.pumpAndSettle();
 
     expect(find.text('Total work items'), findsOneWidget);
-    expect(find.text('from server'), findsOneWidget);
-    expect(find.text('counted here'), findsNWidgets(3));
+    expect(find.text('12'), findsOneWidget);
+    // All four are database counts now, and all four say so.
+    expect(find.text('from server'), findsNWidgets(4));
+    expect(find.text('counted here'), findsNothing);
   });
 
-  testWidgets('a complete sweep says so and does not warn', (tester) async {
-    _serve(totalCount: 2, rows: [
-      {'id': 'i1', 'state': 's1', 'priority': 'urgent'},
-      {'id': 'i2', 'state': 's2', 'priority': 'low'},
-    ]);
+  testWidgets(
+      'a complete answer says nothing was counted here and does not '
+      'warn', (tester) async {
+    _serve();
 
     await tester.pumpWidget(_app());
     await tester.pumpAndSettle();
 
     expect(
-      find.textContaining('from all 2 work items'),
+      find.textContaining('Nothing on this screen is counted on the device'),
       findsOneWidget,
     );
     expect(find.byIcon(Icons.warning_amber_outlined), findsNothing);
   });
 
-  testWidgets('a partial sweep shows the coverage instead of hiding it',
+  testWidgets('a panel the server did not answer for is named, not zeroed',
       (tester) async {
-    // The server says 900; one page came back with two rows and no next page,
-    // which is what a truncated or partly failed sweep looks like.
-    _serve(totalCount: 900, rows: [
-      {'id': 'i1', 'state': 's1', 'priority': 'urgent'},
-      {'id': 'i2', 'state': 's2', 'priority': 'low'},
-    ]);
+    _serve(
+      charts: (query) =>
+          query['x_axis'] == 'PRIORITY' ? 403 : _chart({'started': 8}),
+    );
 
     await tester.pumpWidget(_app());
     await tester.pumpAndSettle();
 
-    expect(find.textContaining('2 of 900 work items'), findsOneWidget);
+    expect(
+      find.textContaining('did not answer for the priority breakdown'),
+      findsOneWidget,
+    );
     expect(find.byIcon(Icons.warning_amber_outlined), findsOneWidget);
-    // The total card still shows the server's figure, not the scanned one.
-    expect(find.text('900'), findsOneWidget);
+
+    // The overview cards fill the test viewport, so the charts below them are
+    // not built until the list is dragged up.
+    await tester.drag(find.byType(ListView), const Offset(0, -400));
+    await tester.pumpAndSettle();
+
+    expect(find.textContaining('Unavailable'), findsOneWidget);
+  });
+
+  testWidgets('a state group this build does not know about still shows',
+      (tester) async {
+    // The chart orders by kStateGroups and would otherwise drop anything not
+    // in it, which would silently hide a group a newer Plane invented.
+    _serve(
+      charts: (query) => query['x_axis'] == 'PRIORITY'
+          ? _chart({'urgent': 8})
+          : _chart({'started': 8, 'triaged': 4}),
+    );
+
+    await tester.pumpWidget(_app());
+    await tester.pumpAndSettle();
+    await tester.drag(find.byType(ListView), const Offset(0, -400));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Triaged'), findsOneWidget);
+  });
+
+  testWidgets('projects are listed largest first', (tester) async {
+    _serve(
+      stats: (_) => [
+        {'project_id': 'p1', 'project__name': 'Small', 'started_work_items': 2},
+        {'project_id': 'p2', 'project__name': 'Big', 'started_work_items': 9},
+      ],
+    );
+
+    await tester.pumpWidget(_app());
+    await tester.pumpAndSettle();
+    await tester.drag(find.byType(ListView), const Offset(0, -900));
+    await tester.pumpAndSettle();
+
+    final big = tester.getTopLeft(find.text('Big')).dy;
+    final small = tester.getTopLeft(find.text('Small')).dy;
+    expect(big, lessThan(small));
+  });
+
+  testWidgets('a missing figure shows a dash rather than a plausible zero',
+      (tester) async {
+    // Losing the project list also loses the overdue count, which cannot be
+    // scoped without it.
+    _serve(stats: (_) => 500);
+
+    await tester.pumpWidget(_app());
+    await tester.pumpAndSettle();
+
+    expect(find.text('—'), findsOneWidget);
+    expect(find.text('unavailable'), findsOneWidget);
+    expect(find.text('0'), findsNothing);
   });
 
   testWidgets('an empty workspace gets the empty state, not zeroed charts',
       (tester) async {
-    AnalyticsService.debugProjectLoader = (_) async => [];
+    final dio = Dio(BaseOptions(baseUrl: 'https://plane.test/api'));
+    dio.httpClientAdapter = _Adapter({
+      '/workspaces/acme/advance-analytics/': (_) => {
+            'total_work_items': {'count': 0},
+          },
+      '/workspaces/acme/advance-analytics-charts/': (_) => _chart({}),
+      '/workspaces/acme/advance-analytics-stats/': (_) => [],
+    });
+    AnalyticsService.debugClient = dio;
 
     await tester.pumpWidget(_app());
     await tester.pumpAndSettle();
 
     expect(find.text('No work items yet'), findsOneWidget);
+  });
+
+  testWidgets('nothing arriving is an error, not an empty workspace',
+      (tester) async {
+    final dio = Dio(BaseOptions(baseUrl: 'https://plane.test/api'));
+    dio.httpClientAdapter = _Adapter({});
+    AnalyticsService.debugClient = dio;
+
+    await tester.pumpWidget(_app());
+    await tester.pumpAndSettle();
+
+    expect(find.text('Failed to load analytics'), findsOneWidget);
+    expect(find.text('No work items yet'), findsNothing);
   });
 }

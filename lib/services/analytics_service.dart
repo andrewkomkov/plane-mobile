@@ -3,56 +3,41 @@ import 'package:flutter/foundation.dart';
 
 import '../config/api_client.dart';
 import '../models/analytics.dart';
-import '../models/project.dart';
-import '../services/project_service.dart';
 
-/// Builds the analytics screen's figures from the v1 API.
+/// Reads the analytics screen's figures from Plane's analytics API.
 ///
-/// ## Why this sweeps instead of asking
+/// ## What replaced what
 ///
-/// OUT OF DATE — this sweep exists because Plane's analytics endpoints were
-/// unreachable: they live on the internal app API behind a session cookie,
-/// and the app authenticated by API token against `/api/v1/`, which has no
-/// analytics routes at all.
+/// This used to sweep every project's work-item list to its last page and count
+/// on the device — up to 45 requests, visited serially so as not to burst the
+/// API token's 60-per-minute throttle, with a request budget and a coverage
+/// figure to admit when it ran out. All of that existed for one reason: the
+/// analytics endpoints were unreachable. They live on the internal API behind a
+/// session cookie, and the app's token only reached `/api/v1/`, which has no
+/// analytics module.
 ///
-/// That is no longer true. Requests now go through the session proxy in
-/// plane-mobile-api, and `workspaces/{slug}/analytics/` answers — it returns
-/// 400 asking for x-axis and y-axis dimensions, which is a reachable endpoint
-/// refusing an incomplete query, not an absent one. This whole sweep should be
-/// replaced by the real analytics API. Until it is, what it computes is still
-/// accurate; it is just far more expensive than it needs to be.
+/// The session proxy in `plane-mobile-api` made them reachable. Five requests
+/// now replace the sweep, each one an aggregate the database computed:
 ///
-/// Counting here is only honest if it counts *everything*, which is what
-/// [getWorkspaceAnalytics] does: it pages each project to exhaustion rather
-/// than reading one page. Two things keep that affordable:
+/// | Figure | Endpoint | Query |
+/// |---|---|---|
+/// | total / completed / pending | `advance-analytics/` | `tab=work-items` |
+/// | by state group | `advance-analytics-charts/` | `type=custom-work-items&x_axis=STATE_GROUPS` |
+/// | by priority | `advance-analytics-charts/` | `type=custom-work-items&x_axis=PRIORITY` |
+/// | per project | `advance-analytics-stats/` | `type=work-items` |
+/// | overdue | `default-analytics/` | `project=…&target_date=…;before` |
 ///
-///   * `fields=id,state,priority,target_date` — the API's dynamic serialiser
-///     drops everything else, so a work item costs about a hundred bytes over
-///     the wire instead of the several kilobytes a full one costs.
-///   * `per_page` at the server's maximum, so even a large project is a
-///     handful of requests.
+/// The first four are independent and go out together. The overdue call waits
+/// on the fourth, because it needs the project list to scope itself the same
+/// way — see [_overdue].
 ///
-/// And a request budget keeps it bounded: the API token is rate limited to 60
-/// requests a minute, so a workspace big enough to blow through
-/// [_requestBudget] is reported as a partial scan instead of grinding against
-/// the throttle. The screen then shows the coverage.
+/// With no paging there is no budget to run out of and no partial scan to
+/// report. What can still go wrong is a request failing, and that is reported
+/// per panel: see the note on null in `models/analytics.dart`.
 class AnalyticsService {
   /// Injected by tests in place of a real HTTP client.
   @visibleForTesting
   static Dio? debugClient;
-
-  /// Injected by tests in place of the project list.
-  @visibleForTesting
-  static Future<List<Project>> Function(String slug)? debugProjectLoader;
-
-  /// The server caps `per_page` at 1000 (`BasePaginator.paginate`). Asking for
-  /// the cap is what keeps a 5,000-item project down to five requests.
-  static const int _pageSize = 1000;
-
-  /// Ceiling on requests for one refresh, chosen against the API token's
-  /// 60/minute throttle. Leaves room for the project list and one states call
-  /// per project without the sweep ever tripping the limiter.
-  static const int _requestBudget = 45;
 
   static Future<Dio> _client() async {
     final injected = debugClient;
@@ -60,152 +45,121 @@ class AnalyticsService {
     return ApiClient.getInstance();
   }
 
-  static Future<List<Project>> _projects(String workspaceSlug) async {
-    final loader = debugProjectLoader;
-    if (loader != null) return loader(workspaceSlug);
-    return ProjectService.getProjects(workspaceSlug);
-  }
-
-  /// Maps state UUID to state group for one project.
-  ///
-  /// Work items carry a state id, and state ids are per-project, so the group —
-  /// the only axis worth aggregating across projects — has to be looked up.
-  static Future<Map<String, String>> getStateGroups(
-    String workspaceSlug,
-    String projectId, {
-    Dio? client,
-  }) async {
-    final dio = client ?? await _client();
-    final response = await dio.get(
-      '/workspaces/$workspaceSlug/projects/$projectId/states/',
-    );
-    final data = response.data;
-    final rows = data is Map ? (data['results'] ?? data['data']) : data;
-    if (rows is! List) return {};
-    return {
-      for (final row in rows.whereType<Map>())
-        (row['id'] ?? '').toString(): (row['group'] ?? 'backlog').toString(),
-    };
-  }
-
-  /// Reads every work item in one project, following the cursor to the end.
-  ///
-  /// Returns the scan together with the number of requests it consumed, so the
-  /// caller can hold the whole refresh to a budget. A project is cut short — and
-  /// therefore reported as incomplete — only when the budget runs out.
-  static Future<({ProjectScan scan, int requests})> scanProject(
-    String workspaceSlug,
-    Project project, {
-    Dio? client,
-    int requestBudget = _requestBudget,
-  }) async {
-    final dio = client ?? await _client();
-    final stateGroups =
-        await getStateGroups(workspaceSlug, project.id, client: dio);
-    var requests = 1;
-
-    final items = <ScannedWorkItem>[];
-    var serverTotal = 0;
-    String? cursor;
-
-    while (requests < requestBudget) {
-      final response = await dio.get(
-        '/workspaces/$workspaceSlug/projects/${project.id}/issues/',
-        queryParameters: {
-          'per_page': _pageSize,
-          // Only the four columns the aggregation reads. The rest of the work
-          // item — description HTML above all — would dominate the transfer.
-          'fields': 'id,state,priority,target_date',
-          if (cursor != null) 'cursor': cursor,
-        },
-      );
-      requests++;
-
-      final data = response.data;
-      if (data is! Map) break;
-
-      // `total_count` is a COUNT over the project, not over the page: the one
-      // figure on this screen the database produced.
-      serverTotal = (data['total_count'] as num?)?.toInt() ?? serverTotal;
-
-      final rows = data['results'];
-      if (rows is List) {
-        for (final row in rows.whereType<Map>()) {
-          items.add(ScannedWorkItem.fromJson(
-            Map<String, dynamic>.from(row),
-            stateGroups,
-          ));
-        }
-      }
-
-      final hasMore = data['next_page_results'] == true;
-      final next = data['next_cursor']?.toString();
-      if (!hasMore || next == null || next.isEmpty || next == cursor) break;
-      cursor = next;
-    }
-
-    return (
-      scan: ProjectScan(
-        projectId: project.id,
-        projectName: project.name,
-        serverTotal: serverTotal,
-        items: items,
-      ),
-      requests: requests,
-    );
-  }
-
-  /// Sweeps every project the user can see and folds the result.
-  ///
-  /// Projects are visited one at a time on purpose. Firing them in parallel
-  /// would be faster but would burst straight into the 60/minute throttle, and
-  /// a 429 mid-sweep costs more than the serialisation saves.
-  ///
-  /// A project that fails outright is skipped rather than failing the screen —
-  /// one unreadable project should not blank out the other nine — but it still
-  /// contributes its server total, so the coverage figure exposes the gap.
   static Future<WorkspaceAnalytics> getWorkspaceAnalytics(
     String workspaceSlug, {
     DateTime? now,
   }) async {
-    final projects = await _projects(workspaceSlug);
-    if (projects.isEmpty) return WorkspaceAnalytics.empty;
-
     final dio = await _client();
-    var remaining = _requestBudget;
-    final scans = <ProjectScan>[];
+    final base = '/workspaces/$workspaceSlug';
 
-    for (final project in projects) {
-      if (remaining <= 1) {
-        // Out of budget. The project's server total arrives with its first
-        // page, so skipping it means not knowing its size either — hence the
-        // failed flag rather than a zero that would read as "empty project".
-        scans.add(_unreadable(project));
-        continue;
-      }
-      try {
-        final result = await scanProject(
-          workspaceSlug,
-          project,
-          client: dio,
-          requestBudget: remaining,
-        );
-        remaining -= result.requests;
-        scans.add(result.scan);
-      } catch (_) {
-        remaining -= 1;
-        scans.add(_unreadable(project));
-      }
-    }
+    final responses = await Future.wait([
+      _get(dio, '$base/advance-analytics/', {'tab': 'work-items'}),
+      _get(dio, '$base/advance-analytics-charts/', {
+        'type': 'custom-work-items',
+        'x_axis': 'STATE_GROUPS',
+      }),
+      _get(dio, '$base/advance-analytics-charts/', {
+        'type': 'custom-work-items',
+        'x_axis': 'PRIORITY',
+      }),
+      _get(dio, '$base/advance-analytics-stats/', {'type': 'work-items'}),
+    ]);
 
-    return WorkspaceAnalytics.aggregate(scans, now: now);
+    final overview = responses[0];
+    final counts = overview is Map
+        ? WorkItemCounts.fromJson(Map<String, dynamic>.from(overview))
+        : null;
+    final byStateGroup =
+        responses[1] == null ? null : analyticsChartCounts(responses[1]);
+    final byPriority =
+        responses[2] == null ? null : analyticsChartCounts(responses[2]);
+    final projects = responses[3] == null
+        ? null
+        : ProjectAnalytics.listFromJson(responses[3]);
+
+    final overdue = await _overdue(
+      dio,
+      workspaceSlug,
+      projects,
+      now ?? DateTime.now(),
+    );
+
+    return WorkspaceAnalytics(
+      total: counts?.total,
+      completed: counts?.completed,
+      pending: counts?.pending,
+      overdue: overdue,
+      byStateGroup: byStateGroup,
+      byPriority: byPriority,
+      projects: projects,
+    );
   }
 
-  static ProjectScan _unreadable(Project project) => ProjectScan(
-        projectId: project.id,
-        projectName: project.name,
-        serverTotal: 0,
-        items: const [],
-        failed: true,
-      );
+  /// Open work whose target date has passed.
+  ///
+  /// The only figure on the screen the `advance-analytics*` family cannot
+  /// produce: those three views build their querysets from a fixed set of
+  /// filters and never call `issue_filters`, so there is no way to ask them for
+  /// a date-bounded subset. `default-analytics/` does call it, and its
+  /// `open_issues` is already restricted to the backlog / unstarted / started
+  /// groups, so one request with a target-date filter answers the question
+  /// outright.
+  ///
+  /// `target_date=<today>;before` is the filter grammar's `<=`: `date_filter`
+  /// in `plane/utils/issue_filters.py` reads any term that is not `after` as an
+  /// upper bound. A target date of today therefore counts as passed, which is
+  /// the rule `Issue.isOverdue` applies everywhere else in the app.
+  ///
+  /// The `project=` list exists because `default-analytics/` counts the whole
+  /// workspace rather than the caller's projects, unlike the other three, and
+  /// two different scopes on one screen would be worse than no figure at all.
+  /// The list comes from `advance-analytics-stats/`, which returns every
+  /// project holding at least one work item — which is every project that could
+  /// hold an overdue one.
+  ///
+  /// So a failed project read means no overdue figure either: without the list
+  /// the count could not be scoped, and an unscoped one would quietly be
+  /// answering a different question.
+  static Future<int?> _overdue(
+    Dio dio,
+    String workspaceSlug,
+    List<ProjectAnalytics>? projects,
+    DateTime asOf,
+  ) async {
+    if (projects == null) return null;
+    if (projects.isEmpty) return 0;
+
+    final today = '${asOf.year.toString().padLeft(4, '0')}-'
+        '${asOf.month.toString().padLeft(2, '0')}-'
+        '${asOf.day.toString().padLeft(2, '0')}';
+
+    final body =
+        await _get(dio, '/workspaces/$workspaceSlug/default-analytics/', {
+      'project': projects.map((p) => p.projectId).join(','),
+      'target_date': '$today;before',
+    });
+
+    if (body is! Map) return null;
+    return (body['open_issues'] as num?)?.toInt();
+  }
+
+  /// One analytics read, yielding null instead of throwing.
+  ///
+  /// A failure here is not exceptional. The `advance-analytics*` views admit
+  /// admins and members only, while `default-analytics/` also admits guests, so
+  /// a guest gets a 403 on four of the five and a perfectly good overdue-free
+  /// screen — provided one dead panel does not take the other four with it.
+  /// The caller turns null into "unavailable" on that panel and says so.
+  static Future<dynamic> _get(
+    Dio dio,
+    String path,
+    Map<String, dynamic> query,
+  ) async {
+    try {
+      final response = await dio.get(path, queryParameters: query);
+      return response.data;
+    } catch (_) {
+      return null;
+    }
+  }
 }

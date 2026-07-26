@@ -11,23 +11,19 @@ import '../../widgets/m3e/app_bar.dart';
 
 /// Workspace analytics.
 ///
-/// The screen used to fetch one page of work items from the first five
-/// projects and count those, which made every figure a function of how much the
-/// app happened to have loaded — right on a toy workspace, quietly wrong on a
-/// real one. It now sweeps every project to the last page (see
-/// `AnalyticsService`) and says out loud where each number comes from.
+/// Two rewrites deep. The first version fetched one page of work items from the
+/// first five projects and counted those, which made every figure a function of
+/// how much the app happened to have loaded. The second swept every project to
+/// its last page and said out loud which figures the device had counted, because
+/// Plane's analytics endpoints were unreachable behind an API token.
 ///
-/// It does *not* call Plane's analytics API, and not for want of trying: those
-/// endpoints are session-authenticated internal routes, and this app holds an
-/// API token for `/api/v1/`, which has no analytics module. `models/analytics.dart`
-/// carries the full trace. The one figure the server does compute is the work
-/// item total, which the paginated list reports as `total_count`; the rest is
-/// counted here, over everything fetched, with the coverage on screen.
+/// They are reachable now, through the session proxy, and this version asks the
+/// server. Nothing on this screen is counted on the device; see
+/// `AnalyticsService` for the endpoint per panel.
 ///
-/// The old "recent activity" list went with the rewrite. It was the same
-/// partial fetch sorted by update time — not the workspace's recent activity,
-/// only five projects' first pages — and it is not an analytic. Per-project
-/// state breakdowns took its place.
+/// What survives from the second version is the habit that made it worth
+/// keeping: the screen states where its numbers come from, and where one is
+/// missing it says so rather than drawing a zero.
 class AnalyticsScreen extends ConsumerStatefulWidget {
   final String workspaceSlug;
   const AnalyticsScreen({super.key, required this.workspaceSlug});
@@ -80,15 +76,19 @@ class _AnalyticsScreenState extends ConsumerState<AnalyticsScreen> {
   Widget _buildBody(BuildContext context) {
     if (_loading) return const LoadingStateWidget();
 
-    if (_error != null) {
+    final data = _data;
+
+    // The service swallows a failed panel so the rest of the screen survives
+    // it. When every panel failed there is nothing left to show and nothing
+    // honest to say about it, so it becomes the error state.
+    if (_error != null || data == null || !data.hasAnyFigure) {
       return ErrorStateWidget(
         message: 'Failed to load analytics',
         onRetry: _load,
       );
     }
 
-    final data = _data;
-    if (data == null || data.isEmpty) {
+    if (data.isEmpty) {
       // Pull-to-refresh has to work with nothing on screen too, so the empty
       // state sits inside a scrollable that is always drag-able.
       return RefreshIndicator(
@@ -110,8 +110,8 @@ class _AnalyticsScreenState extends ConsumerState<AnalyticsScreen> {
     }
 
     final theme = Theme.of(context);
-    final projects = data.projects.where((p) => p.items.isNotEmpty).toList()
-      ..sort((a, b) => b.items.length.compareTo(a.items.length));
+    final projects = [...?data.projects]
+      ..sort((a, b) => b.total.compareTo(a.total));
 
     return RefreshIndicator(
       onRefresh: _load,
@@ -140,12 +140,12 @@ class _AnalyticsScreenState extends ConsumerState<AnalyticsScreen> {
           const SizedBox(height: 24),
           _buildSectionTitle('Work items by project', theme),
           const SizedBox(height: 12),
-          if (projects.isEmpty)
-            Text('No data',
-                style: theme.textTheme.bodyMedium
-                    ?.copyWith(color: theme.colorScheme.onSurfaceVariant))
+          if (data.projects == null)
+            const _Unavailable()
+          else if (projects.isEmpty)
+            const _NoData()
           else
-            ...projects.map((p) => _ProjectRow(scan: p)),
+            ...projects.map((p) => _ProjectRow(project: p)),
           const SizedBox(height: 40),
         ],
       ),
@@ -165,9 +165,6 @@ class _AnalyticsScreenState extends ConsumerState<AnalyticsScreen> {
           label: 'Total work items',
           value: data.total,
           color: theme.colorScheme.primary,
-          // The only card the server produced, so the only one that stays
-          // right even when the sweep did not finish.
-          source: 'from server',
         ),
         _StatCard(
           label: 'Completed',
@@ -175,19 +172,16 @@ class _AnalyticsScreenState extends ConsumerState<AnalyticsScreen> {
           // The state-group palette resolves against the current brightness;
           // the raw constants underneath it were tuned for dark only.
           color: PlaneTheme.stateGroupColor(context, 'completed'),
-          source: 'counted here',
         ),
         _StatCard(
           label: 'Pending',
           value: data.pending,
           color: PlaneTheme.stateGroupColor(context, 'started'),
-          source: 'counted here',
         ),
         _StatCard(
           label: 'Overdue',
           value: data.overdue,
           color: PlaneTheme.priorityColor(context, 'urgent'),
-          source: 'counted here',
         ),
       ],
     );
@@ -198,12 +192,14 @@ class _AnalyticsScreenState extends ConsumerState<AnalyticsScreen> {
   }
 }
 
-/// Says where the numbers came from, and how much of the workspace they cover.
+/// Says where the numbers came from, and names anything that did not arrive.
 ///
-/// This is not decoration. The screen mixes one server-side count with several
-/// device-side ones, and a partial sweep is possible on a large workspace; both
-/// facts change how the figures should be read, so both are stated rather than
-/// left for the user to discover by disagreeing with the web UI.
+/// This is not decoration. The previous version of this screen counted most of
+/// these figures on the device from a sweep that could fall short, and said so;
+/// replacing that with server-side aggregates is only an improvement if the
+/// screen keeps stating which it is. The second sentence exists for the same
+/// reason: five endpoints answer this screen and they fail independently, so a
+/// panel can be missing while its neighbours are correct.
 class _ProvenanceNote extends StatelessWidget {
   final WorkspaceAnalytics data;
 
@@ -214,35 +210,23 @@ class _ProvenanceNote extends StatelessWidget {
     final theme = Theme.of(context);
     final complete = data.isComplete;
 
-    // A partial scan is a warning, not an error — the numbers are real, they
-    // just do not cover everything. The app's pending amber is its warning
-    // role and is already resolved per brightness.
+    // A missing panel is a warning, not an error — what is on screen is real,
+    // there is just less of it. The app's pending amber is its warning role and
+    // is already resolved per brightness.
     final accent = complete
         ? theme.colorScheme.onSurfaceVariant
         : PlaneTheme.pendingColor(context);
 
-    // Two ways the sweep can fall short, and they need different wording. If a
-    // project was read only partly, the server's total is known and the
-    // shortfall can be quoted as a fraction. If a project could not be read at
-    // all, its size is unknown — the total is short too — so quoting a fraction
-    // would understate the gap, and the note names the projects instead.
-    final unread = data.incompleteProjects;
-    final String message;
-    if (complete) {
-      message = 'Counted on this device from all ${data.scanned} work items. '
-          'The total comes from the server; this Plane instance serves its '
-          'analytics API only to browser sessions, and the app signs in with '
-          'an API token.';
-    } else if (data.total > data.scanned) {
-      message = 'Counted on this device from ${data.scanned} of ${data.total} '
-          'work items — the sweep stopped short, so every figure except the '
-          'total covers part of the workspace.';
-    } else {
-      message = 'Counted on this device from ${data.scanned} work items. '
-          '$unread ${unread == 1 ? 'project' : 'projects'} could not be read, '
-          'so these figures — the total included — cover part of the '
-          'workspace.';
+    final buffer = StringBuffer(
+      'Computed by Plane over the projects you belong to. Nothing on this '
+      'screen is counted on the device.',
+    );
+    if (!complete) {
+      buffer.write(' The server did not answer for ');
+      buffer.write(_list(data.unavailable));
+      buffer.write(', shown as unavailable below.');
     }
+    final message = buffer.toString();
 
     return Semantics(
       container: true,
@@ -278,14 +262,23 @@ class _ProvenanceNote extends StatelessWidget {
       ),
     );
   }
+
+  /// "a", "a and b", "a, b and c" — the note is a sentence, not a bullet list.
+  static String _list(List<String> parts) {
+    if (parts.length == 1) return parts.first;
+    return '${parts.sublist(0, parts.length - 1).join(', ')} and ${parts.last}';
+  }
 }
 
 /// A horizontal bar per category, in a fixed order with empty rows dropped.
 ///
 /// The order is Plane's own (urgency, then workflow) rather than by size: these
 /// two axes have a meaning that a sort by count would scramble.
+///
+/// A null [counts] is the panel's request having failed, which is a different
+/// thing from a workspace with nothing in it, and reads differently.
 class _ChartBars extends StatelessWidget {
-  final Map<String, int> counts;
+  final Map<String, int>? counts;
   final List<String> order;
   final Color Function(String key) colorOf;
 
@@ -298,6 +291,8 @@ class _ChartBars extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final counts = this.counts;
+    if (counts == null) return const _Unavailable();
 
     // Fixed order first, then anything the server invented that this build does
     // not know about, so a new state group shows up rather than disappearing.
@@ -306,11 +301,7 @@ class _ChartBars extends StatelessWidget {
       ...counts.keys.where((k) => !order.contains(k) && counts[k]! > 0),
     ];
 
-    if (keys.isEmpty) {
-      return Text('No data',
-          style: theme.textTheme.bodyMedium
-              ?.copyWith(color: theme.colorScheme.onSurfaceVariant));
-    }
+    if (keys.isEmpty) return const _NoData();
 
     final maxValue =
         keys.map((k) => counts[k]!).reduce((a, b) => a > b ? a : b);
@@ -370,36 +361,61 @@ class _ChartBars extends StatelessWidget {
   }
 }
 
+/// The server answered, and the answer was nothing.
+class _NoData extends StatelessWidget {
+  const _NoData();
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Text(
+      'No data',
+      style: theme.textTheme.bodyMedium
+          ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+    );
+  }
+}
+
+/// The server did not answer. Deliberately worded so it cannot be read as a
+/// count of zero, and coloured with the warning role so it does not read as a
+/// caption either.
+class _Unavailable extends StatelessWidget {
+  const _Unavailable();
+
+  @override
+  Widget build(BuildContext context) => Text(
+        'Unavailable — the server did not answer for this',
+        style: Theme.of(context)
+            .textTheme
+            .bodyMedium
+            ?.copyWith(color: PlaneTheme.pendingColor(context)),
+      );
+}
+
 /// One project, with its work items stacked by state group.
 ///
 /// A stacked bar rather than another length-versus-max bar: what is interesting
 /// about a project is the shape of its backlog-to-done split, and that only
 /// shows if the segments share one bar.
 class _ProjectRow extends StatelessWidget {
-  final ProjectScan scan;
+  final ProjectAnalytics project;
 
-  const _ProjectRow({required this.scan});
+  const _ProjectRow({required this.project});
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final counts = scan.byStateGroup;
+    final counts = project.byStateGroup;
     final segments = kStateGroups
         .where((g) => (counts[g] ?? 0) > 0)
         .map((g) => MapEntry(g, counts[g]!))
         .toList();
 
-    final scanned = scan.items.length;
-    // A project whose sweep fell short shows both numbers rather than a single
-    // figure that would read as the project's size.
-    final countLabel =
-        scan.isComplete ? '$scanned' : '$scanned / ${scan.serverTotal}';
-
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
       child: Semantics(
         container: true,
-        label: '${scan.projectName}: $countLabel work items, '
+        label: '${project.projectName}: ${project.total} work items, '
             '${counts['completed'] ?? 0} completed',
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -408,14 +424,14 @@ class _ProjectRow extends StatelessWidget {
               children: [
                 Expanded(
                   child: Text(
-                    scan.projectName,
+                    project.projectName,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: theme.textTheme.titleSmall,
                   ),
                 ),
                 const SizedBox(width: 8),
-                Text(countLabel,
+                Text('${project.total}',
                     style: M3EType.emphasized(theme.textTheme.titleSmall!)),
               ],
             ),
@@ -450,26 +466,33 @@ String _titleCase(String s) {
 
 class _StatCard extends StatelessWidget {
   final String label;
-  final int value;
-  final Color color;
 
-  /// Where the figure came from — spelled out per card because two of these
-  /// four are database counts and two are not, and they look identical.
-  final String source;
+  /// Null when the read behind this card failed. The card shows a dash and
+  /// says why, because a zero here is a real and very different answer.
+  final int? value;
+
+  final Color color;
 
   const _StatCard({
     required this.label,
     required this.value,
     required this.color,
-    required this.source,
   });
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final value = this.value;
+
+    // Every card that has a figure got it from the database, so the provenance
+    // line is the same on all four. It is still printed per card rather than
+    // once at the top: the cards are the thing a reader takes a screenshot of,
+    // and a card that lost its source is the one that gets misquoted.
+    final source = value == null ? 'unavailable' : 'from server';
+
     return Semantics(
       container: true,
-      label: '$label: $value, $source',
+      label: '$label: ${value ?? 'unavailable'}, $source',
       child: Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
@@ -481,8 +504,9 @@ class _StatCard extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Text('$value',
-                style: theme.textTheme.headlineMedium?.copyWith(color: color)),
+            Text(value?.toString() ?? '—',
+                style: theme.textTheme.headlineMedium?.copyWith(
+                    color: value == null ? theme.colorScheme.outline : color)),
             const SizedBox(height: 2),
             Text(label,
                 maxLines: 1,

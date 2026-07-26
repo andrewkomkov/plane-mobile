@@ -59,7 +59,7 @@ forbids it — which was not true of this document's first two versions.
 
 | Area | Has | Missing | Pri |
 |---|---|---|---|
-| Analytics | works, and every figure states whether it came from the server or was counted on device | still sweeps every work item to the phone. Plane's analytics API is reachable now and should replace it — task #18 | P1 |
+| Analytics | every figure is now server-computed — `advance-analytics/`, `advance-analytics-charts/`, `advance-analytics-stats/`, and `default-analytics/` for the overdue count. Five requests where the sweep took up to 45. A panel the server does not answer for is named as missing rather than drawn as a zero | the date-range and per-dimension filters Plane's own analytics page offers (assignee, label, cycle, estimate); `export-analytics/` | P3 |
 | Intake | `intake_service.dart` is correct and current | **no UI reaches it.** The "Inbox" tab is the notification feed, not this queue | P2 |
 | Search | works through the shim's own SQL endpoint | not on Plane's `search/` routes, so it bypasses Plane's permission checks | P2 |
 | Estimates | a work item's estimate point can be set | estimate *scales* cannot be created or managed | P3 |

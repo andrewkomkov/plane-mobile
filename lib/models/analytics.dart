@@ -1,25 +1,49 @@
 /// Models behind the analytics screen.
 ///
-/// ## Why so little of this comes from the server
+/// ## Where the numbers come from
 ///
-/// Plane computes analytics itself — `workspaces/{slug}/analytics/`,
-/// `default-analytics/`, `advance-analytics*`, `project-stats/`. None of those
-/// are reachable from this app. They are routed by `plane/app/urls/analytic.py`
-/// under `/api/`, and every view there inherits `BaseSessionAuthentication`,
-/// i.e. a Django session cookie. This app authenticates with an API token
-/// (`setup_screen.dart` stores one for both sign-in paths), so `ApiClient`
-/// talks to `/api/v1/`, whose route package (`plane/api/urls/`) has no
-/// analytics module at all. A request to any analytics endpoint with the
-/// credentials the app holds is a 404 or a 403, never a figure.
+/// The database. Every figure on this screen is an aggregate Plane computed
+/// server-side; none of it is folded on the phone.
 ///
-/// The v1 surface exposes exactly one aggregate the screen can use: the
-/// paginated work-item list reports `total_count`, which the database computes
-/// over the whole project rather than the page. Everything else — the split by
-/// state, by priority, and the overdue count — has to be counted here.
+/// That is a recent change. The analytics views live on Plane's internal API
+/// (`plane/app/urls/analytic.py`) behind a session cookie, and the app
+/// authenticates with an API token, which used to mean `/api/v1/` — a surface
+/// with no analytics module at all. So the screen paged every project's
+/// work-item list onto the device and counted there. The session proxy in
+/// `plane-mobile-api` removed the constraint, and the sweep went with it.
 ///
-/// So it is counted here, over *every* work item, not over one page, and the
-/// screen says which figures are which. See [WorkspaceAnalytics.scanned] and
-/// [WorkspaceAnalytics.isComplete].
+/// Four reads carry the screen:
+///
+///   * `advance-analytics/?tab=work-items` — total, and the count in each open
+///     state group. Feeds the overview cards.
+///   * `advance-analytics-charts/?type=custom-work-items&x_axis=STATE_GROUPS`
+///   * `advance-analytics-charts/?type=custom-work-items&x_axis=PRIORITY`
+///   * `advance-analytics-stats/?type=work-items` — one row per project, split
+///     by state group.
+///
+/// The overdue count has no equivalent in that family — none of those views
+/// accepts an issue filter — so it comes from the older `default-analytics/`
+/// endpoint, which does. See `AnalyticsService`.
+///
+/// ## Scope
+///
+/// The three `advance-*` views restrict themselves to projects the caller is an
+/// active member of (`get_analytics_filters` joins `project_projectmember`).
+/// `default-analytics/` does not; it counts the whole workspace. The overdue
+/// call therefore passes an explicit project list so that every figure on the
+/// screen describes the same set of projects.
+///
+/// This is a narrower set than the sweep used to cover: the project list the
+/// sweep walked includes public projects the user has not joined, and those are
+/// now excluded. Narrower, but it is the set Plane's own analytics reports.
+///
+/// ## Null
+///
+/// Every figure here is nullable and null means exactly one thing: the server
+/// did not answer for that panel. It is never a stand-in for zero. The five
+/// reads have two different permission classes between them and fail
+/// independently, so a partial answer is normal — and a panel that is missing
+/// is shown as missing rather than drawn as an empty chart.
 library;
 
 /// The state groups Plane defines, in workflow order.
@@ -37,191 +61,200 @@ const kStateGroups = <String>[
 /// The priorities Plane defines, most urgent first.
 const kPriorities = <String>['urgent', 'high', 'medium', 'low', 'none'];
 
-/// Groups that mean the work is no longer open, so cannot be late.
-const _closedGroups = <String>{'completed', 'cancelled'};
-
-/// The few fields of a work item the analytics sweep actually needs.
+/// Maps the column names in the `advance-analytics*` payloads onto the state
+/// group values Plane stores.
 ///
-/// The sweep asks the API for `fields=id,state,priority,target_date` and this
-/// is what comes back. Deliberately not [Issue]: pulling full work items —
-/// description HTML, assignees, labels — over a whole workspace to count them
-/// by priority would move megabytes to answer a question about integers.
-class ScannedWorkItem {
-  /// The state *group*, already resolved from the state UUID against the
-  /// project's states. The raw UUID is useless for aggregation because states
-  /// are per-project, so two projects' "In Progress" are different rows.
-  final String stateGroup;
-  final String priority;
-  final DateTime? targetDate;
+/// The two differ by one underscore: the annotations are called
+/// `un_started_work_items` while `state.group` holds `unstarted`. Normalising
+/// here means [kStateGroups] and the theme's per-group colours keep working on
+/// both shapes.
+const _statsColumns = <String, String>{
+  'backlog_work_items': 'backlog',
+  'un_started_work_items': 'unstarted',
+  'started_work_items': 'started',
+  'completed_work_items': 'completed',
+  'cancelled_work_items': 'cancelled',
+};
 
-  const ScannedWorkItem({
-    required this.stateGroup,
-    required this.priority,
-    this.targetDate,
+/// Folds one `advance-analytics-charts/` payload into key -> count.
+///
+/// The response is `{"data": [{"key": ..., "name": ..., "count": n}], "schema":
+/// {}}`. `schema` is only populated when the request asked for a `group_by`,
+/// which these two do not, so the rows are flat.
+///
+/// Keys are lower-cased on the way in. `build_simple_chart_response` writes the
+/// literal string `"None"` where the grouped column was null, and every value
+/// Plane stores in `priority` and `state.group` is lower case, so folding the
+/// case is what puts an unset priority on the `none` row the chart already
+/// knows how to draw.
+Map<String, int> analyticsChartCounts(dynamic body) {
+  final rows = body is Map ? body['data'] : body;
+  if (rows is! List) return const {};
+
+  final counts = <String, int>{};
+  for (final row in rows.whereType<Map>()) {
+    final key = (row['key'] ?? '').toString().toLowerCase();
+    if (key.isEmpty) continue;
+    final count = (row['count'] as num?)?.toInt() ?? 0;
+    if (count == 0) continue;
+    counts[key] = (counts[key] ?? 0) + count;
+  }
+  return counts;
+}
+
+/// The overview counts, from `advance-analytics/?tab=work-items`.
+class WorkItemCounts {
+  final int total;
+  final int backlog;
+  final int unstarted;
+  final int started;
+  final int completed;
+
+  const WorkItemCounts({
+    required this.total,
+    required this.backlog,
+    required this.unstarted,
+    required this.started,
+    required this.completed,
   });
 
-  /// Open work whose target date has passed.
+  /// Work that is neither finished nor cancelled.
   ///
-  /// Same rule as `Issue.isOverdue` — a target date of today counts as passed,
-  /// because the date parses to midnight — with the addition that finished and
-  /// cancelled work is never late.
-  bool isOverdueAt(DateTime now) {
-    final target = targetDate;
-    if (target == null) return false;
-    if (_closedGroups.contains(stateGroup)) return false;
-    return now.isAfter(target);
-  }
+  /// Summed from the three open groups rather than taken as
+  /// `total - completed - cancelled`, because this payload has no cancelled
+  /// count in it. The two are equal — the five groups partition the work items
+  /// — and each addend is itself a database count.
+  int get pending => backlog + unstarted + started;
 
-  /// [stateGroups] maps state UUID to group for the project being scanned.
-  /// A state the map does not know is treated as backlog, which is what the
-  /// screen did before and what Plane falls back to for an unset state.
-  factory ScannedWorkItem.fromJson(
-    Map<String, dynamic> json,
-    Map<String, String> stateGroups,
-  ) {
-    final stateId = json['state']?.toString();
-    final raw = json['target_date']?.toString();
-    return ScannedWorkItem(
-      stateGroup: stateGroups[stateId] ?? 'backlog',
-      priority: (json['priority'] ?? 'none').toString(),
-      targetDate: (raw == null || raw.isEmpty) ? null : DateTime.tryParse(raw),
+  /// Each value in the payload is wrapped as `{"count": n}`.
+  ///
+  /// `AdvanceAnalyticsEndpoint.get_filtered_counts` used to return a
+  /// previous-period figure alongside it; the second key is commented out
+  /// upstream but the wrapper outlived it.
+  factory WorkItemCounts.fromJson(Map<String, dynamic> json) {
+    int at(String key) {
+      final cell = json[key];
+      if (cell is Map) return (cell['count'] as num?)?.toInt() ?? 0;
+      return (cell as num?)?.toInt() ?? 0;
+    }
+
+    return WorkItemCounts(
+      total: at('total_work_items'),
+      backlog: at('backlog_work_items'),
+      unstarted: at('un_started_work_items'),
+      started: at('started_work_items'),
+      completed: at('completed_work_items'),
     );
   }
 }
 
-/// One project's contribution to the sweep.
-class ProjectScan {
+/// One project's work items, split by state group.
+///
+/// From `advance-analytics-stats/?type=work-items`, which groups the caller's
+/// work items by project and counts each state group in one query. Only
+/// projects holding at least one work item appear — the endpoint groups over
+/// issues, so an empty project has no row to be in.
+class ProjectAnalytics {
   final String projectId;
   final String projectName;
+  final Map<String, int> byStateGroup;
 
-  /// What the server said the project holds — `total_count` from the work-item
-  /// list, a `COUNT(*)` over the project rather than over the page. This is the
-  /// one figure on the screen the device did not compute.
-  final int serverTotal;
-
-  final List<ScannedWorkItem> items;
-
-  /// Set when the project could not be read at all — the request failed, or the
-  /// sweep ran out of budget before reaching it.
-  ///
-  /// This exists because such a project has no [serverTotal] either: the total
-  /// arrives *with* the first page, so a project that was never requested looks
-  /// exactly like an empty one. Without the flag, skipping a project would make
-  /// the sweep report itself as complete, which is the precise dishonesty this
-  /// screen was rewritten to remove.
-  final bool failed;
-
-  const ProjectScan({
+  const ProjectAnalytics({
     required this.projectId,
     required this.projectName,
-    required this.serverTotal,
-    required this.items,
-    this.failed = false,
+    required this.byStateGroup,
   });
 
-  /// True when the sweep read every work item the server said was there.
-  bool get isComplete => !failed && items.length >= serverTotal;
+  int get total => byStateGroup.values.fold(0, (sum, n) => sum + n);
 
-  Map<String, int> countBy(String Function(ScannedWorkItem) key) {
+  factory ProjectAnalytics.fromJson(Map<String, dynamic> json) {
     final counts = <String, int>{};
-    for (final item in items) {
-      final k = key(item);
-      counts[k] = (counts[k] ?? 0) + 1;
+    for (final column in _statsColumns.entries) {
+      final value = (json[column.key] as num?)?.toInt() ?? 0;
+      if (value > 0) counts[column.value] = value;
     }
-    return counts;
+    return ProjectAnalytics(
+      projectId: (json['project_id'] ?? '').toString(),
+      // The endpoint selects `project__name`, so the join gives the name
+      // directly and no separate project list is needed to label the rows.
+      projectName: (json['project__name'] ?? 'Untitled').toString(),
+      byStateGroup: counts,
+    );
   }
 
-  Map<String, int> get byStateGroup => countBy((i) => i.stateGroup);
+  /// The endpoint answers with a bare list. Anything else is treated as no
+  /// rows rather than as a failure — a failure is the service's `null`.
+  static List<ProjectAnalytics> listFromJson(dynamic body) {
+    final rows = body is Map ? (body['results'] ?? body['data']) : body;
+    if (rows is! List) return const [];
+    return rows
+        .whereType<Map>()
+        .map((row) => ProjectAnalytics.fromJson(Map<String, dynamic>.from(row)))
+        .toList();
+  }
 }
 
-/// Everything the analytics screen displays, and where each number came from.
+/// Everything the analytics screen displays.
+///
+/// Each field is one server-side aggregate, or null where the server did not
+/// answer. Nothing here is derived from a sample.
 class WorkspaceAnalytics {
-  /// Sum of the per-project `total_count`s. Server-computed.
-  final int total;
-
-  /// How many work items the sweep actually read and counted. Equal to [total]
-  /// on any workspace the budget could cover.
-  final int scanned;
-
-  /// Counted on the device, over [scanned] work items.
-  final Map<String, int> byStateGroup;
-  final Map<String, int> byPriority;
-  final int overdue;
-
-  final List<ProjectScan> projects;
+  final int? total;
+  final int? completed;
+  final int? pending;
+  final int? overdue;
+  final Map<String, int>? byStateGroup;
+  final Map<String, int>? byPriority;
+  final List<ProjectAnalytics>? projects;
 
   const WorkspaceAnalytics({
-    required this.total,
-    required this.scanned,
-    required this.byStateGroup,
-    required this.byPriority,
-    required this.overdue,
-    required this.projects,
+    this.total,
+    this.completed,
+    this.pending,
+    this.overdue,
+    this.byStateGroup,
+    this.byPriority,
+    this.projects,
   });
 
   static const empty = WorkspaceAnalytics(
     total: 0,
-    scanned: 0,
+    completed: 0,
+    pending: 0,
+    overdue: 0,
     byStateGroup: {},
     byPriority: {},
-    overdue: 0,
     projects: [],
   );
 
-  int get completed => byStateGroup['completed'] ?? 0;
-
-  /// Open work: everything not finished and not cancelled.
-  int get pending => scanned - completed - (byStateGroup['cancelled'] ?? 0);
-
-  /// Projects the sweep could not read to the end.
+  /// Panels the server did not answer for, phrased for the note on screen.
   ///
-  /// Reported separately from [total] versus [scanned] because a project that
-  /// was never requested contributes nothing to either — its work items are
-  /// missing from the breakdowns *and* from the total, so counting alone cannot
-  /// reveal it.
-  int get incompleteProjects => projects.where((p) => !p.isComplete).length;
+  /// In the order the screen lays them out, so the sentence reads top to
+  /// bottom.
+  List<String> get unavailable => [
+        if (total == null) 'the overview counts',
+        if (overdue == null) 'the overdue count',
+        if (byPriority == null) 'the priority breakdown',
+        if (byStateGroup == null) 'the state breakdown',
+        if (projects == null) 'the per-project breakdown',
+      ];
 
-  /// Whether the device-side figures cover the whole workspace.
+  /// True when all five reads came back.
+  bool get isComplete => unavailable.isEmpty;
+
+  /// False when every read failed — nothing to show and nothing to say about
+  /// it, which is an error rather than a partial answer.
+  bool get hasAnyFigure =>
+      total != null ||
+      overdue != null ||
+      byPriority != null ||
+      byStateGroup != null ||
+      projects != null;
+
+  /// A workspace with no work items in it.
   ///
-  /// When false the breakdowns describe a subset, and the screen shows the
-  /// coverage rather than pretending the numbers are workspace-wide.
-  bool get isComplete => incompleteProjects == 0;
-
-  bool get isEmpty => total == 0 && scanned == 0;
-
-  /// Folds the per-project scans into one workspace-level view.
-  ///
-  /// [now] is injected so the overdue count is deterministic in tests; it
-  /// defaults to the wall clock in production.
-  factory WorkspaceAnalytics.aggregate(
-    List<ProjectScan> projects, {
-    DateTime? now,
-  }) {
-    final asOf = now ?? DateTime.now();
-    final byStateGroup = <String, int>{};
-    final byPriority = <String, int>{};
-    var total = 0;
-    var scanned = 0;
-    var overdue = 0;
-
-    for (final project in projects) {
-      total += project.serverTotal;
-      for (final item in project.items) {
-        scanned++;
-        byStateGroup[item.stateGroup] =
-            (byStateGroup[item.stateGroup] ?? 0) + 1;
-        byPriority[item.priority] = (byPriority[item.priority] ?? 0) + 1;
-        if (item.isOverdueAt(asOf)) overdue++;
-      }
-    }
-
-    return WorkspaceAnalytics(
-      total: total,
-      scanned: scanned,
-      byStateGroup: byStateGroup,
-      byPriority: byPriority,
-      overdue: overdue,
-      projects: projects,
-    );
-  }
+  /// Requires the total to have actually arrived: a missing panel is not an
+  /// empty one, and reporting "no work items yet" because a request failed is
+  /// the class of lie this screen exists to avoid.
+  bool get isEmpty => total == 0;
 }
