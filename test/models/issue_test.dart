@@ -88,6 +88,77 @@ void main() {
     });
   });
 
+  // Plane's v1 serialisers relate by id, but every one of them honours
+  // `?expand=`, which swaps the id for a nested object. Parsing used to assume
+  // a string, so an expanded response threw a TypeError inside the detail
+  // screen's bare catch and surfaced as an indistinguishable "failed to load".
+  group('Issue.fromJson with expanded relations', () {
+    test('reads an id out of an expanded state object', () {
+      final issue = Issue.fromJson({
+        'state': {'id': 'state-9', 'name': 'In Progress', 'group': 'started'},
+      });
+      expect(issue.state, 'state-9');
+      expect(issue.stateDetail, 'In Progress');
+    });
+
+    test('reads ids out of expanded parent, project and created_by', () {
+      final issue = Issue.fromJson({
+        'parent': {'id': 'parent-9', 'name': 'Epic'},
+        'project': {'id': 'proj-9', 'name': 'Web'},
+        'created_by': {'id': 'user-9', 'display_name': 'Alice'},
+      });
+      expect(issue.parent, 'parent-9');
+      expect(issue.project, 'proj-9');
+      expect(issue.createdBy, 'user-9');
+    });
+
+    test('reads ids out of expanded assignees and labels', () {
+      final issue = Issue.fromJson({
+        'assignees': [
+          {'id': 'user-1'},
+          {'id': 'user-2'},
+        ],
+        'labels': [
+          {'id': 'label-1'},
+        ],
+      });
+      expect(issue.assignees, ['user-1', 'user-2']);
+      expect(issue.labels, ['label-1']);
+    });
+
+    test('still reads the plain id form', () {
+      final issue = Issue.fromJson({
+        'state': 'state-1',
+        'parent': 'parent-1',
+        'assignees': ['user-1'],
+      });
+      expect(issue.state, 'state-1');
+      expect(issue.parent, 'parent-1');
+      expect(issue.assignees, ['user-1']);
+    });
+
+    test('leaves stateDetail null for a bare id, rather than showing a UUID',
+        () {
+      final issue = Issue.fromJson({'state': 'b7e1-uuid'});
+      expect(issue.state, 'b7e1-uuid');
+      expect(issue.stateDetail, isNull);
+    });
+
+    test('accepts a string state_detail', () {
+      final issue = Issue.fromJson({'state_detail': 'Done'});
+      expect(issue.stateDetail, 'Done');
+    });
+
+    test('accepts numeric fields sent as strings', () {
+      final issue = Issue.fromJson({
+        'sequence_id': '42',
+        'sub_issues_count': '3',
+      });
+      expect(issue.sequenceId, 42);
+      expect(issue.subIssuesCount, 3);
+    });
+  });
+
   group('Issue.toCreateJson', () {
     test('includes required fields', () {
       final issue = makeIssue(name: 'My task', priority: 'high');

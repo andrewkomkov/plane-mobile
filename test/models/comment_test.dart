@@ -50,5 +50,60 @@ void main() {
       final comment = Comment.fromJson(json);
       expect(comment.actorDetail, isNull);
     });
+
+    // The token API sends the actor as a bare id and no actor_detail at all,
+    // so the id is the only identity that reliably arrives.
+    test('reads a bare actor id', () {
+      final comment = Comment.fromJson({'id': 'c4', 'actor': 'user-7'});
+      expect(comment.actor, 'user-7');
+    });
+
+    test('reads an id out of an expanded actor object', () {
+      final comment = Comment.fromJson({
+        'id': 'c5',
+        'actor': {'id': 'user-8', 'display_name': 'Bob'},
+      });
+      expect(comment.actor, 'user-8');
+    });
+
+    test('parses edited_at when the server has stamped an edit', () {
+      final comment = Comment.fromJson({
+        'id': 'c6',
+        'edited_at': '2025-03-01T12:00:00Z',
+      });
+      expect(comment.editedAt, DateTime.utc(2025, 3, 1, 12));
+    });
+
+    test('leaves editedAt null for a comment that was never edited', () {
+      final comment = Comment.fromJson({'id': 'c7', 'edited_at': null});
+      expect(comment.editedAt, isNull);
+    });
+  });
+
+  group('Comment.isAuthoredBy', () {
+    test('matches on actor', () {
+      final comment = Comment.fromJson({'id': 'c1', 'actor': 'user-1'});
+      expect(comment.isAuthoredBy('user-1'), isTrue);
+      expect(comment.isAuthoredBy('user-2'), isFalse);
+    });
+
+    // A comment made through an integration can carry created_by without
+    // actor, so both are checked.
+    test('matches on created_by when actor is absent', () {
+      final comment = Comment.fromJson({'id': 'c2', 'created_by': 'user-3'});
+      expect(comment.isAuthoredBy('user-3'), isTrue);
+    });
+
+    test('is false when the current user is unknown', () {
+      final comment = Comment.fromJson({'id': 'c3', 'actor': 'user-1'});
+      expect(comment.isAuthoredBy(null), isFalse);
+      expect(comment.isAuthoredBy(''), isFalse);
+    });
+
+    // An unattributed comment must not become editable by whoever is looking.
+    test('is false when the comment has no author at all', () {
+      final comment = Comment.fromJson({'id': 'c4'});
+      expect(comment.isAuthoredBy('user-1'), isFalse);
+    });
   });
 }

@@ -21,6 +21,8 @@ import '../../services/attachment_service.dart';
 import '../../services/comment_service.dart';
 import '../../services/label_service.dart';
 import '../../services/member_service.dart';
+import '../../services/auth_service.dart';
+import '../../models/user.dart';
 import '../../providers/data_providers.dart';
 import '../../models/issue.dart';
 import '../../models/state.dart';
@@ -54,8 +56,7 @@ class IssueDetailScreen extends ConsumerStatefulWidget {
   });
 
   @override
-  ConsumerState<IssueDetailScreen> createState() =>
-      _IssueDetailScreenState();
+  ConsumerState<IssueDetailScreen> createState() => _IssueDetailScreenState();
 }
 
 class _IssueDetailScreenState extends ConsumerState<IssueDetailScreen> {
@@ -78,6 +79,12 @@ class _IssueDetailScreenState extends ConsumerState<IssueDetailScreen> {
   String? _error;
   String _projectIdentifier = '';
   final _commentController = TextEditingController();
+
+  /// Who is looking at this screen. Decides which comments offer edit and
+  /// delete, so it is loaded before the comment list is drawn rather than
+  /// alongside it — an affordance that appears a moment late is worse than one
+  /// that appears with the content.
+  String? _currentUserId;
 
   @override
   void initState() {
@@ -128,11 +135,32 @@ class _IssueDetailScreenState extends ConsumerState<IssueDetailScreen> {
       // Lazy load the rest in background
       _lazyLoad();
     } catch (e) {
+      if (!mounted) return;
       setState(() {
-        _error = 'Could not load issue';
+        _error = _describeLoadFailure(e);
         _loading = false;
       });
     }
+  }
+
+  /// Turns a load failure into something that names the cause.
+  ///
+  /// This screen used to record a flat 'Could not load issue' for anything that
+  /// threw, which made a 404 from a renamed route, an auth rejection and a
+  /// parse error on an unexpected response shape all look identical — and all
+  /// look like the network. That is precisely how a dead endpoint survives to
+  /// production unnoticed, so the status code, or the type error if the request
+  /// itself succeeded, is kept and shown.
+  String _describeLoadFailure(Object e) {
+    if (e is DioException) {
+      final status = e.response?.statusCode;
+      if (status != null) {
+        return 'Server returned $status for this work item';
+      }
+      return 'Could not reach the server (${e.type.name})';
+    }
+    // A non-Dio throw here means the response arrived and parsing it failed.
+    return 'Could not read the work item response: $e';
   }
 
   Future<void> _lazyLoad() async {
@@ -141,7 +169,13 @@ class _IssueDetailScreenState extends ConsumerState<IssueDetailScreen> {
     final iid = widget.issueId;
     final cache = ref.read(dataCacheProvider);
 
-    _comments = await _tryLoad(() => CommentService.getComments(ws, pid, iid), <Comment>[]);
+    // Identity first: the comment cards below need it to decide whether to
+    // offer edit and delete, and it is a single cheap call.
+    _currentUserId ??=
+        (await _tryLoad<User?>(() => AuthService.getCurrentUser(), null))?.id;
+
+    _comments = await _tryLoad(
+        () => CommentService.getComments(ws, pid, iid), <Comment>[]);
     if (mounted) setState(() {});
 
     // Use shared cache for labels and members (avoids duplicate API calls)
@@ -151,13 +185,19 @@ class _IssueDetailScreenState extends ConsumerState<IssueDetailScreen> {
     _allMembers = cache.getMembers(ws, pid) ?? [];
     if (mounted) setState(() {});
 
-    _activities = await _tryLoad(() => IssueService.getActivities(ws, pid, iid), <Activity>[]);
+    _activities = await _tryLoad(
+        () => IssueService.getActivities(ws, pid, iid), <Activity>[]);
     if (mounted) setState(() {});
 
-    _subIssues = await _tryLoad(() => IssueService.getSubIssues(ws, pid, iid), <Issue>[]);
-    _relations = await _tryLoad(() => IssueService.getIssueRelations(ws, pid, iid), <Map<String, dynamic>>[]);
-    _attachments = await _tryLoad(() => AttachmentService.getAttachments(ws, pid, iid), <Attachment>[]);
-    _links = await _tryLoad(() => IssueService.getLinks(ws, pid, iid), <IssueLink>[]);
+    _subIssues = await _tryLoad(
+        () => IssueService.getSubIssues(ws, pid, iid), <Issue>[]);
+    _relations = await _tryLoad(
+        () => IssueService.getIssueRelations(ws, pid, iid),
+        <Map<String, dynamic>>[]);
+    _attachments = await _tryLoad(
+        () => AttachmentService.getAttachments(ws, pid, iid), <Attachment>[]);
+    _links = await _tryLoad(
+        () => IssueService.getLinks(ws, pid, iid), <IssueLink>[]);
 
     // Module + cycle name via proxy (single SQL query, no N+1)
     try {
@@ -212,6 +252,123 @@ class _IssueDetailScreenState extends ConsumerState<IssueDetailScreen> {
         widget.workspaceSlug, widget.projectId, widget.issueId, '<p>$text</p>');
     _commentController.clear();
     _load();
+  }
+
+  /// Opens the editor for a comment and saves the result.
+  ///
+  /// The body is edited as plain text and re-wrapped in a paragraph on save,
+  /// matching how [_addComment] writes them. Anything richer that was authored
+  /// on the web would be flattened by a round trip through this box, so a
+  /// comment whose markup is more than a single paragraph is not offered for
+  /// editing at all — see [_commentIsPlainParagraph].
+  Future<void> _editComment(Comment comment) async {
+    final controller = TextEditingController(text: _commentPlainText(comment));
+    final saved = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Edit comment'),
+        content: M3ETextField(
+          label: 'Comment',
+          controller: controller,
+          autofocus: true,
+          maxLines: null,
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () {
+              final text = controller.text.trim();
+              if (text.isEmpty) return;
+              Navigator.pop(ctx, text);
+            },
+            child: const Text('Save'),
+          ),
+        ],
+      ),
+    );
+    if (saved == null) return;
+
+    try {
+      final updated = await CommentService.updateComment(
+        widget.workspaceSlug,
+        widget.projectId,
+        widget.issueId,
+        comment.id,
+        '<p>$saved</p>',
+      );
+      if (!mounted) return;
+      // Swap in place rather than reloading the screen: the server answers the
+      // PATCH with the full comment, and a reload would scroll the activity
+      // feed back to the top away from what was just edited.
+      setState(() {
+        final i = _comments.indexWhere((c) => c.id == comment.id);
+        if (i != -1) _comments[i] = updated;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Could not save the comment: $e')),
+      );
+    }
+  }
+
+  Future<void> _deleteComment(Comment comment) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Delete comment'),
+        content: const Text(
+            'Are you sure you want to delete this comment? This cannot be undone.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: Text('Delete',
+                style: TextStyle(color: Theme.of(ctx).colorScheme.error)),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+
+    try {
+      await CommentService.deleteComment(
+        widget.workspaceSlug,
+        widget.projectId,
+        widget.issueId,
+        comment.id,
+      );
+      if (!mounted) return;
+      setState(() => _comments.removeWhere((c) => c.id == comment.id));
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Could not delete the comment: $e')),
+      );
+    }
+  }
+
+  /// The comment body as plain text, which is all this screen can render.
+  static String _commentPlainText(Comment comment) =>
+      (comment.commentHtml ?? '').replaceAll(RegExp(r'<[^>]*>'), '').trim();
+
+  /// Whether the body survives a round trip through the plain-text editor.
+  ///
+  /// The editor strips markup, so offering it for a comment containing lists,
+  /// links or images would quietly destroy them on save. Only a body that is a
+  /// single paragraph — what this app itself writes — is safe to edit here.
+  static bool _commentIsPlainParagraph(Comment comment) {
+    final html = (comment.commentHtml ?? '').trim();
+    if (html.isEmpty) return true;
+    final withoutParagraph =
+        html.replaceAll(RegExp(r'^<p>|</p>$', caseSensitive: false), '');
+    return !withoutParagraph.contains('<');
   }
 
   Future<void> _attachFile() async {
@@ -287,7 +444,7 @@ class _IssueDetailScreenState extends ConsumerState<IssueDetailScreen> {
       return Scaffold(
         appBar: const M3EAppBar(title: 'Issue'),
         body: ErrorStateWidget(
-          message: 'Failed to load issue',
+          message: _error ?? 'Failed to load issue',
           onRetry: _load,
         ),
       );
@@ -372,9 +529,9 @@ class _IssueDetailScreenState extends ConsumerState<IssueDetailScreen> {
                       runSpacing: 6,
                       children: [
                         PropertyChip(
-                          icon: PlaneTheme.stateIcon(
-                              state?.group ?? 'backlog'),
-                          iconColor: PlaneTheme.stateGroupColor(context, state?.group ?? 'backlog'),
+                          icon: PlaneTheme.stateIcon(state?.group ?? 'backlog'),
+                          iconColor: PlaneTheme.stateGroupColor(
+                              context, state?.group ?? 'backlog'),
                           label: state?.name ?? 'Unknown',
                           onTap: () => _showStatePicker(),
                         ),
@@ -401,9 +558,7 @@ class _IssueDetailScreenState extends ConsumerState<IssueDetailScreen> {
                           child: PropertyChip(
                             icon: Icons.label_outline,
                             iconColor: secondary,
-                            label: issueLabels.isEmpty
-                                ? 'Label'
-                                : '+',
+                            label: issueLabels.isEmpty ? 'Label' : '+',
                             onTap: () => _showLabelPicker(),
                           ),
                         ),
@@ -431,9 +586,8 @@ class _IssueDetailScreenState extends ConsumerState<IssueDetailScreen> {
                         // Target date chip
                         PropertyChip(
                           icon: Icons.flag_outlined,
-                          iconColor: issue.isOverdue
-                              ? PlaneTheme.urgent
-                              : secondary,
+                          iconColor:
+                              issue.isOverdue ? PlaneTheme.urgent : secondary,
                           label: issue.targetDate ?? 'Due',
                           onTap: () =>
                               _pickDate('target_date', issue.targetDate),
@@ -458,18 +612,22 @@ class _IssueDetailScreenState extends ConsumerState<IssueDetailScreen> {
                             Row(
                               mainAxisSize: MainAxisSize.min,
                               children: [
-                                Icon(Icons.view_module_outlined, size: 14, color: secondary),
+                                Icon(Icons.view_module_outlined,
+                                    size: 14, color: secondary),
                                 const SizedBox(width: 4),
-                                Text(_moduleName!, style: theme.textTheme.bodySmall),
+                                Text(_moduleName!,
+                                    style: theme.textTheme.bodySmall),
                               ],
                             ),
                           if (_cycleName != null)
                             Row(
                               mainAxisSize: MainAxisSize.min,
                               children: [
-                                Icon(Icons.replay_outlined, size: 14, color: secondary),
+                                Icon(Icons.replay_outlined,
+                                    size: 14, color: secondary),
                                 const SizedBox(width: 4),
-                                Text(_cycleName!, style: theme.textTheme.bodySmall),
+                                Text(_cycleName!,
+                                    style: theme.textTheme.bodySmall),
                               ],
                             ),
                         ],
@@ -506,8 +664,7 @@ class _IssueDetailScreenState extends ConsumerState<IssueDetailScreen> {
                               backgroundColor: theme.colorScheme.primary
                                   .withValues(alpha: 0.08)),
                           codeblockDecoration: BoxDecoration(
-                            color: theme
-                                .colorScheme.surfaceContainerHighest,
+                            color: theme.colorScheme.surfaceContainerHighest,
                             borderRadius: BorderRadius.circular(M3EShape.large),
                           ),
                           blockquoteDecoration: BoxDecoration(
@@ -636,8 +793,7 @@ class _IssueDetailScreenState extends ConsumerState<IssueDetailScreen> {
                 style: theme.textTheme.labelLarge?.copyWith(color: secondary)),
             if (_subIssues.isNotEmpty) ...[
               const SizedBox(width: 6),
-              Text('${_subIssues.length}',
-                  style: theme.textTheme.bodySmall),
+              Text('${_subIssues.length}', style: theme.textTheme.bodySmall),
             ],
             const Spacer(),
             M3EIconButton(
@@ -677,7 +833,8 @@ class _IssueDetailScreenState extends ConsumerState<IssueDetailScreen> {
                     Icon(
                       PlaneTheme.stateIcon(subState?.group ?? 'backlog'),
                       size: 16,
-                      color: PlaneTheme.stateGroupColor(context, subState?.group ?? 'backlog'),
+                      color: PlaneTheme.stateGroupColor(
+                          context, subState?.group ?? 'backlog'),
                     ),
                     const SizedBox(width: 8),
                     Icon(
@@ -714,9 +871,13 @@ class _IssueDetailScreenState extends ConsumerState<IssueDetailScreen> {
           spacing: 6,
           runSpacing: 6,
           children: _relations.map((r) {
+            // The server files each related issue under its relation kind and
+            // returns the issue's own fields flat, so the name is on the entry
+            // itself. The older nested `issue_detail` shape is still read as a
+            // fallback in case an instance serialises it that way.
             final relationType = r['relation_type'] ?? 'relates_to';
-            final relatedIssue = r['issue_detail'] ?? r['related_issue_detail'];
-            final issueName = relatedIssue?['name'] ?? 'Unknown issue';
+            final nested = r['issue_detail'] ?? r['related_issue_detail'];
+            final issueName = r['name'] ?? nested?['name'] ?? 'Unknown issue';
             return _RelationChip(
               type: relationType,
               issueName: issueName,
@@ -739,8 +900,7 @@ class _IssueDetailScreenState extends ConsumerState<IssueDetailScreen> {
                 style: theme.textTheme.labelLarge?.copyWith(color: secondary)),
             if (_attachments.isNotEmpty) ...[
               const SizedBox(width: 6),
-              Text('${_attachments.length}',
-                  style: theme.textTheme.bodySmall),
+              Text('${_attachments.length}', style: theme.textTheme.bodySmall),
             ],
           ],
         ),
@@ -813,8 +973,7 @@ class _IssueDetailScreenState extends ConsumerState<IssueDetailScreen> {
                 style: theme.textTheme.labelLarge?.copyWith(color: secondary)),
             if (_links.isNotEmpty) ...[
               const SizedBox(width: 6),
-              Text('${_links.length}',
-                  style: theme.textTheme.bodySmall),
+              Text('${_links.length}', style: theme.textTheme.bodySmall),
             ],
             const Spacer(),
             M3EIconButton(
@@ -841,7 +1000,8 @@ class _IssueDetailScreenState extends ConsumerState<IssueDetailScreen> {
                   padding: const EdgeInsets.symmetric(vertical: 4),
                   child: Row(
                     children: [
-                      Icon(Icons.link, size: 16, color: theme.colorScheme.primary),
+                      Icon(Icons.link,
+                          size: 16, color: theme.colorScheme.primary),
                       const SizedBox(width: 8),
                       Expanded(
                         child: Column(
@@ -948,14 +1108,47 @@ class _IssueDetailScreenState extends ConsumerState<IssueDetailScreen> {
     return 'Someone';
   }
 
+  /// Names the author of a comment.
+  ///
+  /// The token API serialises a comment's actor as a bare id and sends no
+  /// `actor_detail`, so the model's own fallback yields a raw UUID. Resolving
+  /// the id against the project member list is what turns that back into a
+  /// person; 'Unknown' is better than a UUID when it cannot be resolved.
+  String _resolveCommentAuthor(Comment c) {
+    final id = c.actor ?? c.createdBy;
+    if (id != null) {
+      for (final m in _allMembers) {
+        if (m.id == id) {
+          return m.displayName.isNotEmpty ? m.displayName : m.email;
+        }
+      }
+    }
+    final detail = c.actorDetail;
+    // The model falls back to created_by, which is the very UUID just failed
+    // to resolve — do not render that at people.
+    if (detail != null && detail != id && detail.isNotEmpty) return detail;
+    return 'Unknown';
+  }
+
   List<Widget> _buildActivityItems() {
     final items = <_ActivityEntry>[];
 
     // Add comments
     for (final c in _comments) {
+      // Only the author is offered edit and delete. See
+      // CommentService.canModify for why the project-admin half of the
+      // server's rule is not reproduced here.
+      final mine = CommentService.canModify(c, _currentUserId);
       items.add(_ActivityEntry(
         date: c.createdAt,
-        widget: _CommentCard(comment: c),
+        widget: _CommentCard(
+          comment: c,
+          authorName: _resolveCommentAuthor(c),
+          onEdit: mine && _commentIsPlainParagraph(c)
+              ? () => _editComment(c)
+              : null,
+          onDelete: mine ? () => _deleteComment(c) : null,
+        ),
       ));
     }
 
@@ -964,7 +1157,8 @@ class _IssueDetailScreenState extends ConsumerState<IssueDetailScreen> {
       if (a.field == 'comment') continue;
       items.add(_ActivityEntry(
         date: a.createdAt,
-        widget: _ActivityCard(activity: a, resolvedActorName: _resolveActorName(a)),
+        widget:
+            _ActivityCard(activity: a, resolvedActorName: _resolveActorName(a)),
       ));
     }
 
@@ -1006,8 +1200,7 @@ class _IssueDetailScreenState extends ConsumerState<IssueDetailScreen> {
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Delete issue'),
-        content:
-            const Text('Are you sure you want to delete this issue?'),
+        content: const Text('Are you sure you want to delete this issue?'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
@@ -1038,8 +1231,8 @@ class _IssueDetailScreenState extends ConsumerState<IssueDetailScreen> {
                     leading: Icon(PlaneTheme.stateIcon(s.group),
                         color: PlaneTheme.stateGroupColor(context, s.group),
                         size: 18),
-                    title: Text(s.name,
-                        style: Theme.of(ctx).textTheme.bodyMedium),
+                    title:
+                        Text(s.name, style: Theme.of(ctx).textTheme.bodyMedium),
                     onTap: () {
                       Navigator.pop(ctx);
                       _updateField({'state': s.id});
@@ -1091,8 +1284,16 @@ class _IssueDetailScreenState extends ConsumerState<IssueDetailScreen> {
   Future<void> _createLabel() async {
     final nameController = TextEditingController();
     final colors = [
-      '#ef4444', '#f97316', '#eab308', '#22c55e', '#06b6d4',
-      '#3b82f6', '#8b5cf6', '#ec4899', '#6b7280', '#0ea5e9',
+      '#ef4444',
+      '#f97316',
+      '#eab308',
+      '#22c55e',
+      '#06b6d4',
+      '#3b82f6',
+      '#8b5cf6',
+      '#ec4899',
+      '#6b7280',
+      '#0ea5e9',
     ];
     var selectedColor = colors[0];
 
@@ -1113,40 +1314,47 @@ class _IssueDetailScreenState extends ConsumerState<IssueDetailScreen> {
               Wrap(
                 // A swatch is pure colour — the hex is the only stable name
                 // it has, and selection is otherwise only a border.
-                children: colors.map((c) => Semantics(
-                  label: 'Select label colour $c',
-                  button: true,
-                  selected: selectedColor == c,
-                  container: true,
-                  child: GestureDetector(
-                    onTap: () => setDialogState(() => selectedColor = c),
-                    // 28dp circle, 48dp target: a swatch is still a control.
-                    child: SizedBox(
-                      width: 48,
-                      height: 48,
-                      child: Center(
-                        child: Container(
-                          width: 28,
-                          height: 28,
-                          decoration: BoxDecoration(
-                            color: _parseColor(c),
-                            shape: BoxShape.circle,
-                            border: selectedColor == c
-                                ? Border.all(
-                                    color: Theme.of(ctx).colorScheme.onSurface,
-                                    width: 2)
-                                : null,
+                children: colors
+                    .map((c) => Semantics(
+                          label: 'Select label colour $c',
+                          button: true,
+                          selected: selectedColor == c,
+                          container: true,
+                          child: GestureDetector(
+                            onTap: () =>
+                                setDialogState(() => selectedColor = c),
+                            // 28dp circle, 48dp target: a swatch is still a control.
+                            child: SizedBox(
+                              width: 48,
+                              height: 48,
+                              child: Center(
+                                child: Container(
+                                  width: 28,
+                                  height: 28,
+                                  decoration: BoxDecoration(
+                                    color: _parseColor(c),
+                                    shape: BoxShape.circle,
+                                    border: selectedColor == c
+                                        ? Border.all(
+                                            color: Theme.of(ctx)
+                                                .colorScheme
+                                                .onSurface,
+                                            width: 2)
+                                        : null,
+                                  ),
+                                ),
+                              ),
+                            ),
                           ),
-                        ),
-                      ),
-                    ),
-                  ),
-                )).toList(),
+                        ))
+                    .toList(),
               ),
             ],
           ),
           actions: [
-            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+            TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text('Cancel')),
             TextButton(
               onPressed: () {
                 final name = nameController.text.trim();
@@ -1166,8 +1374,10 @@ class _IssueDetailScreenState extends ConsumerState<IssueDetailScreen> {
         await LabelService.createLabel(
             widget.workspaceSlug, widget.projectId, result);
         // Reload labels and reopen picker
-        _allLabels = await _tryLoad(() => LabelService.getLabels(
-            widget.workspaceSlug, widget.projectId), <Label>[]);
+        _allLabels = await _tryLoad(
+            () =>
+                LabelService.getLabels(widget.workspaceSlug, widget.projectId),
+            <Label>[]);
         if (mounted) {
           setState(() {});
           _showLabelPicker();
@@ -1233,8 +1443,8 @@ class _IssueDetailScreenState extends ConsumerState<IssueDetailScreen> {
                         shape: BoxShape.circle,
                       ),
                     ),
-                    title: Text(l.name,
-                        style: Theme.of(ctx).textTheme.bodyMedium),
+                    title:
+                        Text(l.name, style: Theme.of(ctx).textTheme.bodyMedium),
                     controlAffinity: ListTileControlAffinity.trailing,
                     dense: true,
                   )),
@@ -1458,18 +1668,29 @@ class _ActivityCard extends StatelessWidget {
     final oldVal = activity.oldValue;
     final newVal = activity.newValue;
     if (verb == 'created') {
-      if (newVal != null && newVal.isNotEmpty) return '$actor set $fieldName to $newVal';
+      if (newVal != null && newVal.isNotEmpty) {
+        return '$actor set $fieldName to $newVal';
+      }
       return '$actor created the issue';
     }
     if (verb == 'updated') {
-      if (oldVal != null && oldVal.isNotEmpty && newVal != null && newVal.isNotEmpty) {
+      if (oldVal != null &&
+          oldVal.isNotEmpty &&
+          newVal != null &&
+          newVal.isNotEmpty) {
         return '$actor changed $fieldName from $oldVal to $newVal';
       }
-      if (newVal != null && newVal.isNotEmpty) return '$actor set $fieldName to $newVal';
-      if (oldVal != null && oldVal.isNotEmpty) return '$actor removed $fieldName $oldVal';
+      if (newVal != null && newVal.isNotEmpty) {
+        return '$actor set $fieldName to $newVal';
+      }
+      if (oldVal != null && oldVal.isNotEmpty) {
+        return '$actor removed $fieldName $oldVal';
+      }
       return '$actor updated $fieldName';
     }
-    if (verb == 'deleted') return '$actor removed $fieldName${oldVal != null ? ' $oldVal' : ''}';
+    if (verb == 'deleted') {
+      return '$actor removed $fieldName${oldVal != null ? ' $oldVal' : ''}';
+    }
     return '$actor $verb $fieldName';
   }
 
@@ -1506,7 +1727,8 @@ class _ActivityCard extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(_icon, size: 16,
+          Icon(_icon,
+              size: 16,
               color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.6)),
           const SizedBox(width: 8),
           Expanded(
@@ -1564,8 +1786,7 @@ class _LabelPill extends StatelessWidget {
               ),
             ),
             const SizedBox(width: 5),
-            Text(label.name,
-                style: Theme.of(context).textTheme.labelMedium),
+            Text(label.name, style: Theme.of(context).textTheme.labelMedium),
           ],
         ),
       ),
@@ -1599,8 +1820,7 @@ class _AssigneeChip extends StatelessWidget {
         else
           CircleAvatar(
             radius: 12,
-            backgroundColor:
-                theme.colorScheme.primary.withValues(alpha: 0.2),
+            backgroundColor: theme.colorScheme.primary.withValues(alpha: 0.2),
             child: Text(
               (member.displayName.isNotEmpty ? member.displayName : '?')[0]
                   .toUpperCase(),
@@ -1618,11 +1838,63 @@ class _AssigneeChip extends StatelessWidget {
 // --- Comment card ---
 class _CommentCard extends StatelessWidget {
   final Comment comment;
-  const _CommentCard({required this.comment});
+  final String authorName;
+
+  /// Null when the current user may not edit this comment, or when its markup
+  /// is richer than the plain-text editor can round-trip.
+  final VoidCallback? onEdit;
+
+  /// Null when the current user did not write this comment.
+  final VoidCallback? onDelete;
+
+  const _CommentCard({
+    required this.comment,
+    required this.authorName,
+    this.onEdit,
+    this.onDelete,
+  });
+
+  void _showActions(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (onEdit != null)
+              ListTile(
+                leading: const Icon(Icons.edit_outlined, size: 20),
+                title: Text('Edit comment',
+                    style: Theme.of(ctx).textTheme.bodyMedium),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  onEdit!();
+                },
+              ),
+            if (onDelete != null)
+              ListTile(
+                leading: Icon(Icons.delete_outline,
+                    color: Theme.of(ctx).colorScheme.error, size: 20),
+                title: Text('Delete comment',
+                    style: Theme.of(ctx)
+                        .textTheme
+                        .bodyMedium
+                        ?.copyWith(color: Theme.of(ctx).colorScheme.error)),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  onDelete!();
+                },
+              ),
+          ],
+        ),
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final canModify = onEdit != null || onDelete != null;
     return Padding(
       padding: const EdgeInsets.only(bottom: 16),
       child: Column(
@@ -1635,26 +1907,49 @@ class _CommentCard extends StatelessWidget {
                 backgroundColor:
                     theme.colorScheme.primary.withValues(alpha: 0.2),
                 child: Text(
-                  (comment.actorDetail ?? '?')[0].toUpperCase(),
+                  (authorName.isNotEmpty ? authorName : '?')[0].toUpperCase(),
                   style: theme.textTheme.labelSmall
                       ?.copyWith(color: theme.colorScheme.primary),
                 ),
               ),
               const SizedBox(width: 8),
-              Text(comment.actorDetail ?? 'Unknown',
-                  style: theme.textTheme.titleSmall),
+              Flexible(
+                child: Text(authorName,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.titleSmall),
+              ),
               const SizedBox(width: 8),
               Text(timeAgo(comment.createdAt),
-                  style: theme.textTheme.labelSmall?.copyWith(
-                      color: theme.colorScheme.onSurfaceVariant)),
+                  style: theme.textTheme.labelSmall
+                      ?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
+              // An edited comment is no longer what anyone was notified about,
+              // so say so rather than letting the change pass silently.
+              if (comment.editedAt != null) ...[
+                const SizedBox(width: 6),
+                Text('(edited)',
+                    style: theme.textTheme.labelSmall
+                        ?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
+              ],
+              const Spacer(),
+              if (canModify)
+                // The author's name is in the row, so the label has to name
+                // which comment this acts on — several of these cards sit in
+                // the same list and 'Comment actions' alone would be ambiguous
+                // to anything driving the app by label.
+                M3EIconButton(
+                  icon: Icons.more_horiz,
+                  tooltip: 'Actions for comment by $authorName',
+                  size: M3EIconButtonSize.extraSmall,
+                  color: theme.colorScheme.onSurfaceVariant,
+                  onPressed: () => _showActions(context),
+                ),
             ],
           ),
           Padding(
             padding: const EdgeInsets.only(left: 32, top: 4),
             child: Text(
-              comment.commentHtml
-                      ?.replaceAll(RegExp(r'<[^>]*>'), '')
-                      .trim() ??
+              comment.commentHtml?.replaceAll(RegExp(r'<[^>]*>'), '').trim() ??
                   '',
               style: theme.textTheme.bodyMedium,
             ),
