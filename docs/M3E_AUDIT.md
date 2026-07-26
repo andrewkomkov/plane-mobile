@@ -4,6 +4,43 @@ Read-only audit of `lib/screens/`, `lib/widgets/`, `lib/config/theme.dart` and
 `lib/config/m3e/`, against the brief in [`M3_EXPRESSIVE.md`](M3_EXPRESSIVE.md).
 Audited at `d9d3f88`.
 
+## Status
+
+Audited at `d9d3f88`; this section records what has since been done, because an
+audit that does not say what it retired becomes a list of things that look
+broken and are not.
+
+**Retired:** all of Part 1 (accessibility) — the thirteen double-announcing
+`Semantics` wrappers, the three swipe-only destructive actions, the anonymous
+notification feed, the `GestureDetector` around `IssueRow`, the missing search
+back affordance and the colliding labels. Ranked items 3, 5, 6, 7, 8, 9, 10,
+11, 12, 13, 14 and 15. Both of Part 5 — the four overlay surfaces now carry the
+hairline the decision table promised, and the listing switcher is 48dp. All of
+Part 6 — the four create flows are reachable, `FilterBar` is rendered and
+`applyFilters` called, My issues honours its own Grouping option, and the
+spreadsheet scrolls as one table.
+
+**Consequence worth stating:** `flutter analyze` reports **nothing**, down from
+30, and the suite is 655 green with no failures. The fourteen warnings that
+survived the first cleanup were all unreferenced declarations for the flows
+nobody could reach — the analyzer was, for a while, the only thing in the repo
+reporting that the app could not create a cycle.
+
+**Not done, and deliberately:** `main.dart` still installs no `textScaler`
+clamp. Screens that clipped at large text scales were fixed individually
+instead. A global clamp overrides a user's accessibility setting, which is a
+product decision rather than a refactor.
+
+**Raised by the fixers, still open:** `confirm_dialog` needs a non-destructive
+variant (three restore dialogs are hand-rolled because painting "Restore" in
+the error role would be a lie); `ScrollableEmptyState` needs an action slot;
+`SectionHeader` needs a trailing slot; `app_navbar` should export its occupied
+height instead of callers guessing it; `FilterBar`'s Clear resets ordering as
+well as filters; `Project` carries no feature flags, so the project settings
+Features section was removed rather than fixed.
+
+---
+
 ## Verdict
 
 **The token layer is genuinely excellent. The layer built on top of it has
