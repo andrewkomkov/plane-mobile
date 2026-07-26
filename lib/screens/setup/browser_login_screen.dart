@@ -51,7 +51,8 @@ class _BrowserLoginScreenState extends State<BrowserLoginScreen>
   Future<void> _openBrowser() async {
     final url = Uri.parse(widget.baseUrl);
     try {
-      final launched = await launchUrl(url, mode: LaunchMode.externalApplication);
+      final launched =
+          await launchUrl(url, mode: LaunchMode.externalApplication);
       if (launched) {
         setState(() => _browserOpened = true);
       } else {

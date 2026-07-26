@@ -27,8 +27,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   void initState() {
     super.initState();
     _user = widget.user;
-    _nameController =
-        TextEditingController(text: _user?.displayName ?? '');
+    _nameController = TextEditingController(text: _user?.displayName ?? '');
     if (_user == null) _loadUser();
   }
 
@@ -54,8 +53,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     try {
       await AuthService.updateProfile({'display_name': name});
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Profile updated')));
+        ScaffoldMessenger.of(context)
+            .showSnackBar(const SnackBar(content: Text('Profile updated')));
       }
     } catch (e) {
       if (mounted) {
@@ -87,12 +86,11 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
           Center(
             child: CircleAvatar(
               radius: 40,
-              backgroundColor:
-                  theme.colorScheme.primary.withValues(alpha: 0.2),
-              backgroundImage: _user?.avatar != null &&
-                      _user!.avatar!.isNotEmpty
-                  ? NetworkImage(_user!.avatar!)
-                  : null,
+              backgroundColor: theme.colorScheme.primary.withValues(alpha: 0.2),
+              backgroundImage:
+                  _user?.avatar != null && _user!.avatar!.isNotEmpty
+                      ? NetworkImage(_user!.avatar!)
+                      : null,
               child: _user?.avatar == null || _user!.avatar!.isEmpty
                   ? Text(
                       (_user?.displayName.isNotEmpty == true
@@ -115,8 +113,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
             // below, so it borrows that field's outline, corner and fill rather
             // than inventing a third box treatment.
             Container(
-              padding: const EdgeInsets.symmetric(
-                  horizontal: 16, vertical: 16),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(M3EShape.large),
                 border: Border.all(
@@ -124,8 +121,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                 color: theme.colorScheme.surfaceContainerLow,
               ),
               child: Text(_user!.email,
-                  style: theme.textTheme.bodyMedium?.copyWith(
-                      color: theme.colorScheme.onSurfaceVariant)),
+                  style: theme.textTheme.bodyMedium
+                      ?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
             ),
             const SizedBox(height: 16),
           ],
@@ -211,8 +208,7 @@ class _ThemeOption extends StatelessWidget {
           contentPadding: EdgeInsets.zero,
           leading: Icon(icon, size: 20),
           title: Text(label, style: Theme.of(context).textTheme.bodyMedium),
-          trailing:
-              selected ? const Icon(Icons.check, size: 18) : null,
+          trailing: selected ? const Icon(Icons.check, size: 18) : null,
           onTap: onTap,
         ),
       ),

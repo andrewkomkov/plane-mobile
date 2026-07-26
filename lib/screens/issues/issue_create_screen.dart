@@ -368,96 +368,120 @@ class _IssueCreateScreenState extends State<IssueCreateScreen> {
             Row(
               children: [
                 Expanded(
-                  child: GestureDetector(
-                    onTap: () => _showStatePicker(),
-                    child: Container(
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        color: scheme.surfaceContainerLow,
-                        borderRadius: BorderRadius.circular(M3EShape.large),
-                        // Same outline as the fields above — these are inputs
-                        // too, they just open a sheet instead of a keyboard.
-                        border: Border.all(
-                            color: scheme.outlineVariant, width: 0.8),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'STATUS',
-                            style: M3EType.overline(scheme.onSurfaceVariant),
-                          ),
-                          const SizedBox(height: 8),
-                          Row(
-                            children: [
-                              Container(
-                                width: 8,
-                                height: 8,
-                                decoration: BoxDecoration(
-                                  shape: BoxShape.circle,
-                                  color: _currentState != null
-                                      ? PlaneTheme.stateGroupColor(
-                                          context, _currentState!.group)
-                                      : PlaneTheme.backlog,
+                  // The card reads as an input but is a raw GestureDetector:
+                  // it announced "STATUS Backlog" with no button role, and
+                  // deferToChild meant only the glyphs answered a tap, not the
+                  // 16dp of padding that looks like part of the control.
+                  child: Semantics(
+                    label: 'Status: ${_currentState?.name ?? 'Backlog'}. '
+                        'Change status',
+                    button: true,
+                    container: true,
+                    excludeSemantics: true,
+                    onTap: _showStatePicker,
+                    child: GestureDetector(
+                      onTap: () => _showStatePicker(),
+                      behavior: HitTestBehavior.opaque,
+                      child: Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: scheme.surfaceContainerLow,
+                          borderRadius: BorderRadius.circular(M3EShape.large),
+                          // Same outline as the fields above — these are inputs
+                          // too, they just open a sheet instead of a keyboard.
+                          border: Border.all(
+                              color: scheme.outlineVariant, width: 0.8),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'STATUS',
+                              style: M3EType.overline(scheme.onSurfaceVariant),
+                            ),
+                            const SizedBox(height: 8),
+                            Row(
+                              children: [
+                                Container(
+                                  width: 8,
+                                  height: 8,
+                                  decoration: BoxDecoration(
+                                    shape: BoxShape.circle,
+                                    color: _currentState != null
+                                        ? PlaneTheme.stateGroupColor(
+                                            context, _currentState!.group)
+                                        : PlaneTheme.backlog,
+                                  ),
                                 ),
-                              ),
-                              const SizedBox(width: 8),
-                              Expanded(
-                                child: Text(
-                                  _currentState?.name ?? 'Backlog',
-                                  style: theme.textTheme.labelLarge,
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: Text(
+                                    _currentState?.name ?? 'Backlog',
+                                    style: theme.textTheme.labelLarge,
+                                  ),
                                 ),
-                              ),
-                              Icon(Icons.expand_more,
-                                  size: 18, color: scheme.onSurfaceVariant),
-                            ],
-                          ),
-                        ],
+                                Icon(Icons.expand_more,
+                                    size: 18, color: scheme.onSurfaceVariant),
+                              ],
+                            ),
+                          ],
+                        ),
                       ),
                     ),
                   ),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
-                  child: GestureDetector(
-                    onTap: () => _showPriorityPicker(),
-                    child: Container(
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        color: scheme.surfaceContainerLow,
-                        borderRadius: BorderRadius.circular(M3EShape.large),
-                        border: Border.all(
-                            color: scheme.outlineVariant, width: 0.8),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'PRIORITY',
-                            style: M3EType.overline(scheme.onSurfaceVariant),
-                          ),
-                          const SizedBox(height: 8),
-                          Row(
-                            children: [
-                              Icon(
-                                PlaneTheme.priorityIcon(_selectedPriority),
-                                size: 16,
-                                color: PlaneTheme.priorityColor(
-                                    context, _selectedPriority),
-                              ),
-                              const SizedBox(width: 8),
-                              Expanded(
-                                child: Text(
-                                  _selectedPriority[0].toUpperCase() +
-                                      _selectedPriority.substring(1),
-                                  style: theme.textTheme.labelLarge,
+                  // Same treatment as the status card beside it.
+                  child: Semantics(
+                    label: 'Priority: '
+                        '${_selectedPriority[0].toUpperCase()}'
+                        '${_selectedPriority.substring(1)}. Change priority',
+                    button: true,
+                    container: true,
+                    excludeSemantics: true,
+                    onTap: _showPriorityPicker,
+                    child: GestureDetector(
+                      onTap: () => _showPriorityPicker(),
+                      behavior: HitTestBehavior.opaque,
+                      child: Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: scheme.surfaceContainerLow,
+                          borderRadius: BorderRadius.circular(M3EShape.large),
+                          border: Border.all(
+                              color: scheme.outlineVariant, width: 0.8),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'PRIORITY',
+                              style: M3EType.overline(scheme.onSurfaceVariant),
+                            ),
+                            const SizedBox(height: 8),
+                            Row(
+                              children: [
+                                Icon(
+                                  PlaneTheme.priorityIcon(_selectedPriority),
+                                  size: 16,
+                                  color: PlaneTheme.priorityColor(
+                                      context, _selectedPriority),
                                 ),
-                              ),
-                              Icon(Icons.expand_more,
-                                  size: 18, color: scheme.onSurfaceVariant),
-                            ],
-                          ),
-                        ],
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: Text(
+                                    _selectedPriority[0].toUpperCase() +
+                                        _selectedPriority.substring(1),
+                                    style: theme.textTheme.labelLarge,
+                                  ),
+                                ),
+                                Icon(Icons.expand_more,
+                                    size: 18, color: scheme.onSurfaceVariant),
+                              ],
+                            ),
+                          ],
+                        ),
                       ),
                     ),
                   ),
@@ -589,19 +613,28 @@ class _BarAction extends StatelessWidget {
               pressedScale: 0.92,
               semanticLabel: semanticLabel,
               onTap: onTap,
-              child: Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                decoration: BoxDecoration(
-                  color: onTap == null
-                      ? background.withValues(alpha: 0.4)
-                      : background,
-                  borderRadius: BorderRadius.circular(M3EShape.full),
-                ),
-                child: Text(
-                  label,
-                  style: theme.textTheme.labelLarge?.copyWith(
-                    color: foreground,
+              // The pill draws at about 38dp. M3EPressable hit-tests opaquely
+              // over whatever child it is given, so centring the pill in a
+              // 48dp box buys the touch-target minimum without changing what
+              // is painted — and the 56dp app bar has the room already.
+              child: SizedBox(
+                height: kMinInteractiveDimension,
+                child: Center(
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 14, vertical: 10),
+                    decoration: BoxDecoration(
+                      color: onTap == null
+                          ? background.withValues(alpha: 0.4)
+                          : background,
+                      borderRadius: BorderRadius.circular(M3EShape.full),
+                    ),
+                    child: Text(
+                      label,
+                      style: theme.textTheme.labelLarge?.copyWith(
+                        color: foreground,
+                      ),
+                    ),
                   ),
                 ),
               ),
@@ -662,27 +695,34 @@ class _DiscardDraftButton extends StatelessWidget {
         pressedScale: 0.96,
         semanticLabel: 'Discard draft',
         onTap: onTap,
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(M3EShape.full),
-            border: Border.all(
-                color: scheme.error.withValues(alpha: 0.4), width: 0.8),
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              if (busy)
-                const M3ELoadingIndicator(size: 16)
-              else
-                Icon(Icons.delete_outline, size: 18, color: scheme.error),
-              const SizedBox(width: 8),
-              Text(
-                'Discard draft',
-                style:
-                    theme.textTheme.labelLarge?.copyWith(color: scheme.error),
+        // Roughly 42dp of pill in a 48dp hit box. The pressable is opaque, so
+        // the extra 6dp are tappable without the outline growing to meet them.
+        child: SizedBox(
+          height: kMinInteractiveDimension,
+          child: Center(
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(M3EShape.full),
+                border: Border.all(
+                    color: scheme.error.withValues(alpha: 0.4), width: 0.8),
               ),
-            ],
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (busy)
+                    const M3ELoadingIndicator(size: 16)
+                  else
+                    Icon(Icons.delete_outline, size: 18, color: scheme.error),
+                  const SizedBox(width: 8),
+                  Text(
+                    'Discard draft',
+                    style: theme.textTheme.labelLarge
+                        ?.copyWith(color: scheme.error),
+                  ),
+                ],
+              ),
+            ),
           ),
         ),
       ),

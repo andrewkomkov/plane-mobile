@@ -451,7 +451,10 @@ class _ModuleDetailScreenState extends ConsumerState<ModuleDetailScreen> {
         actions: [
           M3EAppBarAction(
             icon: Icons.more_horiz,
-            tooltip: 'More',
+            // Names the target, not the glyph: the cycle screen carries the
+            // same overflow trigger, and two nodes both called "More" make
+            // `adb_drive.py tap "More"` ambiguous across a flow.
+            tooltip: 'More actions for module ${mod.name}',
             onPressed: () => _showMoreMenu(),
           ),
         ],
@@ -598,25 +601,54 @@ class _ModuleDetailScreenState extends ConsumerState<ModuleDetailScreen> {
                               await _removeIssue(issue);
                               return false;
                             },
-                            child: IssueRow(
-                              issue: issue,
-                              state: _states[issue.state],
-                              showPriority: true,
-                              showState: true,
-                              onTap: () async {
-                                await Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (_) => IssueDetailScreen(
-                                      workspaceSlug: widget.workspaceSlug,
-                                      projectId: widget.projectId,
-                                      issueId: issue.id,
-                                      states: _states,
-                                    ),
+                            // Removing an issue used to be the swipe and
+                            // nothing else: no button, no long-press, no
+                            // custom action. A swipe produces no semantics
+                            // node, so the action was not merely awkward
+                            // without sight — there was nothing for
+                            // `adb_drive.py check` to report as missing. The
+                            // swipe stays as the accelerator.
+                            //
+                            // The button sits beside the row rather than in
+                            // it because `IssueRow` has no trailing slot to
+                            // pass through to `PlaneRow.trailing`; if it
+                            // gains one, this Row collapses into it.
+                            child: Row(
+                              children: [
+                                Expanded(
+                                  child: IssueRow(
+                                    issue: issue,
+                                    state: _states[issue.state],
+                                    showPriority: true,
+                                    showState: true,
+                                    onTap: () async {
+                                      await Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder: (_) => IssueDetailScreen(
+                                            workspaceSlug: widget.workspaceSlug,
+                                            projectId: widget.projectId,
+                                            issueId: issue.id,
+                                            states: _states,
+                                          ),
+                                        ),
+                                      );
+                                      _load();
+                                    },
                                   ),
-                                );
-                                _load();
-                              },
+                                ),
+                                Padding(
+                                  padding: const EdgeInsets.only(right: 8),
+                                  child: M3EIconButton(
+                                    icon: Icons.remove_circle_outline,
+                                    tooltip:
+                                        'Remove ${issue.name} from this module',
+                                    size: M3EIconButtonSize.small,
+                                    color: theme.colorScheme.onSurfaceVariant,
+                                    onPressed: () => _removeIssue(issue),
+                                  ),
+                                ),
+                              ],
                             ),
                           )),
                       const SizedBox(height: 80),

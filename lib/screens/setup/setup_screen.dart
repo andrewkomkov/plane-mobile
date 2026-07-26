@@ -50,7 +50,10 @@ class _SetupScreenState extends State<SetupScreen> {
       return;
     }
 
-    setState(() { _loading = true; _error = null; });
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
 
     try {
       final googleSignIn = GoogleSignIn.instance;
@@ -62,13 +65,19 @@ class _SetupScreenState extends State<SetupScreen> {
           scopeHint: ['email', 'profile'],
         );
       } on GoogleSignInException catch (e) {
-        setState(() { _error = 'Google error: ${e.code} - ${e.description}'; _loading = false; });
+        setState(() {
+          _error = 'Google error: ${e.code} - ${e.description}';
+          _loading = false;
+        });
         return;
       }
 
       final idToken = account.authentication.idToken;
       if (idToken == null) {
-        setState(() { _error = 'Failed to get Google ID token'; _loading = false; });
+        setState(() {
+          _error = 'Failed to get Google ID token';
+          _loading = false;
+        });
         return;
       }
 
@@ -92,14 +101,25 @@ class _SetupScreenState extends State<SetupScreen> {
         });
       }
     } on DioException catch (e) {
-      final msg = e.response?.data?['error'] ?? e.message ?? 'Connection failed';
+      final msg =
+          e.response?.data?['error'] ?? e.message ?? 'Connection failed';
       if (e.response?.statusCode == 404 || e.response?.statusCode == 501) {
-        setState(() { _error = 'Google login not available on this instance. Try email/password or API key.'; _loading = false; });
+        setState(() {
+          _error =
+              'Google login not available on this instance. Try email/password or API key.';
+          _loading = false;
+        });
       } else {
-        setState(() { _error = msg.toString(); _loading = false; });
+        setState(() {
+          _error = msg.toString();
+          _loading = false;
+        });
       }
     } catch (e) {
-      setState(() { _error = 'Google sign-in failed: $e'; _loading = false; });
+      setState(() {
+        _error = 'Google sign-in failed: $e';
+        _loading = false;
+      });
     }
   }
 
@@ -114,7 +134,10 @@ class _SetupScreenState extends State<SetupScreen> {
       return;
     }
 
-    setState(() { _loading = true; _error = null; });
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
 
     try {
       final dio = Dio(BaseOptions(
@@ -136,10 +159,17 @@ class _SetupScreenState extends State<SetupScreen> {
         });
       }
     } on DioException catch (e) {
-      final msg = e.response?.data?['error'] ?? e.message ?? 'Connection failed';
-      setState(() { _error = msg.toString(); _loading = false; });
+      final msg =
+          e.response?.data?['error'] ?? e.message ?? 'Connection failed';
+      setState(() {
+        _error = msg.toString();
+        _loading = false;
+      });
     } catch (e) {
-      setState(() { _error = 'Connection failed: $e'; _loading = false; });
+      setState(() {
+        _error = 'Connection failed: $e';
+        _loading = false;
+      });
     }
   }
 
@@ -154,12 +184,18 @@ class _SetupScreenState extends State<SetupScreen> {
       return;
     }
 
-    setState(() { _loading = true; _error = null; });
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
 
     try {
       final ok = await AuthService.testConnection(url, apiKey);
       if (!ok) {
-        setState(() { _error = 'Could not connect. Check URL and API key.'; _loading = false; });
+        setState(() {
+          _error = 'Could not connect. Check URL and API key.';
+          _loading = false;
+        });
         return;
       }
 
@@ -169,7 +205,10 @@ class _SetupScreenState extends State<SetupScreen> {
       ApiClient.reset();
       widget.onConfigured();
     } catch (e) {
-      setState(() { _error = 'Connection failed: $e'; _loading = false; });
+      setState(() {
+        _error = 'Connection failed: $e';
+        _loading = false;
+      });
     }
   }
 
@@ -183,7 +222,10 @@ class _SetupScreenState extends State<SetupScreen> {
     ApiClient.reset();
 
     if (workspaces.isEmpty) {
-      setState(() { _error = 'No workspaces found.'; _loading = false; });
+      setState(() {
+        _error = 'No workspaces found.';
+        _loading = false;
+      });
       return;
     }
 
@@ -217,7 +259,8 @@ class _SetupScreenState extends State<SetupScreen> {
             children: [
               Padding(
                 padding: const EdgeInsets.all(16),
-                child: Text('Select Workspace', style: theme.textTheme.titleLarge),
+                child:
+                    Text('Select Workspace', style: theme.textTheme.titleLarge),
               ),
               const Divider(height: 1, thickness: 0.5),
               ...workspaces.map((ws) {
@@ -278,8 +321,7 @@ class _SetupScreenState extends State<SetupScreen> {
           children: [
             for (var i = 0; i < options.length; i++) ...[
               if (i > 0)
-                Text('  |  ',
-                    style: TextStyle(color: scheme.onSurfaceVariant)),
+                Text('  |  ', style: TextStyle(color: scheme.onSurfaceVariant)),
               TextButton(
                 onPressed: () => setState(() {
                   _mode = options[i].$2;

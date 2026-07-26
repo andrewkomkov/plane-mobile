@@ -457,24 +457,29 @@ class _MyIssuesTabState extends ConsumerState<MyIssuesTab>
                   Padding(
                     padding:
                         const EdgeInsets.symmetric(horizontal: 20, vertical: 6),
-                    child: Row(
-                      children: [
-                        Text('Show sub-issues',
-                            style: theme.textTheme.bodyLarge),
-                        const Spacer(),
-                        // The switch sits in a Row next to its caption, so it
-                        // would otherwise be an unnamed node for automation.
-                        Semantics(
-                          label: 'Show sub-issues',
-                          child: Switch(
+                    // The switch sits in a Row next to its caption, so on its
+                    // own it is an unnamed toggle. A `Semantics(label:)` on
+                    // the Switch does not fix that — the label forms a node
+                    // *above* the toggle rather than joining it, so the node
+                    // that carries the action is still nameless. Merging the
+                    // caption and the control into one node is what a
+                    // SwitchListTile does internally, and it names the toggle
+                    // without repeating the caption as a second node.
+                    child: MergeSemantics(
+                      child: Row(
+                        children: [
+                          Text('Show sub-issues',
+                              style: theme.textTheme.bodyLarge),
+                          const Spacer(),
+                          Switch(
                             value: _showSubIssues,
                             onChanged: (v) {
                               setSheetState(() => _showSubIssues = v);
                               setState(() {});
                             },
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
                   ),
                   optionRow('Maximum title length',
@@ -530,29 +535,29 @@ class _MyIssuesTabState extends ConsumerState<MyIssuesTab>
                           'Cycle',
                           'Estimate'
                         ])
-                          // The chip's Text names it; only the on/off state
-                          // needs exposing, as it is carried by colour alone.
-                          Semantics(
-                            button: true,
+                          // No Semantics wrapper: M3EChip already hands
+                          // `selected` to M3EPressable, which declares both
+                          // the flag and the button role, and its Text names
+                          // the chip. Wrapping it added a second node
+                          // claiming the same selection with no name on it —
+                          // two nodes per chip for automation to choose
+                          // between, and nothing gained.
+                          M3EChip(
+                            label: prop,
                             selected: _rowProperties.contains(
                                 prop.toLowerCase().replaceAll(' ', '_')),
-                            child: M3EChip(
-                              label: prop,
-                              selected: _rowProperties.contains(
-                                  prop.toLowerCase().replaceAll(' ', '_')),
-                              onTap: () {
-                                final key =
-                                    prop.toLowerCase().replaceAll(' ', '_');
-                                setSheetState(() {
-                                  if (_rowProperties.contains(key)) {
-                                    _rowProperties.remove(key);
-                                  } else {
-                                    _rowProperties.add(key);
-                                  }
-                                });
-                                setState(() {});
-                              },
-                            ),
+                            onTap: () {
+                              final key =
+                                  prop.toLowerCase().replaceAll(' ', '_');
+                              setSheetState(() {
+                                if (_rowProperties.contains(key)) {
+                                  _rowProperties.remove(key);
+                                } else {
+                                  _rowProperties.add(key);
+                                }
+                              });
+                              setState(() {});
+                            },
                           ),
                       ],
                     ),
@@ -584,7 +589,11 @@ class _MyIssuesTabState extends ConsumerState<MyIssuesTab>
       // what a connected ButtonGroup is for. It also gives the row the press
       // give-and-take that separate pills could not.
       bottom: M3EButtonGroup(
-        height: 40,
+        // The same component sits at 48 on issues_tab_screen. Three segments
+        // are the screen's primary navigation and each one was a 40dp target;
+        // the connected group has no padded hit area behind it to make up the
+        // difference, so the height *is* the target.
+        height: kMinInteractiveDimension,
         items: const [
           M3EButtonGroupItem(label: 'Assigned'),
           M3EButtonGroupItem(label: 'Created'),

@@ -88,26 +88,38 @@ class SpreadsheetView extends StatelessWidget {
                       // Title
                       _DataCell(
                         width: 200,
-                        child: InkWell(
-                          onTap: () async {
-                            await Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) => IssueDetailScreen(
-                                  workspaceSlug: workspaceSlug,
-                                  projectId: projectId,
-                                  issueId: issue.id,
-                                  states: states,
+                        // The cell reserves 48dp but the InkWell only wrapped
+                        // the title text, so the control that opens an issue
+                        // was a 20dp band across the middle of it. Filling the
+                        // cell costs nothing visually — the InkWell paints
+                        // nothing but a splash — and gives the row's one
+                        // navigation action a fingertip.
+                        child: SizedBox(
+                          height: kMinInteractiveDimension,
+                          child: InkWell(
+                            onTap: () async {
+                              await Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => IssueDetailScreen(
+                                    workspaceSlug: workspaceSlug,
+                                    projectId: projectId,
+                                    issueId: issue.id,
+                                    states: states,
+                                  ),
                                 ),
+                              );
+                              onRefresh();
+                            },
+                            child: Align(
+                              alignment: Alignment.centerLeft,
+                              child: Text(
+                                issue.name,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: theme.textTheme.titleMedium,
                               ),
-                            );
-                            onRefresh();
-                          },
-                          child: Text(
-                            issue.name,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: theme.textTheme.titleMedium,
+                            ),
                           ),
                         ),
                       ),
@@ -121,10 +133,18 @@ class SpreadsheetView extends StatelessWidget {
                         // The chip text is just the state name, which repeats
                         // in every row; the label pins it to one issue.
                         child: Semantics(
-                          label: 'Change state of '
+                          label: 'State ${state?.name ?? 'Unknown'}, change '
+                              'state of '
                               '$projectIdentifier-${issue.sequenceId}',
                           button: true,
                           container: true,
+                          // Excluded, or the state name the chip draws lands
+                          // on the node beside the label and the cell reports
+                          // it twice. That means the label has to carry the
+                          // current value itself, and the chip's own tap has
+                          // to be re-declared here.
+                          excludeSemantics: true,
+                          onTap: () => _showStatePicker(context, issue),
                           child: PropertyChip(
                             icon:
                                 PlaneTheme.stateIcon(state?.group ?? 'backlog'),
@@ -139,10 +159,13 @@ class SpreadsheetView extends StatelessWidget {
                       _DataCell(
                         width: 100,
                         child: Semantics(
-                          label: 'Change priority of '
-                              '$projectIdentifier-${issue.sequenceId}',
+                          label: 'Priority ${issue.priority}, change priority '
+                              'of $projectIdentifier-${issue.sequenceId}',
                           button: true,
                           container: true,
+                          // Same as the state cell beside it.
+                          excludeSemantics: true,
+                          onTap: () => _showPriorityPicker(context, issue),
                           child: PropertyChip(
                             icon: PlaneTheme.priorityIcon(issue.priority),
                             iconColor: PlaneTheme.priorityColor(

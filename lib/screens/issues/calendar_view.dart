@@ -190,6 +190,12 @@ class _CalendarViewState extends State<CalendarView> {
                   button: true,
                   selected: isSelected,
                   container: true,
+                  // The cell draws the day number and the count, both of which
+                  // the label already carries; without the exclusion the node
+                  // reads "Select day 2026-07-14, 3 issues, 14, 3". The tap is
+                  // re-declared because excluding drops the child's.
+                  excludeSemantics: true,
+                  onTap: () => setState(() => _selectedDay = date),
                   child: GestureDetector(
                     onTap: () => setState(() => _selectedDay = date),
                     child: Container(

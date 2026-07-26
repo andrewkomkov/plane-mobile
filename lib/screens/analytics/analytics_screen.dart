@@ -231,6 +231,12 @@ class _ProvenanceNote extends StatelessWidget {
     return Semantics(
       container: true,
       label: message,
+      // Without this the note is announced twice: `container: true` forces a
+      // node, and the sentence the Text below draws is merged into it beside
+      // the identical label. See `motion.dart:243-259` — a label REPLACES the
+      // subtree's, but only if the subtree is excluded. Nothing here is
+      // tappable, so there is no action to re-declare.
+      excludeSemantics: true,
       child: Container(
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
@@ -315,6 +321,10 @@ class _ChartBars extends StatelessWidget {
           child: Semantics(
             container: true,
             label: '${_titleCase(key)}: $value',
+            // The bar draws the same category and the same number the label
+            // already says, and both reach the node unless the subtree is
+            // excluded — "Urgent: 8, Urgent, 8".
+            excludeSemantics: true,
             child: Row(
               children: [
                 SizedBox(
@@ -417,6 +427,9 @@ class _ProjectRow extends StatelessWidget {
         container: true,
         label: '${project.projectName}: ${project.total} work items, '
             '${counts['completed'] ?? 0} completed',
+        // The name and the total are drawn as well as named; without the
+        // exclusion the row reports both copies.
+        excludeSemantics: true,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -493,6 +506,10 @@ class _StatCard extends StatelessWidget {
     return Semantics(
       container: true,
       label: '$label: ${value ?? 'unavailable'}, $source',
+      // The card draws the figure, the label and the provenance line, all
+      // three of which the label above already carries. Excluded, so the card
+      // is one node saying it once rather than four saying it twice.
+      excludeSemantics: true,
       child: Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(

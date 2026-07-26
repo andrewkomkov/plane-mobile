@@ -121,34 +121,56 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
     return Scaffold(
       // Search is its own surface: the field replaces the title outright. It is
       // the same M3ETextField the Projects tab uses, so the two are identical.
+      //
+      // Because there is no M3EAppBar there is also no M3EAppBarAction titled
+      // "Back", which every other pushed screen gets for free — leaving the
+      // system gesture as the only way out, and nothing at all for a screen
+      // reader or for `adb_drive.py`. The button is drawn only when this
+      // screen was pushed; the Projects tab hosts the same widget inline,
+      // where a back arrow would have nowhere to go.
       appBar: PreferredSize(
         preferredSize: const Size.fromHeight(72),
         child: SafeArea(
           bottom: false,
           child: Padding(
-            padding: const EdgeInsets.fromLTRB(16, 6, 16, 8),
-            child: M3ETextField(
-              label: 'Search across workspace',
-              hint: 'Search across workspace...',
-              compact: true,
-              prefixIcon: Icons.search,
-              controller: _controller,
-              autofocus: widget.autoFocus,
-              onChanged: _onChanged,
-              suffix: _controller.text.isEmpty
-                  ? null
-                  : M3EIconButton(
-                      icon: Icons.clear,
-                      tooltip: 'Clear search',
-                      size: M3EIconButtonSize.small,
-                      onPressed: () {
-                        _controller.clear();
-                        setState(() {
-                          _grouped = {};
-                          _loading = false;
-                        });
-                      },
-                    ),
+            padding: EdgeInsets.fromLTRB(
+                Navigator.of(context).canPop() ? 4 : 16, 6, 16, 8),
+            child: Row(
+              children: [
+                if (Navigator.of(context).canPop()) ...[
+                  M3EIconButton(
+                    icon: Icons.arrow_back,
+                    tooltip: 'Back',
+                    onPressed: () => Navigator.maybePop(context),
+                  ),
+                  const SizedBox(width: 4),
+                ],
+                Expanded(
+                  child: M3ETextField(
+                    label: 'Search across workspace',
+                    hint: 'Search across workspace...',
+                    compact: true,
+                    prefixIcon: Icons.search,
+                    controller: _controller,
+                    autofocus: widget.autoFocus,
+                    onChanged: _onChanged,
+                    suffix: _controller.text.isEmpty
+                        ? null
+                        : M3EIconButton(
+                            icon: Icons.clear,
+                            tooltip: 'Clear search',
+                            size: M3EIconButtonSize.small,
+                            onPressed: () {
+                              _controller.clear();
+                              setState(() {
+                                _grouped = {};
+                                _loading = false;
+                              });
+                            },
+                          ),
+                  ),
+                ),
+              ],
             ),
           ),
         ),
@@ -169,6 +191,11 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                     )
                   : _buildResults(theme),
     );
+  }
+
+  void _clearRecentSearches() {
+    setState(() => _recentSearches.clear());
+    _storage.write(key: _recentKey, value: jsonEncode([]));
   }
 
   Widget _buildRecent(ThemeData theme) {
@@ -193,14 +220,19 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
               // Bare "Clear" collides with the field's clear button, so this
               // one spells out what it clears. A TextButton rather than a bare
               // tap target: it carries the 48dp minimum on its own.
+              //
+              // Excluded, or the node reports "Clear recent searches, Clear"
+              // and the collision the label was written to avoid comes back
+              // through the child. The tap is re-declared here because the
+              // exclusion takes the TextButton's own action with it.
               Semantics(
                 label: 'Clear recent searches',
                 button: true,
+                container: true,
+                excludeSemantics: true,
+                onTap: _clearRecentSearches,
                 child: TextButton(
-                  onPressed: () {
-                    setState(() => _recentSearches.clear());
-                    _storage.write(key: _recentKey, value: jsonEncode([]));
-                  },
+                  onPressed: _clearRecentSearches,
                   style: TextButton.styleFrom(
                     foregroundColor: theme.colorScheme.primary,
                     minimumSize: const Size(48, 48),

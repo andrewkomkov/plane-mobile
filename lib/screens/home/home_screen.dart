@@ -29,9 +29,16 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   int _pendingWrites = 0;
 
   static const _navItems = [
-    NavItem(icon: Icons.inbox_outlined, activeIcon: Icons.inbox, label: 'Inbox'),
-    NavItem(icon: Icons.task_alt_outlined, activeIcon: Icons.task_alt, label: 'My Tasks'),
-    NavItem(icon: Icons.grid_view_outlined, activeIcon: Icons.grid_view, label: 'Projects'),
+    NavItem(
+        icon: Icons.inbox_outlined, activeIcon: Icons.inbox, label: 'Inbox'),
+    NavItem(
+        icon: Icons.task_alt_outlined,
+        activeIcon: Icons.task_alt,
+        label: 'My Tasks'),
+    NavItem(
+        icon: Icons.grid_view_outlined,
+        activeIcon: Icons.grid_view,
+        label: 'Projects'),
     NavItem(icon: Icons.menu, activeIcon: Icons.menu, label: 'More'),
   ];
 
@@ -92,7 +99,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               onWorkspaceChanged: _onWorkspaceChanged,
               pendingWrites: _pendingWrites,
               onSyncQueue: _drainWriteQueue),
-          SearchScreen(workspaceSlug: _workspaceSlug, autoFocus: _searchAutoFocus),
+          SearchScreen(
+              workspaceSlug: _workspaceSlug, autoFocus: _searchAutoFocus),
         ],
       ),
       extendBody: true,

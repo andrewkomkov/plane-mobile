@@ -100,6 +100,13 @@ class _KanbanBoardScreenState extends State<KanbanBoardScreen> {
               label: 'Column ${state?.name ?? 'Unknown'}, '
                   '${columnIssues.length} issues',
               container: true,
+              // Not `excludeSemantics` — the column contains the cards, and
+              // excluding would erase every one of them. `explicitChildNodes`
+              // is the container form of the same rule: the header's own text
+              // is forced into a node of its own instead of being merged into
+              // this label, so the drop target reports its name once and the
+              // cards below keep theirs.
+              explicitChildNodes: true,
               child: AnimatedContainer(
                 duration: const Duration(milliseconds: 200),
                 width: 280,

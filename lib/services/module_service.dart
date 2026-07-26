@@ -1,11 +1,25 @@
+import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
+
 import '../config/api_client.dart';
 import '../models/module.dart';
 import '../models/issue.dart';
 
 class ModuleService {
+  /// Injected by tests in place of a real HTTP client, the same seam
+  /// [AnalyticsService] and [FavoriteService] already carry.
+  @visibleForTesting
+  static Dio? debugClient;
+
+  static Future<Dio> _client() async {
+    final injected = debugClient;
+    if (injected != null) return injected;
+    return ApiClient.getInstance();
+  }
+
   static Future<List<Module>> getModules(
       String workspaceSlug, String projectId) async {
-    final dio = await ApiClient.getInstance();
+    final dio = await _client();
     final response = await dio
         .get('/workspaces/$workspaceSlug/projects/$projectId/modules/');
     final data = response.data;
@@ -20,7 +34,7 @@ class ModuleService {
   /// list rather than a paginated envelope.
   static Future<List<Module>> getArchivedModules(
       String workspaceSlug, String projectId) async {
-    final dio = await ApiClient.getInstance();
+    final dio = await _client();
     final response = await dio.get(
         '/workspaces/$workspaceSlug/projects/$projectId/archived-modules/');
     final data = response.data;
@@ -42,7 +56,7 @@ class ModuleService {
     String projectId,
     String moduleId,
   ) async {
-    final dio = await ApiClient.getInstance();
+    final dio = await _client();
     await dio.post(
       '/workspaces/$workspaceSlug/projects/$projectId/modules/$moduleId/archive/',
     );
@@ -53,7 +67,7 @@ class ModuleService {
     String projectId,
     String moduleId,
   ) async {
-    final dio = await ApiClient.getInstance();
+    final dio = await _client();
     await dio.delete(
       '/workspaces/$workspaceSlug/projects/$projectId/modules/$moduleId/archive/',
     );
@@ -64,7 +78,7 @@ class ModuleService {
     String projectId,
     Map<String, dynamic> data,
   ) async {
-    final dio = await ApiClient.getInstance();
+    final dio = await _client();
     final response = await dio.post(
       '/workspaces/$workspaceSlug/projects/$projectId/modules/',
       data: data,
@@ -78,7 +92,7 @@ class ModuleService {
     String moduleId,
     Map<String, dynamic> data,
   ) async {
-    final dio = await ApiClient.getInstance();
+    final dio = await _client();
     final response = await dio.patch(
       '/workspaces/$workspaceSlug/projects/$projectId/modules/$moduleId/',
       data: data,
@@ -91,7 +105,7 @@ class ModuleService {
     String projectId,
     String moduleId,
   ) async {
-    final dio = await ApiClient.getInstance();
+    final dio = await _client();
     await dio.delete(
       '/workspaces/$workspaceSlug/projects/$projectId/modules/$moduleId/',
     );
@@ -99,7 +113,7 @@ class ModuleService {
 
   static Future<List<Issue>> getModuleIssues(
       String workspaceSlug, String projectId, String moduleId) async {
-    final dio = await ApiClient.getInstance();
+    final dio = await _client();
     final response = await dio.get(
         '/workspaces/$workspaceSlug/projects/$projectId/modules/$moduleId/issues/');
     final data = response.data;
@@ -113,7 +127,7 @@ class ModuleService {
     String moduleId,
     List<String> issueIds,
   ) async {
-    final dio = await ApiClient.getInstance();
+    final dio = await _client();
     await dio.post(
       '/workspaces/$workspaceSlug/projects/$projectId/modules/$moduleId/issues/',
       data: {'issues': issueIds},
@@ -126,7 +140,7 @@ class ModuleService {
     String moduleId,
     String issueId,
   ) async {
-    final dio = await ApiClient.getInstance();
+    final dio = await _client();
     await dio.delete(
       '/workspaces/$workspaceSlug/projects/$projectId/modules/$moduleId/issues/$issueId/',
     );

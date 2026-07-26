@@ -481,42 +481,73 @@ class _InboxTabState extends ConsumerState<InboxTab>
                                 size: 22),
                           ),
                           onDismissed: (_) => _dismiss(notificationId),
-                          child: GestureDetector(
-                            onLongPress: () => _showNotificationOptions(n),
-                            child: IssueRow(
-                              issue: issue,
-                              state: fakeState,
-                              identifier:
-                                  identifier.isNotEmpty ? identifier : null,
-                              subtitle: activityText,
-                              showId: identifier.isNotEmpty,
-                              showPriority: true,
-                              unread: !isRead,
-                              timeAgo: createdAt != null
-                                  ? timeAgoShort(createdAt)
-                                  : null,
-                              onTap: () {
-                                if (projectId.isEmpty || issueId.isEmpty) {
-                                  return;
-                                }
-                                // Mark as read on tap
-                                if (!isRead && notificationId.isNotEmpty) {
-                                  _markRead(notificationId);
-                                }
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (_) => IssueDetailScreen(
-                                      workspaceSlug: widget.workspaceSlug,
-                                      projectId: projectId,
-                                      issueId: issueId,
-                                      projectIdentifier: identifier,
-                                      states: const {},
-                                    ),
+                          // Dismissing and marking read were reachable only by
+                          // the swipe and by a long-press declared on this
+                          // GestureDetector — which sits *above* IssueRow,
+                          // whose own node excludes its subtree and swallows
+                          // the focus, so the long-press was never associated
+                          // with the row. Neither route leaves a node behind,
+                          // so the gap could not even be reported. The button
+                          // beside the row is the reachable copy; both
+                          // gestures stay as accelerators.
+                          child: Row(
+                            children: [
+                              Expanded(
+                                child: GestureDetector(
+                                  onLongPress: () =>
+                                      _showNotificationOptions(n),
+                                  child: IssueRow(
+                                    issue: issue,
+                                    state: fakeState,
+                                    identifier: identifier.isNotEmpty
+                                        ? identifier
+                                        : null,
+                                    subtitle: activityText,
+                                    showId: identifier.isNotEmpty,
+                                    showPriority: true,
+                                    unread: !isRead,
+                                    timeAgo: createdAt != null
+                                        ? timeAgoShort(createdAt)
+                                        : null,
+                                    onTap: () {
+                                      if (projectId.isEmpty ||
+                                          issueId.isEmpty) {
+                                        return;
+                                      }
+                                      // Mark as read on tap
+                                      if (!isRead &&
+                                          notificationId.isNotEmpty) {
+                                        _markRead(notificationId);
+                                      }
+                                      Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder: (_) => IssueDetailScreen(
+                                            workspaceSlug: widget.workspaceSlug,
+                                            projectId: projectId,
+                                            issueId: issueId,
+                                            projectIdentifier: identifier,
+                                            states: const {},
+                                          ),
+                                        ),
+                                      );
+                                    },
                                   ),
-                                );
-                              },
-                            ),
+                                ),
+                              ),
+                              Padding(
+                                padding: const EdgeInsets.only(right: 8),
+                                child: M3EIconButton(
+                                  icon: Icons.more_horiz,
+                                  tooltip: 'Actions for notification $title',
+                                  size: M3EIconButtonSize.small,
+                                  color: Theme.of(context)
+                                      .colorScheme
+                                      .onSurfaceVariant,
+                                  onPressed: () => _showNotificationOptions(n),
+                                ),
+                              ),
+                            ],
                           ),
                         );
                       },

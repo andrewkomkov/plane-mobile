@@ -512,6 +512,12 @@ class _ProjectSettingsScreenState extends ConsumerState<ProjectSettingsScreen> {
                       button: true,
                       selected: color == c,
                       container: true,
+                      // Excluded so the swatch is one node rather than a named
+                      // node wrapping an anonymous tappable one; the tap is
+                      // re-declared here because the exclusion takes the
+                      // GestureDetector's action with it.
+                      excludeSemantics: true,
+                      onTap: () => setDialogState(() => color = c),
                       child: GestureDetector(
                         onTap: () => setDialogState(() => color = c),
                         // 32dp circle, 48dp target: a swatch is a control.
@@ -796,7 +802,12 @@ class _ProjectSettingsScreenState extends ConsumerState<ProjectSettingsScreen> {
                         label: Text(l.name, style: theme.textTheme.labelMedium),
                         deleteIcon: Icon(Icons.close,
                             size: 16, semanticLabel: 'Delete label ${l.name}'),
-                        deleteButtonTooltipMessage: 'Delete label',
+                        // Named per label, like the icon beside it. A single
+                        // "Delete label" repeated across every chip made
+                        // `adb_drive.py tap` pick whichever one it found
+                        // first, and disagreed with the semantic label on the
+                        // same glyph.
+                        deleteButtonTooltipMessage: 'Delete label ${l.name}',
                         onDeleted: () => _deleteLabel(l),
                       );
                     }).toList(),

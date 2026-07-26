@@ -12,7 +12,6 @@ import 'kanban_board_screen.dart';
 import 'spreadsheet_view.dart';
 import 'calendar_view.dart';
 
-
 enum _ViewMode { list, kanban, spreadsheet, calendar }
 
 class IssuesTabScreen extends ConsumerStatefulWidget {
@@ -28,8 +27,7 @@ class IssuesTabScreen extends ConsumerStatefulWidget {
   });
 
   @override
-  ConsumerState<IssuesTabScreen> createState() =>
-      _IssuesTabScreenState();
+  ConsumerState<IssuesTabScreen> createState() => _IssuesTabScreenState();
 }
 
 class _IssuesTabScreenState extends ConsumerState<IssuesTabScreen>
@@ -105,8 +103,7 @@ class _IssuesTabScreenState extends ConsumerState<IssuesTabScreen>
             height: 48,
             labels: const ['List', 'Board', 'Table', 'Calendar'],
             selectedIndex: _ViewMode.values.indexOf(_viewMode),
-            onSelected: (i) =>
-                setState(() => _viewMode = _ViewMode.values[i]),
+            onSelected: (i) => setState(() => _viewMode = _ViewMode.values[i]),
           ),
         ),
         Expanded(child: _buildView()),

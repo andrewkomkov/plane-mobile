@@ -16,6 +16,7 @@ import '../modules/module_list_screen.dart';
 import '../cycles/cycle_list_screen.dart';
 import '../views/view_list_screen.dart';
 import '../search/search_screen.dart';
+
 class ProjectScreen extends ConsumerStatefulWidget {
   final String workspaceSlug;
   final Project project;
@@ -71,10 +72,7 @@ class _ProjectScreenState extends ConsumerState<ProjectScreen> {
         icon: Icons.visibility_outlined,
         activeIcon: Icons.visibility,
         label: 'Views'),
-    NavItem(
-        icon: Icons.loop_outlined,
-        activeIcon: Icons.loop,
-        label: 'Cycles'),
+    NavItem(icon: Icons.loop_outlined, activeIcon: Icons.loop, label: 'Cycles'),
   ];
 
   @override
@@ -117,8 +115,10 @@ class _ProjectScreenState extends ConsumerState<ProjectScreen> {
   }
 
   void _createIssue() async {
-    final states = ref.read(dataCacheProvider)
-        .getStates(widget.workspaceSlug, widget.project.id) ?? {};
+    final states = ref
+            .read(dataCacheProvider)
+            .getStates(widget.workspaceSlug, widget.project.id) ??
+        {};
     await Navigator.push(
       context,
       MaterialPageRoute(

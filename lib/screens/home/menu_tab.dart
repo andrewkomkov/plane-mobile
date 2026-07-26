@@ -159,27 +159,45 @@ class _MenuTabState extends ConsumerState<MenuTab> {
             child: Row(
               children: [
                 // The visible text is the workspace name, which says nothing
-                // about what tapping it does — hence an explicit label.
+                // about what tapping it does — hence an explicit label. The
+                // label only replaces the subtree's if the subtree is excluded
+                // (`motion.dart:243-259`); without that the control reported
+                // "Switch workspace, Plane" and automation matching either
+                // string got two nodes. Excluding drops the child's tap, so
+                // the action is re-declared here.
                 Semantics(
                   label: 'Switch workspace',
                   button: true,
+                  container: true,
+                  excludeSemantics: true,
+                  onTap: _showSwitchWorkspace,
                   child: GestureDetector(
                     onTap: _showSwitchWorkspace,
-                    child: Row(
-                      children: [
-                        Icon(Icons.grid_view,
-                            size: 20, color: theme.colorScheme.primary),
-                        const SizedBox(width: 10),
-                        Text(
-                          'Plane',
-                          style: M3EType.emphasized(
-                              theme.textTheme.headlineSmall!),
-                        ),
-                        const SizedBox(width: 4),
-                        Icon(Icons.unfold_more,
-                            size: 14,
-                            color: theme.colorScheme.onSurfaceVariant),
-                      ],
+                    // Opaque, or only the glyphs themselves answer a tap: the
+                    // row is 25dp of text with nothing hit-testable around it.
+                    behavior: HitTestBehavior.opaque,
+                    child: ConstrainedBox(
+                      // The switcher is the header's primary control and was
+                      // half a fingertip tall. The sibling icon button already
+                      // holds this row at 48dp, so the floor costs no height.
+                      constraints: const BoxConstraints(
+                          minHeight: kMinInteractiveDimension),
+                      child: Row(
+                        children: [
+                          Icon(Icons.grid_view,
+                              size: 20, color: theme.colorScheme.primary),
+                          const SizedBox(width: 10),
+                          Text(
+                            'Plane',
+                            style: M3EType.emphasized(
+                                theme.textTheme.headlineSmall!),
+                          ),
+                          const SizedBox(width: 4),
+                          Icon(Icons.unfold_more,
+                              size: 14,
+                              color: theme.colorScheme.onSurfaceVariant),
+                        ],
+                      ),
                     ),
                   ),
                 ),
@@ -378,8 +396,12 @@ class _MenuTabState extends ConsumerState<MenuTab> {
                   ],
                 ),
                 const SizedBox(height: 24),
-                // Disconnect button
+                // Disconnect button. Opaque because the default defers to the
+                // child, and a DecoratedBox does not hit-test itself: only the
+                // glyphs in the middle answered a tap, not the full-width
+                // 52dp slab that looks like the button.
                 GestureDetector(
+                  behavior: HitTestBehavior.opaque,
                   onTap: () async {
                     final ok = await showDialog<bool>(
                       context: context,

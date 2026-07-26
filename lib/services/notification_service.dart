@@ -1,8 +1,23 @@
+import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
+
 import '../config/api_client.dart';
 import '../config/secure_storage.dart';
 import '../models/notification.dart';
 
 class NotificationService {
+  /// Injected by tests in place of a real HTTP client, the same seam
+  /// [AnalyticsService] uses. The notification list is the one screen whose
+  /// accessibility can only be checked with rows on it.
+  @visibleForTesting
+  static Dio? debugClient;
+
+  static Future<Dio> _client() async {
+    final injected = debugClient;
+    if (injected != null) return injected;
+    return ApiClient.getInstance();
+  }
+
   /// Notifications are workspace-scoped on Plane: the routes are
   /// `workspaces/{slug}/users/notifications/...`. The bare `/users/...` paths
   /// this service used to call are not routes on either of Plane's APIs, so
@@ -18,7 +33,7 @@ class NotificationService {
     bool? archived,
     bool? read,
   }) async {
-    final dio = await ApiClient.getInstance();
+    final dio = await _client();
     final params = <String, dynamic>{};
     if (type != null) params['type'] = type;
     if (snoozed != null) params['snoozed'] = snoozed;
@@ -42,29 +57,29 @@ class NotificationService {
   }
 
   static Future<void> markAsRead(String notificationId) async {
-    final dio = await ApiClient.getInstance();
+    final dio = await _client();
     await dio.post('${await _base()}/$notificationId/read/');
   }
 
   static Future<void> archive(String notificationId) async {
-    final dio = await ApiClient.getInstance();
+    final dio = await _client();
     await dio.post('${await _base()}/$notificationId/archive/');
   }
 
   static Future<void> markAllAsRead() async {
-    final dio = await ApiClient.getInstance();
+    final dio = await _client();
     await dio.post('${await _base()}/mark-all-read/');
   }
 
   static Future<Map<String, dynamic>> getNotificationPreferences() async {
-    final dio = await ApiClient.getInstance();
+    final dio = await _client();
     final response = await dio.get('/users/me/notification-preferences/');
     return Map<String, dynamic>.from(response.data as Map);
   }
 
   static Future<Map<String, dynamic>> updateNotificationPreferences(
       Map<String, dynamic> data) async {
-    final dio = await ApiClient.getInstance();
+    final dio = await _client();
     final response =
         await dio.patch('/users/me/notification-preferences/', data: data);
     return Map<String, dynamic>.from(response.data as Map);

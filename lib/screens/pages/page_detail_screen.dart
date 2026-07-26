@@ -380,18 +380,30 @@ class _PageEditScreenState extends State<PageEditScreen> {
                 : M3EPressable(
                     pressedScale: 0.92,
                     onTap: _save,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 16, vertical: 9),
-                      decoration: BoxDecoration(
-                        color: Theme.of(context).colorScheme.primaryContainer,
-                        borderRadius: BorderRadius.circular(M3EShape.full),
-                      ),
-                      child: Text(
-                        'Save',
-                        style: M3EType.emphasized(theme.textTheme.labelLarge!)
-                            .copyWith(
-                          color: theme.colorScheme.onPrimaryContainer,
+                    // The pill is about 35dp tall and M3EPressable forwards an
+                    // opaque hit test over exactly its child, so the hit area
+                    // was the pill. Centring it in a 48dp box lifts the target
+                    // to the minimum; the 56dp app bar already has the room,
+                    // so nothing moves.
+                    child: SizedBox(
+                      height: kMinInteractiveDimension,
+                      child: Center(
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 16, vertical: 9),
+                          decoration: BoxDecoration(
+                            color:
+                                Theme.of(context).colorScheme.primaryContainer,
+                            borderRadius: BorderRadius.circular(M3EShape.full),
+                          ),
+                          child: Text(
+                            'Save',
+                            style:
+                                M3EType.emphasized(theme.textTheme.labelLarge!)
+                                    .copyWith(
+                              color: theme.colorScheme.onPrimaryContainer,
+                            ),
+                          ),
                         ),
                       ),
                     ),

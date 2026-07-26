@@ -165,7 +165,8 @@ class _WebViewLoginScreenState extends State<WebViewLoginScreen> {
       if (mounted) {
         setState(() => _loading = false);
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Logged in! Tap the checkmark to continue.')),
+          const SnackBar(
+              content: Text('Logged in! Tap the checkmark to continue.')),
         );
       }
     } catch (e) {
@@ -208,7 +209,12 @@ class _WebViewLoginScreenState extends State<WebViewLoginScreen> {
       body: Stack(
         children: [
           WebViewWidget(controller: _controller),
-          if (_loading) const LinearProgressIndicator(),
+          // Named, or the only indication that the sign-in page is still
+          // loading is a moving bar — silent to a screen reader, and nothing
+          // for `adb_drive.py` to wait on.
+          if (_loading)
+            const LinearProgressIndicator(
+                semanticsLabel: 'Loading sign-in page'),
         ],
       ),
     );

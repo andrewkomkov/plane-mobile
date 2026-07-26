@@ -58,8 +58,7 @@ class _CommandPaletteBody extends ConsumerStatefulWidget {
       _CommandPaletteBodyState();
 }
 
-class _CommandPaletteBodyState
-    extends ConsumerState<_CommandPaletteBody> {
+class _CommandPaletteBodyState extends ConsumerState<_CommandPaletteBody> {
   final _controller = TextEditingController();
   Timer? _debounce;
   List<_CommandItem> _quickActions = [];
@@ -96,8 +95,7 @@ class _CommandPaletteBodyState
 
   Future<void> _loadProjects() async {
     try {
-      _projects =
-          await ProjectService.getProjects(widget.workspaceSlug);
+      _projects = await ProjectService.getProjects(widget.workspaceSlug);
     } catch (_) {}
   }
 
@@ -134,8 +132,8 @@ class _CommandPaletteBodyState
             ),
             ..._projects.map((p) => ListTile(
                   leading: const Icon(Icons.bolt_outlined, size: 20),
-                  title: Text(p.name,
-                      style: Theme.of(ctx).textTheme.bodyMedium),
+                  title:
+                      Text(p.name, style: Theme.of(ctx).textTheme.bodyMedium),
                   subtitle: Text(p.identifier,
                       style: Theme.of(ctx).textTheme.bodySmall),
                   onTap: () => Navigator.pop(ctx, p),
@@ -171,8 +169,8 @@ class _CommandPaletteBodyState
   Future<void> _search(String query) async {
     setState(() => _loading = true);
     try {
-      final results = await SearchService.searchAll(
-          widget.workspaceSlug, query);
+      final results =
+          await SearchService.searchAll(widget.workspaceSlug, query);
       final items = <_CommandItem>[];
       for (final entry in results.entries) {
         for (final item in entry.value) {
@@ -249,13 +247,11 @@ class _CommandPaletteBodyState
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final showSearch = _controller.text.length >= 2;
-    final items =
-        showSearch ? _searchResults : _quickActions;
+    final items = showSearch ? _searchResults : _quickActions;
     final filteredActions = showSearch
         ? _quickActions
-            .where((a) => a.label
-                .toLowerCase()
-                .contains(_controller.text.toLowerCase()))
+            .where((a) =>
+                a.label.toLowerCase().contains(_controller.text.toLowerCase()))
             .toList()
         : <_CommandItem>[];
 
@@ -275,8 +271,8 @@ class _CommandPaletteBodyState
               width: 36,
               height: 4,
               decoration: BoxDecoration(
-                color: theme.colorScheme.onSurfaceVariant
-                    .withValues(alpha: 0.3),
+                color:
+                    theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.3),
                 borderRadius: BorderRadius.circular(M3EShape.full),
               ),
             ),
@@ -297,8 +293,7 @@ class _CommandPaletteBodyState
           if (_loading)
             const Padding(
               padding: EdgeInsets.all(16),
-              child: Center(
-                  child: M3ELoadingIndicator(size: 20)),
+              child: Center(child: M3ELoadingIndicator(size: 20)),
             ),
           // Quick actions header
           if (!showSearch)
@@ -307,8 +302,8 @@ class _CommandPaletteBodyState
               child: Align(
                 alignment: Alignment.centerLeft,
                 child: Text('Quick actions',
-                    style: theme.textTheme.labelMedium?.copyWith(
-                        color: theme.colorScheme.onSurfaceVariant)),
+                    style: theme.textTheme.labelMedium
+                        ?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
               ),
             ),
           // Items
@@ -318,8 +313,7 @@ class _CommandPaletteBodyState
               children: [
                 if (showSearch && filteredActions.isNotEmpty) ...[
                   Padding(
-                    padding:
-                        const EdgeInsets.fromLTRB(16, 4, 16, 4),
+                    padding: const EdgeInsets.fromLTRB(16, 4, 16, 4),
                     child: Text('Actions',
                         style: theme.textTheme.labelMedium?.copyWith(
                             color: theme.colorScheme.onSurfaceVariant)),
@@ -327,8 +321,7 @@ class _CommandPaletteBodyState
                   ...filteredActions.map((a) => _buildItem(a, theme)),
                   if (items.isNotEmpty)
                     Padding(
-                      padding:
-                          const EdgeInsets.fromLTRB(16, 8, 16, 4),
+                      padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
                       child: Text('Results',
                           style: theme.textTheme.labelMedium?.copyWith(
                               color: theme.colorScheme.onSurfaceVariant)),
@@ -341,8 +334,7 @@ class _CommandPaletteBodyState
                     child: Center(
                       child: Text('No results',
                           style: TextStyle(
-                              color:
-                                  theme.colorScheme.onSurfaceVariant)),
+                              color: theme.colorScheme.onSurfaceVariant)),
                     ),
                   ),
               ],

@@ -318,7 +318,11 @@ class _IssueListScreenState extends ConsumerState<IssueListScreen>
                 // width the switcher would resize every time the listing
                 // changed, under the finger that changed it.
                 SizedBox(
-                  width: M3EIconButtonSize.small.container,
+                  // The slot is the touch-target minimum, not the button's
+                  // visible diameter. `M3EIconButtonSize.small.container` is
+                  // 40, which tightly constrained the 48dp box the button
+                  // builds for itself and silently cancelled its guarantee.
+                  width: kMinInteractiveDimension,
                   child: _listing == IssueListing.live
                       // The display sheet drives grouping and sorting, neither
                       // of which the drafts or archive listings use.

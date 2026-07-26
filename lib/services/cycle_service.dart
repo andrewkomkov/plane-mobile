@@ -1,11 +1,26 @@
+import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
+
 import '../config/api_client.dart';
 import '../models/cycle.dart';
 import '../models/issue.dart';
 
 class CycleService {
+  /// Injected by tests in place of a real HTTP client, the same seam
+  /// [AnalyticsService] and [FavoriteService] already carry. The cycle detail
+  /// screen's accessibility can only be checked with issues listed on it.
+  @visibleForTesting
+  static Dio? debugClient;
+
+  static Future<Dio> _client() async {
+    final injected = debugClient;
+    if (injected != null) return injected;
+    return ApiClient.getInstance();
+  }
+
   static Future<List<Cycle>> getCycles(
       String workspaceSlug, String projectId) async {
-    final dio = await ApiClient.getInstance();
+    final dio = await _client();
     final response =
         await dio.get('/workspaces/$workspaceSlug/projects/$projectId/cycles/');
     final data = response.data;
@@ -22,7 +37,7 @@ class CycleService {
   /// — that list omits `created_at`.
   static Future<List<Cycle>> getArchivedCycles(
       String workspaceSlug, String projectId) async {
-    final dio = await ApiClient.getInstance();
+    final dio = await _client();
     final response = await dio
         .get('/workspaces/$workspaceSlug/projects/$projectId/archived-cycles/');
     final data = response.data;
@@ -45,7 +60,7 @@ class CycleService {
     String projectId,
     String cycleId,
   ) async {
-    final dio = await ApiClient.getInstance();
+    final dio = await _client();
     await dio.post(
       '/workspaces/$workspaceSlug/projects/$projectId/cycles/$cycleId/archive/',
     );
@@ -56,7 +71,7 @@ class CycleService {
     String projectId,
     String cycleId,
   ) async {
-    final dio = await ApiClient.getInstance();
+    final dio = await _client();
     await dio.delete(
       '/workspaces/$workspaceSlug/projects/$projectId/cycles/$cycleId/archive/',
     );
@@ -67,7 +82,7 @@ class CycleService {
     String projectId,
     Map<String, dynamic> data,
   ) async {
-    final dio = await ApiClient.getInstance();
+    final dio = await _client();
     final response = await dio.post(
       '/workspaces/$workspaceSlug/projects/$projectId/cycles/',
       data: data,
@@ -81,7 +96,7 @@ class CycleService {
     String cycleId,
     Map<String, dynamic> data,
   ) async {
-    final dio = await ApiClient.getInstance();
+    final dio = await _client();
     final response = await dio.patch(
       '/workspaces/$workspaceSlug/projects/$projectId/cycles/$cycleId/',
       data: data,
@@ -94,7 +109,7 @@ class CycleService {
     String projectId,
     String cycleId,
   ) async {
-    final dio = await ApiClient.getInstance();
+    final dio = await _client();
     await dio.delete(
       '/workspaces/$workspaceSlug/projects/$projectId/cycles/$cycleId/',
     );
@@ -102,7 +117,7 @@ class CycleService {
 
   static Future<List<Issue>> getCycleIssues(
       String workspaceSlug, String projectId, String cycleId) async {
-    final dio = await ApiClient.getInstance();
+    final dio = await _client();
     final response = await dio.get(
         '/workspaces/$workspaceSlug/projects/$projectId/cycles/$cycleId/cycle-issues/');
     final data = response.data;
@@ -116,7 +131,7 @@ class CycleService {
     String cycleId,
     List<String> issueIds,
   ) async {
-    final dio = await ApiClient.getInstance();
+    final dio = await _client();
     await dio.post(
       '/workspaces/$workspaceSlug/projects/$projectId/cycles/$cycleId/cycle-issues/',
       data: {'issues': issueIds},
@@ -129,7 +144,7 @@ class CycleService {
     String cycleId,
     String issueId,
   ) async {
-    final dio = await ApiClient.getInstance();
+    final dio = await _client();
     await dio.delete(
       '/workspaces/$workspaceSlug/projects/$projectId/cycles/$cycleId/cycle-issues/$issueId/',
     );
