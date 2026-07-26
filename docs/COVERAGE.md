@@ -42,7 +42,7 @@ forbids it — which was not true of this document's first two versions.
 | Reactions | on work items and on comments — *verified*, round-trips and removes |
 | Subscription | subscribe/unsubscribe on a work item |
 | Relations | read and write, all four kinds, plus sub-issue create and adopt |
-| Comments | list, add, edit, delete, reactions |
+| Comments | list, add, edit, delete, reactions — *verified* end to end on a device: posted, edited and deleted |
 | Attachments | list / upload / delete |
 | Activity feed | *verified* — requires `activity_type`, see below |
 | Archive | work items, cycles, modules, pages; archived listings — *verified* |
@@ -55,7 +55,7 @@ forbids it — which was not true of this document's first two versions.
 | Members | roles, invite, change role, remove, leave, pending invitations — *verified* |
 | Notifications | list, read/unread, archive, mark-all-read, preferences |
 | Workspace rollups | cross-project work items (paginated), workspace saved views incl. delete, cycles, modules — from the More menu. `workspaces/{}/states/` and `.../labels/` resolve the ids, which the project-scoped calls cannot |
-| Favorites | projects, cycles, modules, views and pages, starred from their list rows — *wired*. On `user-favorites/`, not the per-entity routes; see below |
+| Favorites | projects, cycles, modules, views and pages, starred from their list rows — *verified*, a star round-trips and unstars. On `user-favorites/`, not the per-entity routes; see below |
 
 ## Partial
 
@@ -65,7 +65,7 @@ forbids it — which was not true of this document's first two versions.
 | Intake | the triage queue has a screen: Open/Closed tabs, and the server's whole action set — accept, decline, snooze, un-snooze, mark duplicate. Reached from a badged app-bar action on the project screen, shown only where `intake_view` is on. Note the "Inbox" tab is the notification feed, not this queue | submitting *into* intake from the app (`POST intake-issues/`), deleting an entry, and the per-property filters Plane's own intake sidebar offers | P3 |
 | Search | on Plane's own `workspaces/{slug}/search/` through the proxy, so `GlobalSearchEndpoint` filters every entity on project membership — *verified* | `entity-search/` and the per-project `search-issues/` are not used | P3 |
 | Estimates | a work item's estimate point can be set | estimate *scales* cannot be created or managed | P3 |
-| Projects | list, detail, settings, members | **create** (deliberate), archive, join, leave | P3 |
+| Projects | list, detail, settings, members; **cycles, modules, pages and views can be created**, gated on the caller's role | project **create** itself (deliberate — projects are made on the web), archive, join, leave | P3 |
 | Draft work items | list, edit, promote to a work item, discard, and "Save draft" on the create screen. Reached from the work-item list's listing switcher | the draft editor carries the same fields the create screen does — title, description, state, priority — so assignees, labels, dates, cycle and module can be read off a web-made draft but not changed. Description is plain text, and the editor says so before it flattens a rich one. Workspace-level drafts with no project are not listed: the listing is project-scoped, and Plane refuses to promote a project-less draft anyway | P2 |
 
 Two things about drafts that the route names do not tell you. They are
