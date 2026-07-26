@@ -49,6 +49,26 @@ class IssueService {
     return Issue.fromJson(response.data);
   }
 
+  /// Renames relation keys to what Plane's internal write serializer expects.
+  ///
+  /// `IssueCreateSerializer` declares `state_id`, `parent_id`, `label_ids` and
+  /// `assignee_ids` (see `plane/app/serializers/issue.py`). A payload using the
+  /// plain names is not rejected — the serialiser simply ignores the unknown
+  /// keys — so changing a state or an assignee would appear to succeed and
+  /// then quietly do nothing. Translating in one place keeps every call site
+  /// speaking the model's own field names.
+  static Map<String, dynamic> _toWritePayload(Map<String, dynamic> data) {
+    const renames = {
+      'state': 'state_id',
+      'parent': 'parent_id',
+      'labels': 'label_ids',
+      'assignees': 'assignee_ids',
+    };
+    final out = <String, dynamic>{};
+    data.forEach((key, value) => out[renames[key] ?? key] = value);
+    return out;
+  }
+
   static Future<Issue> createIssue(
     String workspaceSlug,
     String projectId,
@@ -57,7 +77,7 @@ class IssueService {
     final dio = await ApiClient.getInstance();
     final response = await dio.post(
       '/workspaces/$workspaceSlug/projects/$projectId/issues/',
-      data: data,
+      data: _toWritePayload(data),
     );
     return Issue.fromJson(response.data);
   }
@@ -71,7 +91,7 @@ class IssueService {
     final dio = await ApiClient.getInstance();
     final response = await dio.patch(
       '/workspaces/$workspaceSlug/projects/$projectId/issues/$issueId/',
-      data: data,
+      data: _toWritePayload(data),
     );
     return Issue.fromJson(response.data);
   }
@@ -109,15 +129,12 @@ class IssueService {
 
   /// Sub-issues of [issueId].
   ///
-  /// UNREACHABLE ON THE CURRENT TRANSPORT. `sub-issues/` exists only on Plane's
-  /// internal app API (`/api`), which authenticates with a session cookie and
-  /// rejects the `X-Api-Key` header this app sends. The app authenticates with
-  /// an API token and so talks to `/api/v1`, whose work-item route table has no
-  /// sub-issue endpoint at all. This therefore 404s in production; callers must
-  /// treat a failure as "unknown", not as "none".
-  ///
-  /// Linking a child to a parent still works, because that is a plain `parent`
-  /// field on the work item and v1 supports PATCHing it.
+  /// This lives only on Plane's internal API, which used to be unreachable —
+  /// it authenticates by session cookie and ignores the `X-Api-Key` this app
+  /// sends, and the v1 API the app was pinned to has no sub-issue route at all.
+  /// It works now because requests go through the proxy in plane-mobile-api,
+  /// which exchanges the token for a real session. Verified against the live
+  /// instance.
   static Future<List<Issue>> getSubIssues(
     String workspaceSlug,
     String projectId,
@@ -127,27 +144,31 @@ class IssueService {
     final response = await dio.get(
       '/workspaces/$workspaceSlug/projects/$projectId/issues/$issueId/sub-issues/',
     );
-    if (response.data is List) {
-      return (response.data as List).map((e) => Issue.fromJson(e)).toList();
+    // The internal API answers with an object, not a list:
+    // {"sub_issues": [...], "state_distribution": {...}}.
+    final data = response.data;
+    if (data is Map && data['sub_issues'] is List) {
+      return (data['sub_issues'] as List)
+          .map((e) => Issue.fromJson(e))
+          .toList();
+    }
+    if (data is List) {
+      return data.map((e) => Issue.fromJson(e)).toList();
     }
     return [];
   }
 
   /// Relations (blocking / blocked by / duplicate / relates to) on [issueId].
   ///
-  /// UNREACHABLE ON THE CURRENT TRANSPORT, for the same reason as
-  /// [getSubIssues]: issue relations live only on the internal app API, and the
-  /// v1 API this app authenticates against has no relation routes — neither
-  /// read nor write. The write path asked for in the coverage doc (POST
-  /// `issue-relation/` and `remove-relation/`) is therefore not implemented,
-  /// because there is nothing on this transport to call.
-  ///
-  /// Two bugs in the previous version of this method are fixed anyway, so that
-  /// it works the moment the transport does. The path was `issue-relations/`,
-  /// plural, which is not a route on either API. And the response is not a
-  /// list: the server returns an object keyed by relation kind
+  /// Reachable through the proxy, like [getSubIssues]. Two bugs had to be
+  /// fixed before it could work: the path was `issue-relations/`, plural,
+  /// which is a route on neither API, and the response is not a list — the
+  /// server returns an object keyed by relation kind
   /// (`{"blocking": [...], "blocked_by": [...], ...}`), so the old `is List`
-  /// check could never match and the method always returned empty.
+  /// check never matched and the method always returned empty.
+  ///
+  /// The write path (POST `issue-relation/`, `remove-relation/`) is now
+  /// callable too but is not implemented yet — see task #14.
   static Future<List<Map<String, dynamic>>> getIssueRelations(
     String workspaceSlug,
     String projectId,
@@ -189,8 +210,14 @@ class IssueService {
   ) async {
     final dio = await ApiClient.getInstance();
     final response = await dio.get(
-      '/workspaces/$workspaceSlug/projects/$projectId/issues/$issueId/activities/',
-      queryParameters: {'expand': 'actor_detail'},
+      '/workspaces/$workspaceSlug/projects/$projectId/issues/$issueId/history/',
+      // activity_type is not optional here, whatever the route suggests.
+      // Without it Plane falls through to a branch that sorts unserialised
+      // model instances as if they were dicts (`instance["created_at"]` in
+      // plane/app/views/issue/activity.py), which throws and returns a 500.
+      // The property feed already embeds actor_detail, and comments are
+      // fetched separately by CommentService, so this is the branch we want.
+      queryParameters: {'activity_type': 'issue-property'},
     );
     final data = response.data;
     final list = data is Map ? (data['results'] ?? []) : data;

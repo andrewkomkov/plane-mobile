@@ -4,7 +4,7 @@ import '../models/label.dart';
 class LabelService {
   static Future<List<Label>> getLabels(String workspaceSlug, String projectId) async {
     final dio = await ApiClient.getInstance();
-    final response = await dio.get('/workspaces/$workspaceSlug/projects/$projectId/labels/');
+    final response = await dio.get('/workspaces/$workspaceSlug/projects/$projectId/issue-labels/');
     final data = response.data;
     final list = data is Map ? (data['results'] ?? []) : data;
     return (list as List).map((e) => Label.fromJson(e)).toList();
@@ -17,7 +17,7 @@ class LabelService {
   ) async {
     final dio = await ApiClient.getInstance();
     final response = await dio.post(
-      '/workspaces/$workspaceSlug/projects/$projectId/labels/',
+      '/workspaces/$workspaceSlug/projects/$projectId/issue-labels/',
       data: data,
     );
     return Label.fromJson(response.data);
@@ -31,7 +31,7 @@ class LabelService {
   ) async {
     final dio = await ApiClient.getInstance();
     final response = await dio.patch(
-      '/workspaces/$workspaceSlug/projects/$projectId/labels/$labelId/',
+      '/workspaces/$workspaceSlug/projects/$projectId/issue-labels/$labelId/',
       data: data,
     );
     return Label.fromJson(response.data);
@@ -44,7 +44,7 @@ class LabelService {
   ) async {
     final dio = await ApiClient.getInstance();
     await dio.delete(
-      '/workspaces/$workspaceSlug/projects/$projectId/labels/$labelId/',
+      '/workspaces/$workspaceSlug/projects/$projectId/issue-labels/$labelId/',
     );
   }
 }

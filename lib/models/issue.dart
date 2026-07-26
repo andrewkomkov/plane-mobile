@@ -79,7 +79,13 @@ class Issue {
         id: json['id'] ?? '',
         name: json['name'] ?? '',
         descriptionHtml: json['description_html'],
-        state: _relationId(json['state']),
+        // Plane's two APIs name the same field differently. The external v1
+        // sends `state`; the internal one — which the app reaches through the
+        // proxy — sends `state_id`, and the same holds for every relation
+        // below. Reading only one spelling is why every work item arrived with
+        // a null state, which the UI then rendered as "Unknown" and grouped
+        // under Backlog.
+        state: _relationId(json['state'] ?? json['state_id']),
         // Prefer an explicit `state_detail` (the internal API's shape), then
         // fall back to a name carried on an expanded `state`. Previously this
         // called toString() on whatever was there, which rendered a Dart map
@@ -97,20 +103,20 @@ class Issue {
             (json['project_detail'] is String
                 ? json['project_detail'] as String
                 : null),
-        // Note that v1 declares `assignees` and `labels` write_only, so they
-        // are simply absent from its responses and these stay empty. That is a
-        // server-side shape limit, not a parse failure.
-        assignees: _relationIds(json['assignees']),
-        labels: _relationIds(json['labels']),
+        // v1 declares `assignees` and `labels` write_only, so they never come
+        // back from it at all. The internal API does return them, as id lists
+        // under `assignee_ids` / `label_ids`.
+        assignees: _relationIds(json['assignees'] ?? json['assignee_ids']),
+        labels: _relationIds(json['labels'] ?? json['label_ids']),
         createdAt: DateTime.tryParse(json['created_at']?.toString() ?? '') ??
             DateTime.now(),
         updatedAt: DateTime.tryParse(json['updated_at']?.toString() ?? '') ??
             DateTime.now(),
         createdBy: _relationId(json['created_by']),
-        project: _relationId(json['project']),
+        project: _relationId(json['project'] ?? json['project_id']),
         startDate: json['start_date']?.toString(),
         targetDate: json['target_date']?.toString(),
-        parent: _relationId(json['parent']),
+        parent: _relationId(json['parent'] ?? json['parent_id']),
         subIssuesCount: json['sub_issues_count'] is int
             ? json['sub_issues_count'] as int
             : int.tryParse(json['sub_issues_count']?.toString() ?? '') ?? 0,
@@ -123,6 +129,8 @@ class Issue {
         'priority': priority,
         if (assignees.isNotEmpty) 'assignees': assignees,
         if (labels.isNotEmpty) 'labels': labels,
+        // Keys stay in the model's own vocabulary; IssueService translates
+        // them to the server's write names on the way out.
         if (startDate != null) 'start_date': startDate,
         if (targetDate != null) 'target_date': targetDate,
         if (parent != null) 'parent': parent,

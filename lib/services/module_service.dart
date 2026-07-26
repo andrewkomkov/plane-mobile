@@ -53,7 +53,7 @@ class ModuleService {
       String workspaceSlug, String projectId, String moduleId) async {
     final dio = await ApiClient.getInstance();
     final response = await dio.get(
-        '/workspaces/$workspaceSlug/projects/$projectId/modules/$moduleId/module-issues/');
+        '/workspaces/$workspaceSlug/projects/$projectId/modules/$moduleId/issues/');
     final data = response.data;
     final list = data is Map ? (data['results'] ?? []) : data;
     return (list as List).map((e) => Issue.fromJson(e)).toList();
@@ -67,7 +67,7 @@ class ModuleService {
   ) async {
     final dio = await ApiClient.getInstance();
     await dio.post(
-      '/workspaces/$workspaceSlug/projects/$projectId/modules/$moduleId/module-issues/',
+      '/workspaces/$workspaceSlug/projects/$projectId/modules/$moduleId/issues/',
       data: {'issues': issueIds},
     );
   }
@@ -80,7 +80,7 @@ class ModuleService {
   ) async {
     final dio = await ApiClient.getInstance();
     await dio.delete(
-      '/workspaces/$workspaceSlug/projects/$projectId/modules/$moduleId/module-issues/$issueId/',
+      '/workspaces/$workspaceSlug/projects/$projectId/modules/$moduleId/issues/$issueId/',
     );
   }
 }

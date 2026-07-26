@@ -1,7 +1,17 @@
 import '../config/api_client.dart';
+import '../config/secure_storage.dart';
 import '../models/notification.dart';
 
 class NotificationService {
+  /// Notifications are workspace-scoped on Plane: the routes are
+  /// `workspaces/{slug}/users/notifications/...`. The bare `/users/...` paths
+  /// this service used to call are not routes on either of Plane's APIs, so
+  /// every call here returned 404.
+  static Future<String> _base() async {
+    final slug = await SecureStorage.getWorkspaceSlug() ?? '';
+    return '/workspaces/$slug/users/notifications';
+  }
+
   static Future<List<PlaneNotification>> getNotifications({
     String? type,
     bool? snoozed,
@@ -16,7 +26,7 @@ class NotificationService {
     if (read != null) params['read'] = read;
 
     final response = await dio.get(
-      '/users/notifications/',
+      '${await _base()}/',
       queryParameters: params,
     );
     final data = response.data;
@@ -33,17 +43,17 @@ class NotificationService {
 
   static Future<void> markAsRead(String notificationId) async {
     final dio = await ApiClient.getInstance();
-    await dio.post('/users/notifications/$notificationId/read/');
+    await dio.post('${await _base()}/$notificationId/read/');
   }
 
   static Future<void> archive(String notificationId) async {
     final dio = await ApiClient.getInstance();
-    await dio.post('/users/notifications/$notificationId/archive/');
+    await dio.post('${await _base()}/$notificationId/archive/');
   }
 
   static Future<void> markAllAsRead() async {
     final dio = await ApiClient.getInstance();
-    await dio.post('/users/notifications/mark-all-read/');
+    await dio.post('${await _base()}/mark-all-read/');
   }
 
   static Future<Map<String, dynamic>> getNotificationPreferences() async {
