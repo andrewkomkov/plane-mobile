@@ -63,51 +63,57 @@ class M3ETextField extends StatelessWidget {
 
     // Multi-line fields keep a rectangle; single-line compact ones are pills.
     // A stadium wrapped around six lines of text reads as a mistake.
-    final radius = compact && (maxLines ?? 1) == 1
-        ? M3EShape.full
-        : M3EShape.large;
+    final radius =
+        compact && (maxLines ?? 1) == 1 ? M3EShape.full : M3EShape.large;
 
     OutlineInputBorder border(Color color, double width) => OutlineInputBorder(
           borderRadius: BorderRadius.circular(radius),
           borderSide: BorderSide(color: color, width: width),
         );
 
-    return Semantics(
-      label: label,
-      textField: true,
-      child: TextField(
-        controller: controller,
-        onChanged: onChanged,
-        onSubmitted: onSubmitted == null ? null : (_) => onSubmitted!(),
-        autofocus: autofocus,
-        obscureText: obscureText,
-        keyboardType: keyboardType,
-        maxLines: obscureText ? 1 : maxLines,
-        style: theme.textTheme.bodyLarge,
-        cursorColor: scheme.primary,
-        decoration: InputDecoration(
-          labelText: compact ? null : label,
-          hintText: hint ?? (compact ? label : null),
-          labelStyle: theme.textTheme.bodyMedium
-              ?.copyWith(color: scheme.onSurfaceVariant),
-          hintStyle: theme.textTheme.bodyLarge
-              ?.copyWith(color: scheme.onSurfaceVariant),
-          prefixIcon: prefixIcon == null
-              ? null
-              : Icon(prefixIcon, size: 20, color: scheme.onSurfaceVariant),
-          suffixIcon: suffix,
-          filled: true,
-          fillColor: scheme.surfaceContainerLow,
-          isDense: true,
-          contentPadding: EdgeInsets.symmetric(
-            horizontal: prefixIcon == null ? 16 : 12,
-            vertical: compact ? 14 : 16,
+    // MergeSemantics, not a bare Semantics wrapper. On its own, `Semantics`
+    // annotates a node that sits *above* the field, so the editable node the
+    // platform actually focuses stays anonymous — uiautomator reports it as
+    // NAF, and `tool/adb_drive.py tap` cannot find the field by name. Merging
+    // folds the label onto the editable node itself.
+    return MergeSemantics(
+      child: Semantics(
+        label: label,
+        textField: true,
+        child: TextField(
+          controller: controller,
+          onChanged: onChanged,
+          onSubmitted: onSubmitted == null ? null : (_) => onSubmitted!(),
+          autofocus: autofocus,
+          obscureText: obscureText,
+          keyboardType: keyboardType,
+          maxLines: obscureText ? 1 : maxLines,
+          style: theme.textTheme.bodyLarge,
+          cursorColor: scheme.primary,
+          decoration: InputDecoration(
+            labelText: compact ? null : label,
+            hintText: hint ?? (compact ? label : null),
+            labelStyle: theme.textTheme.bodyMedium
+                ?.copyWith(color: scheme.onSurfaceVariant),
+            hintStyle: theme.textTheme.bodyLarge
+                ?.copyWith(color: scheme.onSurfaceVariant),
+            prefixIcon: prefixIcon == null
+                ? null
+                : Icon(prefixIcon, size: 20, color: scheme.onSurfaceVariant),
+            suffixIcon: suffix,
+            filled: true,
+            fillColor: scheme.surfaceContainerLow,
+            isDense: true,
+            contentPadding: EdgeInsets.symmetric(
+              horizontal: prefixIcon == null ? 16 : 12,
+              vertical: compact ? 14 : 16,
+            ),
+            border: border(scheme.outline, 0.8),
+            enabledBorder: border(scheme.outline, 0.8),
+            focusedBorder: border(scheme.primary, 1.6),
+            errorBorder: border(scheme.error, 0.8),
+            focusedErrorBorder: border(scheme.error, 1.6),
           ),
-          border: border(scheme.outline, 0.8),
-          enabledBorder: border(scheme.outline, 0.8),
-          focusedBorder: border(scheme.primary, 1.6),
-          errorBorder: border(scheme.error, 0.8),
-          focusedErrorBorder: border(scheme.error, 1.6),
         ),
       ),
     );

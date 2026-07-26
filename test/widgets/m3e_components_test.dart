@@ -11,6 +11,7 @@ import 'package:plane_mobile/widgets/m3e/flexible_app_bar.dart';
 import 'package:plane_mobile/widgets/m3e/loading_indicator.dart';
 import 'package:plane_mobile/widgets/m3e/native.dart';
 import 'package:plane_mobile/widgets/m3e/split_button.dart';
+import 'package:plane_mobile/widgets/m3e/text_field.dart';
 
 void main() {
   Widget wrap(Widget child) =>
@@ -71,11 +72,14 @@ void main() {
       // The nearest Container ancestor is the button's own painted box. It
       // used to be an AnimatedContainer; the width response never came from
       // that widget, so what this measures is unchanged.
-      double widthOf(String label) =>
-          tester.getSize(find.ancestor(
-            of: find.text(label),
-            matching: find.byType(Container),
-          ).first).width;
+      double widthOf(String label) => tester
+          .getSize(find
+              .ancestor(
+                of: find.text(label),
+                matching: find.byType(Container),
+              )
+              .first)
+          .width;
 
       final restingFirst = widthOf('One');
       final restingSecond = widthOf('Two');
@@ -129,10 +133,12 @@ void main() {
       // spring produced — a filter on top of the physics, flattening the
       // overshoot underneath it. Nothing between the spring and the box.
       double cornerOf() {
-        final box = tester.widget<Container>(find.descendant(
-          of: find.byType(M3EChip),
-          matching: find.byType(Container),
-        ).first);
+        final box = tester.widget<Container>(find
+            .descendant(
+              of: find.byType(M3EChip),
+              matching: find.byType(Container),
+            )
+            .first);
         final decoration = box.decoration as BoxDecoration;
         return (decoration.borderRadius as BorderRadius).topLeft.x;
       }
@@ -140,8 +146,8 @@ void main() {
       await tester.pumpWidget(wrap(const M3EChip(label: 'Filter')));
       final atRest = cornerOf();
 
-      await tester.pumpWidget(
-          wrap(const M3EChip(label: 'Filter', selected: true)));
+      await tester
+          .pumpWidget(wrap(const M3EChip(label: 'Filter', selected: true)));
       await tester.pump(const Duration(milliseconds: 16));
       final travelling = cornerOf();
 
@@ -235,7 +241,8 @@ void main() {
             title: 'My issues',
             body: ListView.builder(
               itemCount: 60,
-              itemBuilder: (_, i) => SizedBox(height: 48, child: Text('row $i')),
+              itemBuilder: (_, i) =>
+                  SizedBox(height: 48, child: Text('row $i')),
             ),
           ),
         ),
@@ -493,6 +500,56 @@ void main() {
 
       await tester.pumpAndSettle();
       expect(observed, closeTo(1, 0.02));
+    });
+  });
+
+  group('M3ETextField', () {
+    // tool/adb_drive.py cannot see this. The platform carries a text field's
+    // accessible name in AccessibilityNodeInfo.hintText, which
+    // `uiautomator dump` does not print, so on-device the field reads as
+    // anonymous whether or not it is named. The semantics tree is readable
+    // here, so this is where the guarantee is pinned.
+    testWidgets(
+        'publishes its label even in compact mode, where nothing '
+        'renders it visually', (tester) async {
+      final handle = tester.ensureSemantics();
+      await tester.pumpWidget(wrap(const M3ETextField(
+        label: 'Search projects',
+        hint: 'Search projects...',
+        compact: true,
+        prefixIcon: Icons.search,
+      )));
+
+      expect(
+        tester.getSemantics(find.byType(TextField)).label,
+        contains('Search projects'),
+        reason: 'compact mode drops the visible label, so the semantics '
+            'label is the only name the field has',
+      );
+      handle.dispose();
+    });
+
+    // The label has to outlive the hint: Android drops a placeholder from the
+    // accessible name as soon as the field holds content, which is exactly
+    // when a screen reader most needs to say what the field is.
+    testWidgets('keeps its label once the field has content', (tester) async {
+      final handle = tester.ensureSemantics();
+      final controller = TextEditingController();
+      await tester.pumpWidget(wrap(M3ETextField(
+        label: 'Search projects',
+        hint: 'Search projects...',
+        compact: true,
+        controller: controller,
+      )));
+
+      await tester.enterText(find.byType(TextField), 'plane');
+      await tester.pump();
+
+      expect(
+        tester.getSemantics(find.byType(TextField)).label,
+        contains('Search projects'),
+      );
+      handle.dispose();
     });
   });
 }

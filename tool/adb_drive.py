@@ -76,11 +76,13 @@ def nodes():
             continue
         x1, y1, x2, y2 = map(int, m.groups())
         out.append({
-            # hint is where Android puts a text field's placeholder; it is a
-            # legitimate accessible name, though a poor one — it disappears
-            # once the field has content.
+            # A text field's accessible name lands in AccessibilityNodeInfo's
+            # hintText, which `uiautomator dump` does not emit — there is no
+            # hint attribute in the XML at all. Kept in the lookup because a
+            # node that does carry one should win over an empty text.
             "label": (n.get("content-desc") or n.get("text")
                       or n.get("hint") or "").strip(),
+            "editable": n.get("class", "").endswith("EditText"),
             "box": (x1, y1, x2, y2),
             "center": ((x1 + x2) // 2, (y1 + y2) // 2),
             "size": (x2 - x1, y2 - y1),
@@ -125,6 +127,16 @@ def cmd_check():
     inside the clickable node. Compose does exactly this — it emits the click
     target and the text as separate nodes — so treating every anonymous
     clickable as a gap would flag the whole native ButtonGroup falsely.
+
+    Text fields are counted separately rather than reported as gaps. Flutter
+    publishes a field's name through the semantics label, and the platform
+    puts a *text field's* label in AccessibilityNodeInfo.hintText rather than
+    contentDescription — which `uiautomator dump` does not print. So an
+    EditText here reads as anonymous whether it is named or not, and this
+    command cannot tell the two apart. It said "1 unlabelled tappable node" on
+    every screen with a search box for exactly that reason. What a field
+    publishes is asserted in test/widgets/m3e_components_test.dart instead,
+    where the semantics tree is actually readable.
     """
     awake()
     mine = ours(nodes())
@@ -135,16 +147,19 @@ def cmd_check():
         return any(x1 <= n["center"][0] <= x2 and y1 <= n["center"][1] <= y2
                    for n in labelled)
 
-    gaps = [n for n in mine
+    anon = [n for n in mine
             if n["clickable"] and not n["label"]
             # Ignore hairline nodes; those are dividers and scroll shims, not
             # controls a user or a script would ever target.
             and n["size"][0] > 24 and n["size"][1] > 24
             and not covered(n["box"])]
+    gaps = [n for n in anon if not n["editable"]]
+    fields = len(anon) - len(gaps)
+    note = f" ({fields} text field(s) not checkable here — see cmd_check)" if fields else ""
     if not gaps:
-        print("OK — every tappable node on this screen has a label")
+        print(f"OK — every tappable node on this screen has a label{note}")
         return 0
-    print(f"{len(gaps)} unlabelled tappable node(s):")
+    print(f"{len(gaps)} unlabelled tappable node(s):{note}")
     for n in gaps:
         print(f'  at {n["center"][0]},{n["center"][1]}  size {n["size"][0]}x{n["size"][1]}')
     return 1
