@@ -32,10 +32,16 @@ import '../../models/member.dart';
 import '../../models/activity.dart';
 import '../../models/attachment.dart';
 import '../../models/link.dart';
+import '../../models/reaction.dart';
+import '../../models/estimate_point.dart';
+import '../../models/cycle.dart';
+import '../../models/module.dart';
+import '../../services/cycle_service.dart';
 import '../../utils/html_to_markdown.dart';
 import '../../utils/time_ago.dart';
 import '../../widgets/property_chip.dart';
 import '../../widgets/loading_state.dart';
+import '../../widgets/reaction_bar.dart';
 import '../../widgets/skeleton_loader.dart';
 import 'issue_create_screen.dart';
 
@@ -75,6 +81,21 @@ class _IssueDetailScreenState extends ConsumerState<IssueDetailScreen> {
   String? _moduleName;
   String? _cycleName;
   List<IssueLink> _links = [];
+
+  /// Reactions on the work item itself. Comment reactions ride along on the
+  /// comments and live in [Comment.reactions].
+  List<Reaction> _reactions = [];
+
+  /// The project's estimate scale. Empty means the project has no estimate
+  /// system configured, which is the common case — the control hides entirely
+  /// rather than offering an empty picker.
+  List<EstimatePoint> _estimatePoints = [];
+
+  /// Loaded so the cycle and module chips can name what they point at and so
+  /// their pickers open instantly. Read-only use of the two services those
+  /// screens own.
+  List<Cycle> _cycles = [];
+  List<Module> _modules = [];
   bool _loading = true;
   String? _error;
   String _projectIdentifier = '';
@@ -189,6 +210,10 @@ class _IssueDetailScreenState extends ConsumerState<IssueDetailScreen> {
         () => IssueService.getActivities(ws, pid, iid), <Activity>[]);
     if (mounted) setState(() {});
 
+    _reactions = await _tryLoad(
+        () => IssueService.getReactions(ws, pid, iid), <Reaction>[]);
+    if (mounted) setState(() {});
+
     _subIssues = await _tryLoad(
         () => IssueService.getSubIssues(ws, pid, iid), <Issue>[]);
     _relations = await _tryLoad(
@@ -198,6 +223,16 @@ class _IssueDetailScreenState extends ConsumerState<IssueDetailScreen> {
         () => AttachmentService.getAttachments(ws, pid, iid), <Attachment>[]);
     _links = await _tryLoad(
         () => IssueService.getLinks(ws, pid, iid), <IssueLink>[]);
+
+    // An empty scale is the normal answer for a project with no estimates
+    // configured, and a 403 is the answer for a guest. _tryLoad turns the
+    // second into the first, and both mean the same thing here: no control.
+    _estimatePoints = await _tryLoad(
+        () => IssueService.getEstimatePoints(ws, pid), <EstimatePoint>[]);
+    _cycles = await _tryLoad(() => CycleService.getCycles(ws, pid), <Cycle>[]);
+    _modules =
+        await _tryLoad(() => ModuleService.getModules(ws, pid), <Module>[]);
+    if (mounted) setState(() {});
 
     // Module + cycle name via proxy (single SQL query, no N+1)
     try {
@@ -216,6 +251,42 @@ class _IssueDetailScreenState extends ConsumerState<IssueDetailScreen> {
       }
     } catch (_) {}
     if (mounted) setState(() {});
+  }
+
+  /// The estimate's display value, or null when nothing is set.
+  String? _estimateLabel(Issue issue) {
+    final id = issue.estimatePoint;
+    if (id == null) return null;
+    for (final p in _estimatePoints) {
+      if (p.id == id) return p.value;
+    }
+    return null;
+  }
+
+  /// The cycle's name.
+  ///
+  /// Falls back to the name the bespoke `issue-info` proxy endpoint returns,
+  /// which is the only source when the cycle list could not be loaded.
+  String? _cycleLabel(Issue issue) {
+    final id = issue.cycleId;
+    if (id != null) {
+      for (final c in _cycles) {
+        if (c.id == id) return c.name;
+      }
+    }
+    return _cycleName;
+  }
+
+  /// Module names, or a count once there is more than one — several module
+  /// names side by side push every other chip off the row.
+  String? _moduleLabel(Issue issue) {
+    final ids = issue.moduleIds;
+    if (ids.isEmpty) return _moduleName;
+    final names =
+        _modules.where((m) => ids.contains(m.id)).map((m) => m.name).toList();
+    if (names.isEmpty) return _moduleName ?? '${ids.length}';
+    if (names.length == 1) return names.first;
+    return '${names.length} modules';
   }
 
   Future<T> _tryLoad<T>(Future<T> Function() fn, T fallback) async {
@@ -432,6 +503,547 @@ class _IssueDetailScreenState extends ConsumerState<IssueDetailScreen> {
     _load();
   }
 
+  /// Makes an existing work item a child of this one.
+  ///
+  /// The other half of "add sub-issue": creating a new child is
+  /// [_addSubIssue], adopting one that already exists is this. Parenthood is
+  /// just a field on the child, so this is a PATCH of the child rather than
+  /// anything on this screen's own work item.
+  Future<void> _linkExistingSubIssue() async {
+    final picked = await _pickIssue(
+      title: 'Add existing sub-issue',
+      excludeIds: {widget.issueId, ..._subIssues.map((s) => s.id)},
+    );
+    if (picked == null) return;
+    try {
+      await IssueService.updateIssue(
+        widget.workspaceSlug,
+        widget.projectId,
+        picked.id,
+        {'parent': widget.issueId},
+      );
+      _load();
+    } catch (e) {
+      _complain('Could not add the sub-issue', e);
+    }
+  }
+
+  /// Detaches a child, which is clearing its parent, not deleting it.
+  Future<void> _removeSubIssue(Issue sub) async {
+    try {
+      await IssueService.updateIssue(
+        widget.workspaceSlug,
+        widget.projectId,
+        sub.id,
+        {'parent': null},
+      );
+      if (mounted)
+        setState(() => _subIssues.removeWhere((s) => s.id == sub.id));
+    } catch (e) {
+      _complain('Could not remove the sub-issue', e);
+    }
+  }
+
+  void _complain(String what, Object e) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('$what: $e')),
+    );
+  }
+
+  // --- Reactions (#7) ---
+
+  /// Adds or removes the current user's [code] reaction on the work item.
+  ///
+  /// Applied locally first and reverted on failure. A reaction is a one-tap
+  /// action whose whole value is that it feels instant; waiting on a round
+  /// trip to redraw makes it feel broken, and the failure case is both rare
+  /// and cheap to undo.
+  Future<void> _toggleIssueReaction(String code) async {
+    final me = _currentUserId;
+    final mine = me != null &&
+        _reactions.any((r) => r.reaction == code && r.actor == me);
+    final before = List<Reaction>.from(_reactions);
+
+    setState(() {
+      if (mine) {
+        _reactions.removeWhere((r) => r.reaction == code && r.actor == me);
+      } else {
+        _reactions.add(Reaction(id: '', reaction: code, actor: me));
+      }
+    });
+
+    try {
+      if (mine) {
+        await IssueService.removeReaction(
+            widget.workspaceSlug, widget.projectId, widget.issueId, code);
+      } else {
+        await IssueService.addReaction(
+            widget.workspaceSlug, widget.projectId, widget.issueId, code);
+      }
+      // Identity unknown means the optimistic row could not be attributed, so
+      // the chip would not show as the user's own until the next load. Re-read
+      // rather than leave it looking like someone else's.
+      if (me == null || me.isEmpty) {
+        final fresh = await _tryLoad(
+            () => IssueService.getReactions(
+                widget.workspaceSlug, widget.projectId, widget.issueId),
+            before);
+        if (mounted) setState(() => _reactions = fresh);
+      }
+    } catch (e) {
+      if (mounted) setState(() => _reactions = before);
+      _complain('Could not update the reaction', e);
+    }
+  }
+
+  /// Same toggle, against a comment's own reaction route.
+  Future<void> _toggleCommentReaction(Comment comment, String code) async {
+    final me = _currentUserId;
+    final mine = me != null &&
+        comment.reactions.any((r) => r.reaction == code && r.actor == me);
+    final before = comment.reactions;
+
+    List<Reaction> next;
+    if (mine) {
+      next =
+          before.where((r) => !(r.reaction == code && r.actor == me)).toList();
+    } else {
+      next = [...before, Reaction(id: '', reaction: code, actor: me)];
+    }
+    _replaceComment(comment.copyWithReactions(next));
+
+    try {
+      if (mine) {
+        await CommentService.removeReaction(
+            widget.workspaceSlug, widget.projectId, comment.id, code);
+      } else {
+        await CommentService.addReaction(
+            widget.workspaceSlug, widget.projectId, comment.id, code);
+      }
+      if (me == null || me.isEmpty) {
+        final fresh = await _tryLoad(
+            () => CommentService.getReactions(
+                widget.workspaceSlug, widget.projectId, comment.id),
+            next);
+        _replaceComment(comment.copyWithReactions(fresh));
+      }
+    } catch (e) {
+      _replaceComment(comment.copyWithReactions(before));
+      _complain('Could not update the reaction', e);
+    }
+  }
+
+  void _replaceComment(Comment updated) {
+    if (!mounted) return;
+    setState(() {
+      final i = _comments.indexWhere((c) => c.id == updated.id);
+      if (i != -1) _comments[i] = updated;
+    });
+  }
+
+  // --- Subscription (#8) ---
+
+  /// Turns notifications for this work item on or off.
+  ///
+  /// This app already delivers push notifications with no way to decline them,
+  /// so this is the off switch for those.
+  Future<void> _toggleSubscription() async {
+    final issue = _issue;
+    if (issue == null) return;
+    // Null means the server did not say. Treating unknown as subscribed makes
+    // the first tap an unsubscribe, which is the safe direction: the worst
+    // case is a no-op the service already swallows, rather than silently
+    // subscribing someone who tapped a bell to make it stop.
+    final subscribed = issue.isSubscribed ?? true;
+
+    setState(() => _issue = _withSubscription(issue, !subscribed));
+    try {
+      if (subscribed) {
+        await IssueService.unsubscribe(
+            widget.workspaceSlug, widget.projectId, widget.issueId);
+      } else {
+        await IssueService.subscribe(
+            widget.workspaceSlug, widget.projectId, widget.issueId);
+      }
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(subscribed
+                ? 'Unsubscribed from this work item'
+                : 'Subscribed to this work item'),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) setState(() => _issue = issue);
+      _complain('Could not change the subscription', e);
+    }
+  }
+
+  /// The work item with only `is_subscribed` changed.
+  ///
+  /// Issue has no copyWith and adding one for a single screen's optimistic
+  /// update would be a wide change to a model several screens share, so the
+  /// round trip through JSON reuses the parser that is already correct about
+  /// every other field.
+  Issue _withSubscription(Issue issue, bool subscribed) => Issue.fromJson({
+        'id': issue.id,
+        'name': issue.name,
+        'description_html': issue.descriptionHtml,
+        'state_id': issue.state,
+        'state_detail': issue.stateDetail,
+        'priority': issue.priority,
+        'sequence_id': issue.sequenceId,
+        'project_detail': issue.projectDetail,
+        'assignee_ids': issue.assignees,
+        'label_ids': issue.labels,
+        'created_at': issue.createdAt.toIso8601String(),
+        'updated_at': issue.updatedAt.toIso8601String(),
+        'created_by': issue.createdBy,
+        'project_id': issue.project,
+        'start_date': issue.startDate,
+        'target_date': issue.targetDate,
+        'parent_id': issue.parent,
+        'sub_issues_count': issue.subIssuesCount,
+        'is_subscribed': subscribed,
+        'estimate_point': issue.estimatePoint,
+        'cycle_id': issue.cycleId,
+        'module_ids': issue.moduleIds,
+        'archived_at': issue.archivedAt,
+      });
+
+  // --- Archive (#15) ---
+
+  /// Whether the server will accept an archive for the current state.
+  ///
+  /// Plane only archives work items sitting in a completed or cancelled state
+  /// group and 400s anything else. Knowing that here is what lets the menu say
+  /// why instead of offering the action and then failing.
+  bool get _canArchive {
+    final group = widget.states[_issue?.state]?.group;
+    return group != null && IssueService.archivableStateGroups.contains(group);
+  }
+
+  Future<void> _archiveIssue() async {
+    try {
+      await IssueService.archiveIssue(
+          widget.workspaceSlug, widget.projectId, widget.issueId);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Work item archived')),
+      );
+      _load();
+    } catch (e) {
+      _complain('Could not archive the work item', e);
+    }
+  }
+
+  Future<void> _unarchiveIssue() async {
+    try {
+      await IssueService.unarchiveIssue(
+          widget.workspaceSlug, widget.projectId, widget.issueId);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Work item restored')),
+      );
+      _load();
+    } catch (e) {
+      _complain('Could not restore the work item', e);
+    }
+  }
+
+  // --- Relations (#14) ---
+
+  Future<void> _addRelation() async {
+    final kind = await showModalBottomSheet<String>(
+      context: context,
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: Text('Relation type',
+                  style: Theme.of(ctx).textTheme.titleMedium),
+            ),
+            ...IssueService.relationKinds.entries.map(
+              (e) => ListTile(
+                leading: Icon(_RelationChip.iconFor(e.key), size: 20),
+                title: Text(e.value, style: Theme.of(ctx).textTheme.bodyMedium),
+                onTap: () => Navigator.pop(ctx, e.key),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (kind == null || !mounted) return;
+
+    final picked = await _pickIssue(
+      title: IssueService.relationKinds[kind] ?? 'Related work item',
+      excludeIds: {
+        widget.issueId,
+        ..._relations.map((r) => r['id']?.toString() ?? ''),
+      },
+    );
+    if (picked == null) return;
+
+    try {
+      await IssueService.addRelation(
+        widget.workspaceSlug,
+        widget.projectId,
+        widget.issueId,
+        kind,
+        [picked.id],
+      );
+      _load();
+    } catch (e) {
+      _complain('Could not add the relation', e);
+    }
+  }
+
+  Future<void> _removeRelation(Map<String, dynamic> relation) async {
+    final relatedId = relation['id']?.toString();
+    if (relatedId == null || relatedId.isEmpty) return;
+    try {
+      await IssueService.removeRelation(
+          widget.workspaceSlug, widget.projectId, widget.issueId, relatedId);
+      if (mounted) {
+        setState(() =>
+            _relations.removeWhere((r) => r['id']?.toString() == relatedId));
+      }
+    } catch (e) {
+      _complain('Could not remove the relation', e);
+    }
+  }
+
+  // --- Estimate, cycle and module (#11) ---
+
+  void _showEstimatePicker() {
+    final current = _issue?.estimatePoint;
+    showModalBottomSheet(
+      context: context,
+      builder: (ctx) => SafeArea(
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Padding(
+                padding: const EdgeInsets.all(16),
+                child: Text('Estimate',
+                    style: Theme.of(ctx).textTheme.titleMedium),
+              ),
+              ..._estimatePoints.map((p) => ListTile(
+                    title: Text(p.value,
+                        style: Theme.of(ctx).textTheme.bodyMedium),
+                    subtitle: (p.description ?? '').isNotEmpty
+                        ? Text(p.description!,
+                            style: Theme.of(ctx).textTheme.bodySmall)
+                        : null,
+                    trailing: p.id == current
+                        ? const Icon(Icons.check, size: 18)
+                        : null,
+                    onTap: () {
+                      Navigator.pop(ctx);
+                      _updateField({'estimate_point': p.id});
+                    },
+                  )),
+              if (current != null) ...[
+                const Divider(),
+                ListTile(
+                  leading: const Icon(Icons.clear, size: 20),
+                  title: Text('Clear estimate',
+                      style: Theme.of(ctx).textTheme.bodyMedium),
+                  onTap: () {
+                    Navigator.pop(ctx);
+                    _updateField({'estimate_point': null});
+                  },
+                ),
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _showCyclePicker() {
+    final current = _issue?.cycleId;
+    showModalBottomSheet(
+      context: context,
+      builder: (ctx) => SafeArea(
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Padding(
+                padding: const EdgeInsets.all(16),
+                child:
+                    Text('Cycle', style: Theme.of(ctx).textTheme.titleMedium),
+              ),
+              if (_cycles.isEmpty)
+                Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Text('No cycles in this project',
+                      style: Theme.of(ctx).textTheme.bodySmall),
+                ),
+              ..._cycles.map((c) => ListTile(
+                    leading: const Icon(Icons.replay_outlined, size: 20),
+                    title:
+                        Text(c.name, style: Theme.of(ctx).textTheme.bodyMedium),
+                    trailing: c.id == current
+                        ? const Icon(Icons.check, size: 18)
+                        : null,
+                    onTap: () {
+                      Navigator.pop(ctx);
+                      _setCycle(c.id);
+                    },
+                  )),
+              if (current != null) ...[
+                const Divider(),
+                ListTile(
+                  leading: const Icon(Icons.clear, size: 20),
+                  title: Text('Remove from cycle',
+                      style: Theme.of(ctx).textTheme.bodyMedium),
+                  onTap: () {
+                    Navigator.pop(ctx);
+                    _setCycle(null);
+                  },
+                ),
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// Moves the work item to [cycleId], or out of its cycle when null.
+  ///
+  /// There is no `cycle` field on the work item to PATCH — membership lives in
+  /// a join table reached through the cycle's own collection — so leaving a
+  /// cycle is a delete against the old one and moving is an add to the new
+  /// one, which the server treats as a move.
+  Future<void> _setCycle(String? cycleId) async {
+    final previous = _issue?.cycleId;
+    try {
+      if (cycleId == null) {
+        if (previous == null) return;
+        await IssueService.removeIssueFromCycle(
+            widget.workspaceSlug, widget.projectId, previous, widget.issueId);
+      } else {
+        await IssueService.addIssueToCycle(
+            widget.workspaceSlug, widget.projectId, cycleId, widget.issueId);
+      }
+      _load();
+    } catch (e) {
+      _complain('Could not change the cycle', e);
+    }
+  }
+
+  void _showModulePicker() {
+    final selected = Set<String>.from(_issue?.moduleIds ?? const <String>[]);
+    final original = Set<String>.from(selected);
+    showModalBottomSheet(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setSheetState) => SafeArea(
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Padding(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  child: Row(
+                    children: [
+                      Text('Modules',
+                          style: Theme.of(ctx).textTheme.titleMedium),
+                      const Spacer(),
+                      TextButton(
+                        onPressed: () {
+                          Navigator.pop(ctx);
+                          _setModules(original, selected);
+                        },
+                        child: const Text('Done'),
+                      ),
+                    ],
+                  ),
+                ),
+                if (_modules.isEmpty)
+                  Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Text('No modules in this project',
+                        style: Theme.of(ctx).textTheme.bodySmall),
+                  ),
+                ..._modules.map((m) => CheckboxListTile(
+                      value: selected.contains(m.id),
+                      onChanged: (v) => setSheetState(() {
+                        if (v == true) {
+                          selected.add(m.id);
+                        } else {
+                          selected.remove(m.id);
+                        }
+                      }),
+                      secondary:
+                          const Icon(Icons.view_module_outlined, size: 20),
+                      title: Text(m.name,
+                          style: Theme.of(ctx).textTheme.bodyMedium),
+                      controlAffinity: ListTileControlAffinity.trailing,
+                      dense: true,
+                    )),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// Sends the module change as the difference between the two sets.
+  ///
+  /// The endpoint takes additions and removals in one call but applies exactly
+  /// what it is given — it does not diff against what is stored — so sending
+  /// the whole selection as `modules` would re-add what was already there and
+  /// never remove anything.
+  Future<void> _setModules(Set<String> before, Set<String> after) async {
+    final added = after.difference(before).toList();
+    final removed = before.difference(after).toList();
+    if (added.isEmpty && removed.isEmpty) return;
+    try {
+      await IssueService.setIssueModules(
+        widget.workspaceSlug,
+        widget.projectId,
+        widget.issueId,
+        added: added,
+        removed: removed,
+      );
+      _load();
+    } catch (e) {
+      _complain('Could not change the modules', e);
+    }
+  }
+
+  /// Opens a searchable list of the project's work items and returns the
+  /// chosen one. Used for both relations and adopting an existing sub-issue.
+  Future<Issue?> _pickIssue({
+    required String title,
+    required Set<String> excludeIds,
+  }) {
+    return showModalBottomSheet<Issue>(
+      context: context,
+      isScrollControlled: true,
+      builder: (ctx) => _IssuePickerSheet(
+        title: title,
+        workspaceSlug: widget.workspaceSlug,
+        projectId: widget.projectId,
+        excludeIds: excludeIds,
+        states: widget.states,
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_loading) {
@@ -471,6 +1083,17 @@ class _IssueDetailScreenState extends ConsumerState<IssueDetailScreen> {
             ? '${widget.projectIdentifier}-${issue.sequenceId}'
             : 'Issue',
         actions: [
+          // The bell is the only control for push notifications the app has,
+          // so it sits in the bar rather than behind the overflow menu.
+          M3EAppBarAction(
+            icon: (issue.isSubscribed ?? false)
+                ? Icons.notifications_active
+                : Icons.notifications_none,
+            tooltip: (issue.isSubscribed ?? false)
+                ? 'Unsubscribe from this work item'
+                : 'Subscribe to this work item',
+            onPressed: _toggleSubscription,
+          ),
           M3EAppBarAction(
               icon: Icons.share_outlined,
               tooltip: 'Share',
@@ -592,46 +1215,71 @@ class _IssueDetailScreenState extends ConsumerState<IssueDetailScreen> {
                           onTap: () =>
                               _pickDate('target_date', issue.targetDate),
                         ),
+                        // Estimate chip. Absent entirely when the project has
+                        // no estimate scale configured — which is most of
+                        // them — rather than offering a picker with nothing
+                        // in it.
+                        if (_estimatePoints.isNotEmpty)
+                          Semantics(
+                            label: 'Edit estimate',
+                            button: true,
+                            container: true,
+                            child: PropertyChip(
+                              icon: Icons.speed_outlined,
+                              iconColor: secondary,
+                              label: _estimateLabel(issue) ?? 'Estimate',
+                              onTap: _showEstimatePicker,
+                            ),
+                          ),
+                        // Cycle chip
+                        Semantics(
+                          label: 'Edit cycle',
+                          button: true,
+                          container: true,
+                          child: PropertyChip(
+                            icon: Icons.replay_outlined,
+                            iconColor: secondary,
+                            label: _cycleLabel(issue) ?? 'Cycle',
+                            onTap: _showCyclePicker,
+                          ),
+                        ),
+                        // Module chip
+                        Semantics(
+                          label: 'Edit modules',
+                          button: true,
+                          container: true,
+                          child: PropertyChip(
+                            icon: Icons.view_module_outlined,
+                            iconColor: secondary,
+                            label: _moduleLabel(issue) ?? 'Module',
+                            onTap: _showModulePicker,
+                          ),
+                        ),
                       ],
                     ),
+                    // Archived banner. An archived work item is still fully
+                    // editable through this screen, so the state has to be
+                    // visible or every edit looks like it is going somewhere
+                    // it is not.
+                    if (issue.isArchived) ...[
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          Icon(Icons.archive_outlined,
+                              size: 14, color: secondary),
+                          const SizedBox(width: 6),
+                          Text('Archived',
+                              style: theme.textTheme.labelMedium
+                                  ?.copyWith(color: secondary)),
+                        ],
+                      ),
+                    ],
                     // Overdue text
                     if (issue.isOverdue) ...[
                       const SizedBox(height: 6),
                       Text('Overdue',
                           style: theme.textTheme.labelMedium
                               ?.copyWith(color: PlaneTheme.urgent)),
-                    ],
-                    // Module & Cycle
-                    if (_moduleName != null || _cycleName != null) ...[
-                      const SizedBox(height: 10),
-                      Wrap(
-                        spacing: 16,
-                        runSpacing: 6,
-                        children: [
-                          if (_moduleName != null)
-                            Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(Icons.view_module_outlined,
-                                    size: 14, color: secondary),
-                                const SizedBox(width: 4),
-                                Text(_moduleName!,
-                                    style: theme.textTheme.bodySmall),
-                              ],
-                            ),
-                          if (_cycleName != null)
-                            Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(Icons.replay_outlined,
-                                    size: 14, color: secondary),
-                                const SizedBox(width: 4),
-                                Text(_cycleName!,
-                                    style: theme.textTheme.bodySmall),
-                              ],
-                            ),
-                        ],
-                      ),
                     ],
                     // Assignee avatars row
                     if (issueMembers.isNotEmpty) ...[
@@ -679,13 +1327,21 @@ class _IssueDetailScreenState extends ConsumerState<IssueDetailScreen> {
                       ),
                       const SizedBox(height: 24),
                     ],
+                    // Reactions on the work item itself.
+                    ReactionBar(
+                      groups: groupReactions(_reactions, _currentUserId),
+                      onToggle: _toggleIssueReaction,
+                      targetDescription: 'this work item',
+                    ),
+                    const SizedBox(height: 20),
                     // Sub-issues section
                     _buildSubIssuesSection(secondary),
-                    // Relations section
-                    if (_relations.isNotEmpty) ...[
-                      const SizedBox(height: 20),
-                      _buildRelationsSection(secondary),
-                    ],
+                    // Relations section. Shown even when empty, because the
+                    // add control lives in its header — hiding the section
+                    // when there is nothing in it is what made relations
+                    // unaddable in the first place.
+                    const SizedBox(height: 20),
+                    _buildRelationsSection(secondary),
                     // Attachments section
                     const SizedBox(height: 20),
                     _buildAttachmentsSection(secondary),
@@ -781,6 +1437,39 @@ class _IssueDetailScreenState extends ConsumerState<IssueDetailScreen> {
     );
   }
 
+  /// Offers both ways to gain a sub-issue: make a new one, or adopt one that
+  /// already exists.
+  void _showAddSubIssueMenu() {
+    showModalBottomSheet(
+      context: context,
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.add, size: 20),
+              title: Text('Create new sub-issue',
+                  style: Theme.of(ctx).textTheme.bodyMedium),
+              onTap: () {
+                Navigator.pop(ctx);
+                _addSubIssue();
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.playlist_add, size: 20),
+              title: Text('Add existing work item',
+                  style: Theme.of(ctx).textTheme.bodyMedium),
+              onTap: () {
+                Navigator.pop(ctx);
+                _linkExistingSubIssue();
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   // --- Sub-issues section ---
   Widget _buildSubIssuesSection(Color secondary) {
     final theme = Theme.of(context);
@@ -801,7 +1490,7 @@ class _IssueDetailScreenState extends ConsumerState<IssueDetailScreen> {
               tooltip: 'Add sub-issue',
               size: M3EIconButtonSize.extraSmall,
               color: secondary,
-              onPressed: _addSubIssue,
+              onPressed: _showAddSubIssueMenu,
             ),
           ],
         ),
@@ -849,6 +1538,15 @@ class _IssueDetailScreenState extends ConsumerState<IssueDetailScreen> {
                           overflow: TextOverflow.ellipsis,
                           style: theme.textTheme.titleSmall),
                     ),
+                    M3EIconButton(
+                      icon: Icons.close,
+                      // Several of these sit in one list, so the label names
+                      // which child it detaches.
+                      tooltip: 'Remove sub-issue ${sub.name}',
+                      size: M3EIconButtonSize.extraSmall,
+                      color: secondary,
+                      onPressed: () => _removeSubIssue(sub),
+                    ),
                   ],
                 ),
               ),
@@ -864,27 +1562,73 @@ class _IssueDetailScreenState extends ConsumerState<IssueDetailScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('Relations',
-            style: theme.textTheme.labelLarge?.copyWith(color: secondary)),
-        const SizedBox(height: 8),
-        Wrap(
-          spacing: 6,
-          runSpacing: 6,
-          children: _relations.map((r) {
-            // The server files each related issue under its relation kind and
-            // returns the issue's own fields flat, so the name is on the entry
-            // itself. The older nested `issue_detail` shape is still read as a
-            // fallback in case an instance serialises it that way.
-            final relationType = r['relation_type'] ?? 'relates_to';
-            final nested = r['issue_detail'] ?? r['related_issue_detail'];
-            final issueName = r['name'] ?? nested?['name'] ?? 'Unknown issue';
-            return _RelationChip(
-              type: relationType,
-              issueName: issueName,
-            );
-          }).toList(),
+        Row(
+          children: [
+            Text('Relations',
+                style: theme.textTheme.labelLarge?.copyWith(color: secondary)),
+            if (_relations.isNotEmpty) ...[
+              const SizedBox(width: 6),
+              Text('${_relations.length}', style: theme.textTheme.bodySmall),
+            ],
+            const Spacer(),
+            M3EIconButton(
+              icon: Icons.add,
+              tooltip: 'Add relation',
+              size: M3EIconButtonSize.extraSmall,
+              color: secondary,
+              onPressed: _addRelation,
+            ),
+          ],
         ),
+        const SizedBox(height: 8),
+        if (_relations.isEmpty)
+          Text('No relations', style: theme.textTheme.bodySmall)
+        else
+          Wrap(
+            spacing: 6,
+            runSpacing: 6,
+            children: _relations.map((r) {
+              // The server files each related issue under its relation kind
+              // and returns the issue's own fields flat, so the name is on the
+              // entry itself. The older nested `issue_detail` shape is still
+              // read as a fallback in case an instance serialises it that way.
+              final relationType = r['relation_type'] ?? 'relates_to';
+              final nested = r['issue_detail'] ?? r['related_issue_detail'];
+              final issueName = r['name'] ?? nested?['name'] ?? 'Unknown issue';
+              return _RelationChip(
+                type: relationType,
+                issueName: issueName,
+                onRemove: () => _confirmRemoveRelation(r, issueName),
+              );
+            }).toList(),
+          ),
       ],
+    );
+  }
+
+  void _confirmRemoveRelation(Map<String, dynamic> relation, String name) {
+    showModalBottomSheet(
+      context: context,
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: Icon(Icons.link_off,
+                  color: Theme.of(ctx).colorScheme.error, size: 20),
+              title: Text('Remove relation to $name',
+                  style: Theme.of(ctx)
+                      .textTheme
+                      .bodyMedium
+                      ?.copyWith(color: Theme.of(ctx).colorScheme.error)),
+              onTap: () {
+                Navigator.pop(ctx);
+                _removeRelation(relation);
+              },
+            ),
+          ],
+        ),
+      ),
     );
   }
 
@@ -1144,6 +1888,8 @@ class _IssueDetailScreenState extends ConsumerState<IssueDetailScreen> {
         widget: _CommentCard(
           comment: c,
           authorName: _resolveCommentAuthor(c),
+          reactionGroups: groupReactions(c.reactions, _currentUserId),
+          onToggleReaction: (code) => _toggleCommentReaction(c, code),
           onEdit: mine && _commentIsPlainParagraph(c)
               ? () => _editComment(c)
               : null,
@@ -1170,12 +1916,45 @@ class _IssueDetailScreenState extends ConsumerState<IssueDetailScreen> {
 
   // --- More menu with delete ---
   void _showMoreMenu() {
+    final archived = _issue?.isArchived ?? false;
     showModalBottomSheet(
       context: context,
       builder: (ctx) => SafeArea(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
+            if (archived)
+              ListTile(
+                leading: const Icon(Icons.unarchive_outlined, size: 20),
+                title: Text('Restore from archive',
+                    style: Theme.of(ctx).textTheme.bodyMedium),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  _unarchiveIssue();
+                },
+              )
+            else
+              ListTile(
+                enabled: _canArchive,
+                leading: Icon(Icons.archive_outlined,
+                    size: 20,
+                    color: _canArchive ? null : Theme.of(ctx).disabledColor),
+                title: Text('Archive work item',
+                    style: Theme.of(ctx).textTheme.bodyMedium),
+                // The server refuses to archive anything that is not finished,
+                // so say that here rather than letting the tap fail.
+                subtitle: _canArchive
+                    ? null
+                    : Text(
+                        'Only completed or cancelled work items can be archived',
+                        style: Theme.of(ctx).textTheme.bodySmall),
+                onTap: _canArchive
+                    ? () {
+                        Navigator.pop(ctx);
+                        _archiveIssue();
+                      }
+                    : null,
+              ),
             ListTile(
               leading: Icon(Icons.delete_outline,
                   color: Theme.of(ctx).colorScheme.error, size: 20),
@@ -1586,9 +2365,17 @@ class _ActivityEntry {
 class _RelationChip extends StatelessWidget {
   final String type;
   final String issueName;
-  const _RelationChip({required this.type, required this.issueName});
 
-  IconData get _icon {
+  /// Opens the remove sheet. Null on a chip that is only being displayed.
+  final VoidCallback? onRemove;
+
+  const _RelationChip({
+    required this.type,
+    required this.issueName,
+    this.onRemove,
+  });
+
+  static IconData iconFor(String type) {
     switch (type) {
       case 'blocking':
         return Icons.block;
@@ -1603,7 +2390,7 @@ class _RelationChip extends StatelessWidget {
     }
   }
 
-  String get _label {
+  static String labelFor(String type) {
     switch (type) {
       case 'blocking':
         return 'Blocking';
@@ -1613,6 +2400,16 @@ class _RelationChip extends StatelessWidget {
         return 'Duplicate of';
       case 'relates_to':
         return 'Relates to';
+      // The server also stores date-dependency relations, which this app does
+      // not create but must still be able to name if it reads one back.
+      case 'start_after':
+        return 'Starts after';
+      case 'start_before':
+        return 'Starts before';
+      case 'finish_after':
+        return 'Finishes after';
+      case 'finish_before':
+        return 'Finishes before';
       default:
         return type.replaceAll('_', ' ');
     }
@@ -1624,7 +2421,9 @@ class _RelationChip extends StatelessWidget {
     final color = type == 'blocking' || type == 'blocked_by'
         ? PlaneTheme.urgent
         : theme.colorScheme.onSurfaceVariant;
-    return Container(
+    final label = labelFor(type);
+
+    final chip = Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(M3EShape.full),
@@ -1634,9 +2433,9 @@ class _RelationChip extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(_icon, size: 13, color: color),
+          Icon(iconFor(type), size: 13, color: color),
           const SizedBox(width: 4),
-          Text('$_label: ',
+          Text('$label: ',
               style: theme.textTheme.labelSmall?.copyWith(color: color)),
           Flexible(
             child: Text(issueName,
@@ -1645,6 +2444,19 @@ class _RelationChip extends StatelessWidget {
                 style: theme.textTheme.labelSmall?.copyWith(color: color)),
           ),
         ],
+      ),
+    );
+
+    if (onRemove == null) return chip;
+    return Semantics(
+      label: '$label $issueName. Tap to remove this relation',
+      button: true,
+      container: true,
+      excludeSemantics: true,
+      child: InkWell(
+        onTap: onRemove,
+        borderRadius: BorderRadius.circular(M3EShape.full),
+        child: chip,
       ),
     );
   }
@@ -1847,9 +2659,16 @@ class _CommentCard extends StatelessWidget {
   /// Null when the current user did not write this comment.
   final VoidCallback? onDelete;
 
+  /// Reactions already collapsed per emoji.
+  final List<ReactionGroup> reactionGroups;
+
+  final void Function(String code) onToggleReaction;
+
   const _CommentCard({
     required this.comment,
     required this.authorName,
+    required this.reactionGroups,
+    required this.onToggleReaction,
     this.onEdit,
     this.onDelete,
   });
@@ -1954,7 +2773,186 @@ class _CommentCard extends StatelessWidget {
               style: theme.textTheme.bodyMedium,
             ),
           ),
+          Padding(
+            padding: const EdgeInsets.only(left: 32, top: 6),
+            child: ReactionBar(
+              groups: reactionGroups,
+              onToggle: onToggleReaction,
+              // Names whose comment, so the add button is distinguishable
+              // from the one on every other card in the feed.
+              targetDescription: 'comment by $authorName',
+              compact: true,
+            ),
+          ),
         ],
+      ),
+    );
+  }
+}
+
+/// A searchable list of the project's work items, returning the chosen one.
+///
+/// Used for relations and for adopting an existing sub-issue. It loads one
+/// page and filters in memory rather than querying per keystroke: the list
+/// endpoint has no name filter on this transport, and a project small enough
+/// to work with on a phone fits in a page.
+class _IssuePickerSheet extends StatefulWidget {
+  final String title;
+  final String workspaceSlug;
+  final String projectId;
+
+  /// Work items that must not be offered — this work item itself, and
+  /// whatever is already related or already a child. Offering them produces a
+  /// duplicate the server silently ignores, which looks like the tap failed.
+  final Set<String> excludeIds;
+
+  final Map<String, IssueState> states;
+
+  const _IssuePickerSheet({
+    required this.title,
+    required this.workspaceSlug,
+    required this.projectId,
+    required this.excludeIds,
+    required this.states,
+  });
+
+  @override
+  State<_IssuePickerSheet> createState() => _IssuePickerSheetState();
+}
+
+class _IssuePickerSheetState extends State<_IssuePickerSheet> {
+  final _searchController = TextEditingController();
+  List<Issue> _all = [];
+  bool _loading = true;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _load() async {
+    try {
+      final result = await IssueService.getIssues(
+        widget.workspaceSlug,
+        widget.projectId,
+        perPage: 100,
+      );
+      if (!mounted) return;
+      setState(() {
+        _all = (result['issues'] as List<Issue>)
+            .where((i) => !widget.excludeIds.contains(i.id))
+            .toList();
+        _loading = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _error = 'Could not load work items: $e';
+        _loading = false;
+      });
+    }
+  }
+
+  List<Issue> get _filtered {
+    final q = _searchController.text.trim().toLowerCase();
+    if (q.isEmpty) return _all;
+    return _all.where((i) => i.name.toLowerCase().contains(q)).toList();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final results = _filtered;
+
+    return SafeArea(
+      child: Padding(
+        // Lifts the sheet clear of the keyboard the search field summons.
+        padding:
+            EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
+        child: SizedBox(
+          height: MediaQuery.of(context).size.height * 0.7,
+          child: Column(
+            children: [
+              Padding(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Text(widget.title,
+                          style: theme.textTheme.titleMedium),
+                    ),
+                    M3EIconButton(
+                      icon: Icons.close,
+                      tooltip: 'Cancel',
+                      size: M3EIconButtonSize.small,
+                      onPressed: () => Navigator.pop(context),
+                    ),
+                  ],
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: M3ETextField(
+                  label: 'Search work items',
+                  hint: 'Search by title...',
+                  controller: _searchController,
+                  compact: true,
+                  onChanged: (_) => setState(() {}),
+                ),
+              ),
+              const SizedBox(height: 8),
+              Expanded(
+                child: _loading
+                    ? const Center(child: CircularProgressIndicator())
+                    : _error != null
+                        ? Center(
+                            child: Padding(
+                              padding: const EdgeInsets.all(16),
+                              child: Text(_error!,
+                                  style: theme.textTheme.bodySmall),
+                            ),
+                          )
+                        : results.isEmpty
+                            ? Center(
+                                child: Text('No matching work items',
+                                    style: theme.textTheme.bodySmall),
+                              )
+                            : ListView.builder(
+                                itemCount: results.length,
+                                itemBuilder: (ctx, i) {
+                                  final issue = results[i];
+                                  final state = widget.states[issue.state];
+                                  return ListTile(
+                                    leading: Icon(
+                                      PlaneTheme.stateIcon(
+                                          state?.group ?? 'backlog'),
+                                      size: 18,
+                                      color: PlaneTheme.stateGroupColor(
+                                          ctx, state?.group ?? 'backlog'),
+                                    ),
+                                    title: Text(
+                                      issue.name,
+                                      maxLines: 2,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: theme.textTheme.bodyMedium,
+                                    ),
+                                    onTap: () => Navigator.pop(context, issue),
+                                  );
+                                },
+                              ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

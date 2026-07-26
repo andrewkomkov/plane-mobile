@@ -1,5 +1,7 @@
 import '../config/api_client.dart';
 import '../models/comment.dart';
+import '../models/reaction.dart';
+import 'issue_service.dart';
 
 class CommentService {
   static String _base(String workspaceSlug, String projectId, String issueId) =>
@@ -74,4 +76,62 @@ class CommentService {
   /// current user's project role is simply not knowable on this transport.
   static bool canModify(Comment comment, String? currentUserId) =>
       comment.isAuthoredBy(currentUserId);
+
+  // --- Comment reactions (#7) ---
+
+  /// Comment reactions hang off the project, not off the work item.
+  ///
+  /// The route is `projects/<project_id>/comments/<comment_id>/reactions/` —
+  /// there is no `issues/<issue_id>/` segment in it, unlike every other comment
+  /// route in this file. Building it from [_base] by appending would produce a
+  /// path that 404s.
+  static String _reactionBase(
+          String workspaceSlug, String projectId, String commentId) =>
+      '/workspaces/$workspaceSlug/projects/$projectId/comments/$commentId/reactions/';
+
+  /// Reactions on a comment.
+  ///
+  /// Rarely needed: the comment list already embeds them (see
+  /// `Comment.reactions`). This is for re-reading one comment's reactions
+  /// without refetching the feed.
+  static Future<List<Reaction>> getReactions(
+    String workspaceSlug,
+    String projectId,
+    String commentId,
+  ) async {
+    final dio = await ApiClient.getInstance();
+    final response =
+        await dio.get(_reactionBase(workspaceSlug, projectId, commentId));
+    return IssueService.parseReactions(response.data);
+  }
+
+  /// Adds [reactionCode] — a decimal code point string, not an emoji — to a
+  /// comment. See [Reaction.emoji].
+  static Future<Reaction> addReaction(
+    String workspaceSlug,
+    String projectId,
+    String commentId,
+    String reactionCode,
+  ) async {
+    final dio = await ApiClient.getInstance();
+    final response = await dio.post(
+      _reactionBase(workspaceSlug, projectId, commentId),
+      data: {'reaction': reactionCode},
+    );
+    return Reaction.fromJson(Map<String, dynamic>.from(response.data));
+  }
+
+  /// Removes the current user's [reactionCode] from a comment. Keyed by the
+  /// code, and scoped server-side to the requesting user, as for work items.
+  static Future<void> removeReaction(
+    String workspaceSlug,
+    String projectId,
+    String commentId,
+    String reactionCode,
+  ) async {
+    final dio = await ApiClient.getInstance();
+    await dio.delete(
+      '${_reactionBase(workspaceSlug, projectId, commentId)}$reactionCode/',
+    );
+  }
 }

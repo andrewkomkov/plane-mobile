@@ -54,6 +54,32 @@ class Issue {
   final String? parent;
   final int subIssuesCount;
 
+  /// Whether the viewer is subscribed to this work item's notifications.
+  ///
+  /// Only the detail endpoint annotates this (`IssueDetailSerializer`, via an
+  /// `Exists` subquery on IssueSubscriber for the requesting user), so it is
+  /// null on a work item parsed out of a list response. Null means "not
+  /// known", not "not subscribed" — the difference matters, because rendering
+  /// an unknown as unsubscribed would show a bell that lies.
+  final bool? isSubscribed;
+
+  /// Id of the chosen `EstimatePoint`, not a number. See EstimatePoint.
+  final String? estimatePoint;
+
+  /// The cycle this work item sits in, if any. A work item belongs to at most
+  /// one cycle — the server annotates the detail response with a subquery that
+  /// takes the first, so the API shape is singular even though the join table
+  /// could hold more.
+  final String? cycleId;
+
+  /// Modules this work item belongs to. Unlike cycles this is genuinely
+  /// many-to-many.
+  final List<String> moduleIds;
+
+  /// Set once the work item has been archived. Null for a live one, so this
+  /// doubles as the archived flag — see [isArchived].
+  final String? archivedAt;
+
   Issue({
     required this.id,
     required this.name,
@@ -73,7 +99,15 @@ class Issue {
     this.targetDate,
     this.parent,
     this.subIssuesCount = 0,
+    this.isSubscribed,
+    this.estimatePoint,
+    this.cycleId,
+    this.moduleIds = const [],
+    this.archivedAt,
   });
+
+  /// Whether this work item is archived.
+  bool get isArchived => archivedAt != null && archivedAt!.isNotEmpty;
 
   factory Issue.fromJson(Map<String, dynamic> json) => Issue(
         id: json['id'] ?? '',
@@ -120,6 +154,16 @@ class Issue {
         subIssuesCount: json['sub_issues_count'] is int
             ? json['sub_issues_count'] as int
             : int.tryParse(json['sub_issues_count']?.toString() ?? '') ?? 0,
+        // Left null when the key is absent so a list-parsed work item is
+        // distinguishable from one the server said is unsubscribed.
+        isSubscribed: json['is_subscribed'] is bool
+            ? json['is_subscribed'] as bool
+            : null,
+        estimatePoint:
+            _relationId(json['estimate_point'] ?? json['estimate_point_id']),
+        cycleId: _relationId(json['cycle'] ?? json['cycle_id']),
+        moduleIds: _relationIds(json['module_ids'] ?? json['modules']),
+        archivedAt: json['archived_at']?.toString(),
       );
 
   Map<String, dynamic> toCreateJson() => {

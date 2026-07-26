@@ -1,8 +1,18 @@
+import 'reaction.dart';
+
 class Comment {
   final String id;
   final String? commentHtml;
   final String? actorDetail;
   final String? createdBy;
+
+  /// Reactions on this comment.
+  ///
+  /// These arrive embedded in the comment itself — `IssueCommentSerializer`
+  /// declares `comment_reactions` as a nested many serialiser — so the whole
+  /// activity feed's reactions come back with the comment list in one request.
+  /// Fetching them per comment instead would be one round trip per card.
+  final List<Reaction> reactions;
 
   /// User id of whoever wrote the comment.
   ///
@@ -26,9 +36,27 @@ class Comment {
     this.createdBy,
     this.actor,
     this.editedAt,
+    this.reactions = const [],
     required this.createdAt,
     required this.updatedAt,
   });
+
+  /// A copy with [reactions] replaced.
+  ///
+  /// Reacting answers with the reaction row, not the comment, so the card is
+  /// updated in place from what the caller already holds rather than by
+  /// refetching the whole feed and losing the reader's scroll position.
+  Comment copyWithReactions(List<Reaction> reactions) => Comment(
+        id: id,
+        commentHtml: commentHtml,
+        actorDetail: actorDetail,
+        createdBy: createdBy,
+        actor: actor,
+        editedAt: editedAt,
+        reactions: reactions,
+        createdAt: createdAt,
+        updatedAt: updatedAt,
+      );
 
   /// Whether [userId] wrote this comment.
   ///
@@ -57,6 +85,11 @@ class Comment {
         createdBy: _id(json['created_by']),
         actor: _id(json['actor']),
         editedAt: DateTime.tryParse(json['edited_at']?.toString() ?? ''),
+        reactions: (json['comment_reactions'] as List?)
+                ?.whereType<Map>()
+                .map((e) => Reaction.fromJson(Map<String, dynamic>.from(e)))
+                .toList() ??
+            const [],
         createdAt:
             DateTime.tryParse(json['created_at'] ?? '') ?? DateTime.now(),
         updatedAt:

@@ -236,4 +236,82 @@ void main() {
       expect(issue.isOverdue, isFalse);
     });
   });
+
+  // Only the detail endpoint annotates these; a work item parsed out of a list
+  // response carries none of them.
+  group('Issue detail-only properties', () {
+    test('reads is_subscribed, estimate, cycle and modules', () {
+      final issue = Issue.fromJson({
+        'id': 'i1',
+        'name': 'Ship it',
+        'is_subscribed': true,
+        'estimate_point': 'ep-1',
+        'cycle_id': 'cyc-1',
+        'module_ids': ['mod-1', 'mod-2'],
+      });
+      expect(issue.isSubscribed, isTrue);
+      expect(issue.estimatePoint, 'ep-1');
+      expect(issue.cycleId, 'cyc-1');
+      expect(issue.moduleIds, ['mod-1', 'mod-2']);
+    });
+
+    // Null means "the server did not say", which is not the same as "not
+    // subscribed" — rendering unknown as unsubscribed shows a bell that lies.
+    test('leaves is_subscribed null when the key is absent', () {
+      final issue = Issue.fromJson({'id': 'i1', 'name': 'From a list'});
+      expect(issue.isSubscribed, isNull);
+    });
+
+    test('reads is_subscribed false as false, not as unknown', () {
+      final issue = Issue.fromJson({
+        'id': 'i1',
+        'name': 'x',
+        'is_subscribed': false,
+      });
+      expect(issue.isSubscribed, isFalse);
+    });
+
+    test('reads relations that arrived expanded rather than as bare ids', () {
+      final issue = Issue.fromJson({
+        'id': 'i1',
+        'name': 'x',
+        'estimate_point': {'id': 'ep-9', 'value': '8'},
+        'cycle': {'id': 'cyc-9', 'name': 'Sprint 3'},
+        'modules': [
+          {'id': 'mod-9', 'name': 'Billing'},
+        ],
+      });
+      expect(issue.estimatePoint, 'ep-9');
+      expect(issue.cycleId, 'cyc-9');
+      expect(issue.moduleIds, ['mod-9']);
+    });
+
+    test('defaults the collections rather than leaving them null', () {
+      final issue = Issue.fromJson({'id': 'i1', 'name': 'x'});
+      expect(issue.moduleIds, isEmpty);
+      expect(issue.estimatePoint, isNull);
+      expect(issue.cycleId, isNull);
+    });
+  });
+
+  group('Issue.isArchived', () {
+    test('is true once the server stamps archived_at', () {
+      final issue = Issue.fromJson({
+        'id': 'i1',
+        'name': 'x',
+        'archived_at': '2025-03-01T10:00:00Z',
+      });
+      expect(issue.isArchived, isTrue);
+      expect(issue.archivedAt, '2025-03-01T10:00:00Z');
+    });
+
+    test('is false for a live work item', () {
+      expect(Issue.fromJson({'id': 'i1', 'name': 'x'}).isArchived, isFalse);
+      expect(
+        Issue.fromJson({'id': 'i1', 'name': 'x', 'archived_at': null})
+            .isArchived,
+        isFalse,
+      );
+    });
+  });
 }

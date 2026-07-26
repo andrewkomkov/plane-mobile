@@ -1,5 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:plane_mobile/models/comment.dart';
+import 'package:plane_mobile/models/reaction.dart';
 
 void main() {
   group('Comment.fromJson', () {
@@ -104,6 +105,68 @@ void main() {
     test('is false when the comment has no author at all', () {
       final comment = Comment.fromJson({'id': 'c4'});
       expect(comment.isAuthoredBy('user-1'), isFalse);
+    });
+  });
+
+  // IssueCommentSerializer nests comment_reactions, so the whole feed's
+  // reactions arrive with the comment list — one request, not one per card.
+  group('Comment reactions', () {
+    test('reads the embedded comment_reactions', () {
+      final comment = Comment.fromJson({
+        'id': 'c1',
+        'comment_html': '<p>Nice</p>',
+        'comment_reactions': [
+          {
+            'id': 'r1',
+            'reaction': '128077',
+            'actor': 'user-1',
+            'display_name': 'Ada',
+          },
+          {'id': 'r2', 'reaction': '128077', 'actor': 'user-2'},
+        ],
+      });
+      expect(comment.reactions.length, 2);
+      expect(comment.reactions.first.emoji, '\u{1F44D}');
+      expect(comment.reactions.first.displayName, 'Ada');
+    });
+
+    test('defaults to none when the server sends no reactions key', () {
+      expect(Comment.fromJson({'id': 'c1'}).reactions, isEmpty);
+    });
+
+    test('ignores entries that are not objects', () {
+      final comment = Comment.fromJson({
+        'id': 'c1',
+        'comment_reactions': [
+          'garbage',
+          {'id': 'r1', 'reaction': '9992'},
+        ],
+      });
+      expect(comment.reactions.length, 1);
+    });
+
+    // Reacting answers with the reaction row, not the comment, so the card is
+    // rebuilt from what the caller already holds.
+    test('copyWithReactions swaps reactions and keeps everything else', () {
+      final comment = Comment.fromJson({
+        'id': 'c1',
+        'comment_html': '<p>Body</p>',
+        'actor': 'user-1',
+        'edited_at': '2025-03-02T12:00:00Z',
+      });
+      final updated = comment.copyWithReactions([
+        Reaction(id: 'r1', reaction: '128064', actor: 'user-2'),
+      ]);
+
+      expect(updated.reactions.single.reaction, '128064');
+      expect(updated.id, comment.id);
+      expect(updated.commentHtml, comment.commentHtml);
+      expect(updated.actor, comment.actor);
+      expect(updated.editedAt, comment.editedAt);
+      expect(updated.createdAt, comment.createdAt);
+      // The original is untouched, which is what makes the optimistic revert
+      // in the detail screen work.
+      expect(comment.reactions, isEmpty);
     });
   });
 }
