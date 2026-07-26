@@ -4,6 +4,7 @@ import 'package:dio/dio.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:mime/mime.dart';
+import '../../config/m3e/motion.dart';
 import '../../config/m3e/shapes.dart';
 import '../../widgets/m3e/app_bar.dart';
 import '../../widgets/m3e/icon_button.dart';
@@ -44,6 +45,39 @@ import '../../widgets/loading_state.dart';
 import '../../widgets/reaction_bar.dart';
 import '../../widgets/skeleton_loader.dart';
 import 'issue_create_screen.dart';
+
+/// One vertical rhythm for the whole screen.
+///
+/// The gaps here used to be typed at each site — 24 after the description, 20
+/// between every other pair of sections, 14 before the assignee list, 8 and 6
+/// under the chips — so nothing lined up with anything and the eye had no grid
+/// to lock onto. Three constants replace all of them.
+///
+/// Between two blocks whose edges are ink.
+const double _sectionGap = 24;
+
+/// The clear space a 48dp tap target already contributes around the ~28dp pill
+/// drawn inside it. A block of chips or reactions therefore needs less added
+/// space than a block of text to land on the same rhythm.
+const double _targetInset = 10;
+
+/// Between a section's header and its content.
+const double _headerGap = 8;
+
+/// A gap in that rhythm.
+///
+/// [afterTargets] and [beforeTargets] say whether the block above or below is
+/// made of 48dp tap targets. Each of those already carries [_targetInset] of
+/// clear space around the pill drawn inside it, so the added gap is reduced by
+/// that much and the eye sees the same [_sectionGap] at every boundary. This
+/// is the difference between a rhythm and seven numbers that happen to be
+/// close: chips against text and chips against chips are not the same gap.
+Widget _gap({bool afterTargets = false, bool beforeTargets = false}) =>
+    SizedBox(
+      height: _sectionGap -
+          (afterTargets ? _targetInset : 0) -
+          (beforeTargets ? _targetInset : 0),
+    );
 
 class IssueDetailScreen extends ConsumerStatefulWidget {
   final String workspaceSlug;
@@ -99,6 +133,16 @@ class _IssueDetailScreenState extends ConsumerState<IssueDetailScreen> {
   bool _loading = true;
   String? _error;
   String _projectIdentifier = '';
+
+  /// States for this project, keyed by id.
+  ///
+  /// Seeded from whatever the caller passed and refetched when that is empty.
+  /// Same problem the identifier had: half the routes here — the notification
+  /// feed passes `states: const {}` outright — cannot supply it, and the
+  /// screen then rendered every work item's status as "Unknown" with a backlog
+  /// icon. A screen should not depend on nine callers each remembering to hand
+  /// it its own reference data.
+  late Map<String, IssueState> _states = widget.states;
   final _commentController = TextEditingController();
 
   /// Who is looking at this screen. Decides which comments offer edit and
@@ -194,6 +238,37 @@ class _IssueDetailScreenState extends ConsumerState<IssueDetailScreen> {
     // offer edit and delete, and it is a single cheap call.
     _currentUserId ??=
         (await _tryLoad<User?>(() => AuthService.getCurrentUser(), null))?.id;
+
+    // Half the routes into this screen — notifications, the calendar, a cycle
+    // or module's issue list, the sub-issue rows below — push it without an
+    // identifier, and _load can only resolve one from a projects cache that
+    // those routes never warmed. That is why the bar read "Issue" instead of
+    // PLM-123 depending on how you arrived. Warm it here rather than plumbing
+    // the identifier through nine screens: loadProjects reads SQLite first and
+    // no-ops when the list is already in memory, so the common case costs
+    // nothing.
+    if (_projectIdentifier.isEmpty) {
+      await cache.loadProjects(ws);
+      final projects = cache.getProjects(ws);
+      if (projects != null) {
+        for (final p in projects) {
+          if (p.id == pid) {
+            _projectIdentifier = p.identifier;
+            break;
+          }
+        }
+      }
+      if (mounted) setState(() {});
+    }
+
+    if (_states.isEmpty) {
+      final states =
+          await _tryLoad(() => IssueService.getStates(ws, pid), <IssueState>[]);
+      if (states.isNotEmpty) {
+        _states = {for (final s in states) s.id: s};
+        if (mounted) setState(() {});
+      }
+    }
 
     _comments = await _tryLoad(
         () => CommentService.getComments(ws, pid, iid), <Comment>[]);
@@ -495,7 +570,7 @@ class _IssueDetailScreenState extends ConsumerState<IssueDetailScreen> {
         builder: (_) => IssueCreateScreen(
           workspaceSlug: widget.workspaceSlug,
           projectId: widget.projectId,
-          states: widget.states,
+          states: _states,
           parentIssueId: widget.issueId,
         ),
       ),
@@ -721,7 +796,7 @@ class _IssueDetailScreenState extends ConsumerState<IssueDetailScreen> {
   /// group and 400s anything else. Knowing that here is what lets the menu say
   /// why instead of offering the action and then failing.
   bool get _canArchive {
-    final group = widget.states[_issue?.state]?.group;
+    final group = _states[_issue?.state]?.group;
     return group != null && IssueService.archivableStateGroups.contains(group);
   }
 
@@ -1025,6 +1100,176 @@ class _IssueDetailScreenState extends ConsumerState<IssueDetailScreen> {
     }
   }
 
+  /// The property chips for [issue], the ones holding a value first.
+  ///
+  /// Set and unset are two different chips now — see [PropertyChip.hasValue] —
+  /// and interleaving them throws that away: a filled "Done" sandwiched
+  /// between two hollow placeholders reads as noise rather than as an answer.
+  /// Partitioning keeps the relative order within each half, so nothing moves
+  /// further than it has to, and gives the block a shape it did not have:
+  /// what this work item is, then what it is still missing.
+  List<Widget> _propertyChips(
+    Issue issue,
+    IssueState? state,
+    List<Label> issueLabels,
+    List<Member> issueMembers,
+    Color secondary,
+  ) {
+    final valued = <Widget>[];
+    final empty = <Widget>[];
+    void add(bool hasValue, Widget chip) =>
+        (hasValue ? valued : empty).add(chip);
+
+    // A work item always sits in some state, so this is never a placeholder
+    // even when the state map could not name it.
+    add(
+      true,
+      PropertyChip(
+        icon: PlaneTheme.stateIcon(state?.group ?? 'backlog'),
+        iconColor:
+            PlaneTheme.stateGroupColor(context, state?.group ?? 'backlog'),
+        label: state?.name ?? 'Unknown',
+        hasValue: true,
+        onTap: _showStatePicker,
+      ),
+    );
+
+    // Priority is the one property whose absence the API spells out instead of
+    // omitting, so "None" is a placeholder despite having a label to show.
+    final prioritised = issue.priority != 'none';
+    add(
+      prioritised,
+      PropertyChip(
+        icon: PlaneTheme.priorityIcon(issue.priority),
+        iconColor: PlaneTheme.priorityColor(context, issue.priority),
+        label: issue.priority[0].toUpperCase() + issue.priority.substring(1),
+        hasValue: prioritised,
+        onTap: _showPriorityPicker,
+      ),
+    );
+
+    // Labels: the pills carry the value, the chip beside them is the editor,
+    // so the editor follows whichever half the pills are in.
+    final labelled = issueLabels.isNotEmpty;
+    for (final l in issueLabels) {
+      add(true, _LabelPill(label: l, onTap: _showLabelPicker));
+    }
+    add(
+      labelled,
+      Semantics(
+        label: 'Edit labels',
+        button: true,
+        container: true,
+        child: PropertyChip(
+          icon: Icons.label_outline,
+          // Once labels exist the chip reads "+", and a count is no name at
+          // all, so this and the assignee chip carry an explicit label.
+          label: labelled ? '+' : 'Label',
+          iconColor: secondary,
+          hasValue: labelled,
+          onTap: _showLabelPicker,
+        ),
+      ),
+    );
+
+    final assigned = issueMembers.isNotEmpty;
+    add(
+      assigned,
+      Semantics(
+        label: 'Edit assignees',
+        button: true,
+        container: true,
+        child: PropertyChip(
+          icon: Icons.person_outline,
+          label: assigned ? '${issueMembers.length}' : 'Assignee',
+          iconColor: secondary,
+          hasValue: assigned,
+          onTap: _showAssigneePicker,
+        ),
+      ),
+    );
+
+    add(
+      issue.startDate != null,
+      PropertyChip(
+        icon: Icons.calendar_today_outlined,
+        iconColor: secondary,
+        label: issue.startDate ?? 'Start',
+        hasValue: issue.startDate != null,
+        onTap: () => _pickDate('start_date', issue.startDate),
+      ),
+    );
+
+    add(
+      issue.targetDate != null,
+      PropertyChip(
+        icon: Icons.flag_outlined,
+        iconColor: issue.isOverdue ? PlaneTheme.urgent : secondary,
+        label: issue.targetDate ?? 'Due',
+        hasValue: issue.targetDate != null,
+        onTap: () => _pickDate('target_date', issue.targetDate),
+      ),
+    );
+
+    // Estimate is absent entirely when the project has no estimate scale
+    // configured — which is most of them — rather than offering a picker with
+    // nothing in it.
+    if (_estimatePoints.isNotEmpty) {
+      final estimate = _estimateLabel(issue);
+      add(
+        estimate != null,
+        Semantics(
+          label: 'Edit estimate',
+          button: true,
+          container: true,
+          child: PropertyChip(
+            icon: Icons.speed_outlined,
+            iconColor: secondary,
+            label: estimate ?? 'Estimate',
+            hasValue: estimate != null,
+            onTap: _showEstimatePicker,
+          ),
+        ),
+      );
+    }
+
+    final cycle = _cycleLabel(issue);
+    add(
+      cycle != null,
+      Semantics(
+        label: 'Edit cycle',
+        button: true,
+        container: true,
+        child: PropertyChip(
+          icon: Icons.replay_outlined,
+          iconColor: secondary,
+          label: cycle ?? 'Cycle',
+          hasValue: cycle != null,
+          onTap: _showCyclePicker,
+        ),
+      ),
+    );
+
+    final module = _moduleLabel(issue);
+    add(
+      module != null,
+      Semantics(
+        label: 'Edit modules',
+        button: true,
+        container: true,
+        child: PropertyChip(
+          icon: Icons.view_module_outlined,
+          iconColor: secondary,
+          label: module ?? 'Module',
+          hasValue: module != null,
+          onTap: _showModulePicker,
+        ),
+      ),
+    );
+
+    return [...valued, ...empty];
+  }
+
   /// Opens a searchable list of the project's work items and returns the
   /// chosen one. Used for both relations and adopting an existing sub-issue.
   Future<Issue?> _pickIssue({
@@ -1039,7 +1284,7 @@ class _IssueDetailScreenState extends ConsumerState<IssueDetailScreen> {
         workspaceSlug: widget.workspaceSlug,
         projectId: widget.projectId,
         excludeIds: excludeIds,
-        states: widget.states,
+        states: _states,
       ),
     );
   }
@@ -1062,7 +1307,7 @@ class _IssueDetailScreenState extends ConsumerState<IssueDetailScreen> {
       );
     }
     final issue = _issue!;
-    final state = widget.states[issue.state];
+    final state = _states[issue.state];
     final theme = Theme.of(context);
     final secondary = theme.colorScheme.onSurfaceVariant;
 
@@ -1075,12 +1320,24 @@ class _IssueDetailScreenState extends ConsumerState<IssueDetailScreen> {
     // Merge activities and comments, sorted by date
     final activityItems = _buildActivityItems();
 
+    final hasDescription =
+        issue.descriptionHtml != null && issue.descriptionHtml!.isNotEmpty;
+
+    // Whether the property block's last row is tap targets or the archived /
+    // overdue line, which decides how much space the gap below it has to add.
+    final propertiesEndInTargets = !(issue.isArchived || issue.isOverdue);
+
     return Scaffold(
       // The bar used to read "Plane", which told the user nothing they did
       // not already know. The issue's own identifier is the useful thing here.
+      //
+      // It reads the resolved identifier, not the one the route happened to
+      // pass: the body below has always used the resolved one, so a screen
+      // opened from the calendar or a notification showed PLM-123 in the
+      // header and "Issue" in the bar at the same time.
       appBar: M3EAppBar(
-        title: widget.projectIdentifier.isNotEmpty
-            ? '${widget.projectIdentifier}-${issue.sequenceId}'
+        title: _projectIdentifier.isNotEmpty
+            ? '$_projectIdentifier-${issue.sequenceId}'
             : 'Issue',
         actions: [
           // The bell is the only control for push notifications the app has,
@@ -1145,161 +1402,81 @@ class _IssueDetailScreenState extends ConsumerState<IssueDetailScreen> {
                     const SizedBox(height: 10),
                     // Title
                     Text(issue.name, style: theme.textTheme.headlineMedium),
-                    const SizedBox(height: 20),
-                    // Chips row
-                    Wrap(
-                      spacing: 6,
-                      runSpacing: 6,
-                      children: [
-                        PropertyChip(
-                          icon: PlaneTheme.stateIcon(state?.group ?? 'backlog'),
-                          iconColor: PlaneTheme.stateGroupColor(
-                              context, state?.group ?? 'backlog'),
-                          label: state?.name ?? 'Unknown',
-                          onTap: () => _showStatePicker(),
-                        ),
-                        PropertyChip(
-                          icon: PlaneTheme.priorityIcon(issue.priority),
-                          iconColor:
-                              PlaneTheme.priorityColor(context, issue.priority),
-                          label: issue.priority[0].toUpperCase() +
-                              issue.priority.substring(1),
-                          onTap: () => _showPriorityPicker(),
-                        ),
-                        // Label pills
-                        ...issueLabels.map((l) => _LabelPill(
-                              label: l,
-                              onTap: () => _showLabelPicker(),
-                            )),
-                        // Add label chip. Once labels exist the chip reads
-                        // "+", and a count is no name at all, so both this and
-                        // the assignee chip carry an explicit label.
-                        Semantics(
-                          label: 'Edit labels',
-                          button: true,
-                          container: true,
-                          child: PropertyChip(
-                            icon: Icons.label_outline,
-                            iconColor: secondary,
-                            label: issueLabels.isEmpty ? 'Label' : '+',
-                            onTap: () => _showLabelPicker(),
-                          ),
-                        ),
-                        // Assignee chip
-                        Semantics(
-                          label: 'Edit assignees',
-                          button: true,
-                          container: true,
-                          child: PropertyChip(
-                            icon: Icons.person_outline,
-                            iconColor: secondary,
-                            label: issueMembers.isEmpty
-                                ? 'Assignee'
-                                : '${issueMembers.length}',
-                            onTap: () => _showAssigneePicker(),
-                          ),
-                        ),
-                        // Start date chip
-                        PropertyChip(
-                          icon: Icons.calendar_today_outlined,
-                          iconColor: secondary,
-                          label: issue.startDate ?? 'Start',
-                          onTap: () => _pickDate('start_date', issue.startDate),
-                        ),
-                        // Target date chip
-                        PropertyChip(
-                          icon: Icons.flag_outlined,
-                          iconColor:
-                              issue.isOverdue ? PlaneTheme.urgent : secondary,
-                          label: issue.targetDate ?? 'Due',
-                          onTap: () =>
-                              _pickDate('target_date', issue.targetDate),
-                        ),
-                        // Estimate chip. Absent entirely when the project has
-                        // no estimate scale configured — which is most of
-                        // them — rather than offering a picker with nothing
-                        // in it.
-                        if (_estimatePoints.isNotEmpty)
-                          Semantics(
-                            label: 'Edit estimate',
-                            button: true,
-                            container: true,
-                            child: PropertyChip(
-                              icon: Icons.speed_outlined,
-                              iconColor: secondary,
-                              label: _estimateLabel(issue) ?? 'Estimate',
-                              onTap: _showEstimatePicker,
-                            ),
-                          ),
-                        // Cycle chip
-                        Semantics(
-                          label: 'Edit cycle',
-                          button: true,
-                          container: true,
-                          child: PropertyChip(
-                            icon: Icons.replay_outlined,
-                            iconColor: secondary,
-                            label: _cycleLabel(issue) ?? 'Cycle',
-                            onTap: _showCyclePicker,
-                          ),
-                        ),
-                        // Module chip
-                        Semantics(
-                          label: 'Edit modules',
-                          button: true,
-                          container: true,
-                          child: PropertyChip(
-                            icon: Icons.view_module_outlined,
-                            iconColor: secondary,
-                            label: _moduleLabel(issue) ?? 'Module',
-                            onTap: _showModulePicker,
-                          ),
-                        ),
-                      ],
-                    ),
-                    // Archived banner. An archived work item is still fully
-                    // editable through this screen, so the state has to be
-                    // visible or every edit looks like it is going somewhere
-                    // it is not.
-                    if (issue.isArchived) ...[
-                      const SizedBox(height: 8),
-                      Row(
+                    const SizedBox(height: _sectionGap),
+                    // Properties. This block had no header, which is most of
+                    // why it read as leftovers under the title rather than as
+                    // a group — every other block on the screen has one.
+                    _DetailSection(
+                      title: 'Properties',
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Icon(Icons.archive_outlined,
-                              size: 14, color: secondary),
-                          const SizedBox(width: 6),
-                          Text('Archived',
-                              style: theme.textTheme.labelMedium
-                                  ?.copyWith(color: secondary)),
+                          Wrap(
+                            spacing: 6,
+                            // Zero, not 6. Every child here is a 48dp target
+                            // around a ~28dp pill, so a run already carries
+                            // 10dp of clear space at each edge; adding
+                            // runSpacing on top of that is what made the gaps
+                            // between rows read as bigger than the gaps
+                            // between whole sections.
+                            runSpacing: 0,
+                            children: _propertyChips(issue, state, issueLabels,
+                                issueMembers, secondary),
+                          ),
+                          // Archived and overdue are states of the work item,
+                          // not properties of it, but they belong to this
+                          // block rather than trailing off the end of the chip
+                          // Wrap at two different offsets as they used to.
+                          //
+                          // An archived work item is still fully editable
+                          // through this screen, so saying so is not optional:
+                          // otherwise every edit looks like it is going
+                          // somewhere it is not.
+                          if (issue.isArchived || issue.isOverdue)
+                            Wrap(
+                              spacing: 14,
+                              runSpacing: 4,
+                              children: [
+                                if (issue.isArchived)
+                                  _StatusFlag(
+                                    icon: Icons.archive_outlined,
+                                    label: 'Archived',
+                                    color: secondary,
+                                  ),
+                                if (issue.isOverdue)
+                                  const _StatusFlag(
+                                    icon: Icons.error_outline,
+                                    label: 'Overdue',
+                                    color: PlaneTheme.urgent,
+                                  ),
+                              ],
+                            ),
                         ],
                       ),
-                    ],
-                    // Overdue text
-                    if (issue.isOverdue) ...[
-                      const SizedBox(height: 6),
-                      Text('Overdue',
-                          style: theme.textTheme.labelMedium
-                              ?.copyWith(color: PlaneTheme.urgent)),
-                    ],
-                    // Assignee avatars row
+                    ),
+                    // Assignees are their own block now. As a bare labelMedium
+                    // line wedged between the chips and the description they
+                    // were the one heading on the screen that did not look
+                    // like a heading.
                     if (issueMembers.isNotEmpty) ...[
-                      const SizedBox(height: 14),
-                      Text('Assignees',
-                          style: theme.textTheme.labelMedium
-                              ?.copyWith(color: secondary)),
-                      const SizedBox(height: 6),
-                      Wrap(
-                        spacing: 8,
-                        runSpacing: 8,
-                        children: issueMembers
-                            .map((m) => _AssigneeChip(member: m))
-                            .toList(),
+                      _gap(afterTargets: propertiesEndInTargets),
+                      _DetailSection(
+                        title: 'Assignees',
+                        count: issueMembers.length,
+                        child: Wrap(
+                          spacing: 12,
+                          runSpacing: 8,
+                          children: issueMembers
+                              .map((m) => _AssigneeChip(member: m))
+                              .toList(),
+                        ),
                       ),
                     ],
-                    const SizedBox(height: 24),
                     // Description
-                    if (issue.descriptionHtml != null &&
-                        issue.descriptionHtml!.isNotEmpty) ...[
+                    if (hasDescription) ...[
+                      _gap(
+                          afterTargets:
+                              issueMembers.isEmpty && propertiesEndInTargets),
                       MarkdownBody(
                         data: htmlToMarkdown(issue.descriptionHtml!),
                         styleSheet: MarkdownStyleSheet(
@@ -1325,51 +1502,44 @@ class _IssueDetailScreenState extends ConsumerState<IssueDetailScreen> {
                         ),
                         selectable: true,
                       ),
-                      const SizedBox(height: 24),
-                    ],
+                      _gap(beforeTargets: true),
+                    ] else
+                      _gap(
+                        afterTargets:
+                            issueMembers.isEmpty && propertiesEndInTargets,
+                        beforeTargets: true,
+                      ),
                     // Reactions on the work item itself.
                     ReactionBar(
                       groups: groupReactions(_reactions, _currentUserId),
                       onToggle: _toggleIssueReaction,
                       targetDescription: 'this work item',
                     ),
-                    const SizedBox(height: 20),
-                    // Sub-issues section
-                    _buildSubIssuesSection(secondary),
-                    // Relations section. Shown even when empty, because the
-                    // add control lives in its header — hiding the section
-                    // when there is nothing in it is what made relations
-                    // unaddable in the first place.
-                    const SizedBox(height: 20),
-                    _buildRelationsSection(secondary),
-                    // Attachments section
-                    const SizedBox(height: 20),
-                    _buildAttachmentsSection(secondary),
-                    // Links section
-                    const SizedBox(height: 20),
-                    _buildLinksSection(secondary),
-                    const SizedBox(height: 20),
-                    // Activity header
-                    Row(
-                      children: [
-                        Text('Activity',
-                            style: theme.textTheme.labelLarge
-                                ?.copyWith(color: secondary)),
-                        const Spacer(),
-                        if (activityItems.isNotEmpty)
-                          Text('${activityItems.length}',
-                              style: theme.textTheme.bodySmall),
-                      ],
+                    _gap(afterTargets: true),
+                    _buildSubIssuesSection(),
+                    // Relations are shown even when empty, because the add
+                    // control lives in the header — hiding the section when
+                    // there is nothing in it is what made relations unaddable
+                    // in the first place.
+                    _gap(),
+                    _buildRelationsSection(),
+                    _gap(),
+                    _buildAttachmentsSection(),
+                    _gap(),
+                    _buildLinksSection(),
+                    _gap(),
+                    _DetailSection(
+                      title: 'Activity',
+                      count:
+                          activityItems.isEmpty ? null : activityItems.length,
+                      child: activityItems.isEmpty
+                          ? Text('No activity yet',
+                              style: theme.textTheme.bodySmall)
+                          : Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: activityItems,
+                            ),
                     ),
-                    const SizedBox(height: 12),
-                    // Interleaved activities and comments
-                    ...activityItems,
-                    if (activityItems.isEmpty)
-                      Padding(
-                        padding: const EdgeInsets.only(top: 8),
-                        child: Text('No activity yet',
-                            style: theme.textTheme.bodySmall),
-                      ),
                     const SizedBox(height: 80),
                   ],
                 ),
@@ -1471,138 +1641,124 @@ class _IssueDetailScreenState extends ConsumerState<IssueDetailScreen> {
   }
 
   // --- Sub-issues section ---
-  Widget _buildSubIssuesSection(Color secondary) {
+  Widget _buildSubIssuesSection() {
     final theme = Theme.of(context);
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
-            Text('Sub-issues',
-                style: theme.textTheme.labelLarge?.copyWith(color: secondary)),
-            if (_subIssues.isNotEmpty) ...[
-              const SizedBox(width: 6),
-              Text('${_subIssues.length}', style: theme.textTheme.bodySmall),
-            ],
-            const Spacer(),
-            M3EIconButton(
-              icon: Icons.add,
-              tooltip: 'Add sub-issue',
-              size: M3EIconButtonSize.extraSmall,
-              color: secondary,
-              onPressed: _showAddSubIssueMenu,
-            ),
-          ],
-        ),
-        const SizedBox(height: 8),
-        if (_subIssues.isEmpty)
-          Text('No sub-issues', style: theme.textTheme.bodySmall)
-        else
-          ..._subIssues.map((sub) {
-            final subState = widget.states[sub.state];
-            return InkWell(
-              onTap: () async {
-                await Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => IssueDetailScreen(
-                      workspaceSlug: widget.workspaceSlug,
-                      projectId: widget.projectId,
-                      issueId: sub.id,
-                      states: widget.states,
+    final secondary = theme.colorScheme.onSurfaceVariant;
+    return _DetailSection(
+      title: 'Sub-issues',
+      count: _subIssues.isEmpty ? null : _subIssues.length,
+      action: M3EIconButton(
+        icon: Icons.add,
+        tooltip: 'Add sub-issue',
+        size: M3EIconButtonSize.extraSmall,
+        color: secondary,
+        onPressed: _showAddSubIssueMenu,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (_subIssues.isEmpty)
+            Text('No sub-issues', style: theme.textTheme.bodySmall)
+          else
+            ..._subIssues.map((sub) {
+              final subState = _states[sub.state];
+              return InkWell(
+                onTap: () async {
+                  await Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => IssueDetailScreen(
+                        workspaceSlug: widget.workspaceSlug,
+                        projectId: widget.projectId,
+                        issueId: sub.id,
+                        // A child is in the same project, so the identifier this
+                        // screen already resolved is the child's too — no reason
+                        // to make it look it up again.
+                        projectIdentifier: _projectIdentifier,
+                        states: _states,
+                      ),
                     ),
+                  );
+                  _load();
+                },
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 6),
+                  child: Row(
+                    children: [
+                      Icon(
+                        PlaneTheme.stateIcon(subState?.group ?? 'backlog'),
+                        size: 16,
+                        color: PlaneTheme.stateGroupColor(
+                            context, subState?.group ?? 'backlog'),
+                      ),
+                      const SizedBox(width: 8),
+                      Icon(
+                        PlaneTheme.priorityIcon(sub.priority),
+                        size: 14,
+                        color: PlaneTheme.priorityColor(context, sub.priority),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(sub.name,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: theme.textTheme.titleSmall),
+                      ),
+                      M3EIconButton(
+                        icon: Icons.close,
+                        // Several of these sit in one list, so the label names
+                        // which child it detaches.
+                        tooltip: 'Remove sub-issue ${sub.name}',
+                        size: M3EIconButtonSize.extraSmall,
+                        color: secondary,
+                        onPressed: () => _removeSubIssue(sub),
+                      ),
+                    ],
                   ),
-                );
-                _load();
-              },
-              child: Padding(
-                padding: const EdgeInsets.symmetric(vertical: 6),
-                child: Row(
-                  children: [
-                    Icon(
-                      PlaneTheme.stateIcon(subState?.group ?? 'backlog'),
-                      size: 16,
-                      color: PlaneTheme.stateGroupColor(
-                          context, subState?.group ?? 'backlog'),
-                    ),
-                    const SizedBox(width: 8),
-                    Icon(
-                      PlaneTheme.priorityIcon(sub.priority),
-                      size: 14,
-                      color: PlaneTheme.priorityColor(context, sub.priority),
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(sub.name,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: theme.textTheme.titleSmall),
-                    ),
-                    M3EIconButton(
-                      icon: Icons.close,
-                      // Several of these sit in one list, so the label names
-                      // which child it detaches.
-                      tooltip: 'Remove sub-issue ${sub.name}',
-                      size: M3EIconButtonSize.extraSmall,
-                      color: secondary,
-                      onPressed: () => _removeSubIssue(sub),
-                    ),
-                  ],
                 ),
-              ),
-            );
-          }),
-      ],
+              );
+            }),
+        ],
+      ),
     );
   }
 
   // --- Relations section ---
-  Widget _buildRelationsSection(Color secondary) {
+  Widget _buildRelationsSection() {
     final theme = Theme.of(context);
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
-            Text('Relations',
-                style: theme.textTheme.labelLarge?.copyWith(color: secondary)),
-            if (_relations.isNotEmpty) ...[
-              const SizedBox(width: 6),
-              Text('${_relations.length}', style: theme.textTheme.bodySmall),
-            ],
-            const Spacer(),
-            M3EIconButton(
-              icon: Icons.add,
-              tooltip: 'Add relation',
-              size: M3EIconButtonSize.extraSmall,
-              color: secondary,
-              onPressed: _addRelation,
+    final secondary = theme.colorScheme.onSurfaceVariant;
+    return _DetailSection(
+      title: 'Relations',
+      count: _relations.isEmpty ? null : _relations.length,
+      action: M3EIconButton(
+        icon: Icons.add,
+        tooltip: 'Add relation',
+        size: M3EIconButtonSize.extraSmall,
+        color: secondary,
+        onPressed: _addRelation,
+      ),
+      child: _relations.isEmpty
+          ? Text('No relations', style: theme.textTheme.bodySmall)
+          : Wrap(
+              spacing: 6,
+              runSpacing: 6,
+              children: _relations.map((r) {
+                // The server files each related issue under its relation kind
+                // and returns the issue's own fields flat, so the name is on
+                // the entry itself. The older nested `issue_detail` shape is
+                // still read as a fallback in case an instance serialises it
+                // that way.
+                final relationType = r['relation_type'] ?? 'relates_to';
+                final nested = r['issue_detail'] ?? r['related_issue_detail'];
+                final issueName =
+                    r['name'] ?? nested?['name'] ?? 'Unknown issue';
+                return _RelationChip(
+                  type: relationType,
+                  issueName: issueName,
+                  onRemove: () => _confirmRemoveRelation(r, issueName),
+                );
+              }).toList(),
             ),
-          ],
-        ),
-        const SizedBox(height: 8),
-        if (_relations.isEmpty)
-          Text('No relations', style: theme.textTheme.bodySmall)
-        else
-          Wrap(
-            spacing: 6,
-            runSpacing: 6,
-            children: _relations.map((r) {
-              // The server files each related issue under its relation kind
-              // and returns the issue's own fields flat, so the name is on the
-              // entry itself. The older nested `issue_detail` shape is still
-              // read as a fallback in case an instance serialises it that way.
-              final relationType = r['relation_type'] ?? 'relates_to';
-              final nested = r['issue_detail'] ?? r['related_issue_detail'];
-              final issueName = r['name'] ?? nested?['name'] ?? 'Unknown issue';
-              return _RelationChip(
-                type: relationType,
-                issueName: issueName,
-                onRemove: () => _confirmRemoveRelation(r, issueName),
-              );
-            }).toList(),
-          ),
-      ],
     );
   }
 
@@ -1633,148 +1789,135 @@ class _IssueDetailScreenState extends ConsumerState<IssueDetailScreen> {
   }
 
   // --- Attachments section ---
-  Widget _buildAttachmentsSection(Color secondary) {
+  Widget _buildAttachmentsSection() {
     final theme = Theme.of(context);
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
-            Text('Attachments',
-                style: theme.textTheme.labelLarge?.copyWith(color: secondary)),
-            if (_attachments.isNotEmpty) ...[
-              const SizedBox(width: 6),
-              Text('${_attachments.length}', style: theme.textTheme.bodySmall),
-            ],
-          ],
-        ),
-        const SizedBox(height: 8),
-        // The upload is a three-call round trip to object storage, so it is
-        // long enough to need saying. It sits in the list rather than in a
-        // toast, where the file will appear for real once it lands.
-        if (_uploadingAttachment != null)
-          Padding(
-            padding: const EdgeInsets.symmetric(vertical: 4),
-            child: Row(
-              children: [
-                SizedBox(
-                  width: 16,
-                  height: 16,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2,
-                    color: secondary,
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    'Uploading $_uploadingAttachment…',
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: theme.textTheme.bodySmall,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        if (_attachments.isEmpty && _uploadingAttachment == null)
-          Text('No attachments', style: theme.textTheme.bodySmall)
-        else
-          ..._attachments.map((a) => Padding(
-                padding: const EdgeInsets.symmetric(vertical: 4),
-                child: Row(
-                  children: [
-                    Icon(Icons.attach_file, size: 16, color: secondary),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        a.filename ?? 'Unnamed file',
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: theme.textTheme.titleSmall,
-                      ),
+    final secondary = theme.colorScheme.onSurfaceVariant;
+    return _DetailSection(
+      title: 'Attachments',
+      count: _attachments.isEmpty ? null : _attachments.length,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // The upload is a three-call round trip to object storage, so it is
+          // long enough to need saying. It sits in the list rather than in a
+          // toast, where the file will appear for real once it lands.
+          if (_uploadingAttachment != null)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 4),
+              child: Row(
+                children: [
+                  SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: secondary,
                     ),
-                    if (a.displaySize.isNotEmpty)
-                      Text(a.displaySize,
-                          style: theme.textTheme.labelSmall
-                              ?.copyWith(color: secondary)),
-                  ],
-                ),
-              )),
-      ],
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Uploading $_uploadingAttachment…',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.bodySmall,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          if (_attachments.isEmpty && _uploadingAttachment == null)
+            Text('No attachments', style: theme.textTheme.bodySmall)
+          else
+            ..._attachments.map((a) => Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 4),
+                  child: Row(
+                    children: [
+                      Icon(Icons.attach_file, size: 16, color: secondary),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          a.filename ?? 'Unnamed file',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: theme.textTheme.titleSmall,
+                        ),
+                      ),
+                      if (a.displaySize.isNotEmpty)
+                        Text(a.displaySize,
+                            style: theme.textTheme.labelSmall
+                                ?.copyWith(color: secondary)),
+                    ],
+                  ),
+                )),
+        ],
+      ),
     );
   }
 
   // --- Links section ---
-  Widget _buildLinksSection(Color secondary) {
+  Widget _buildLinksSection() {
     final theme = Theme.of(context);
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
-            Text('Links',
-                style: theme.textTheme.labelLarge?.copyWith(color: secondary)),
-            if (_links.isNotEmpty) ...[
-              const SizedBox(width: 6),
-              Text('${_links.length}', style: theme.textTheme.bodySmall),
-            ],
-            const Spacer(),
-            M3EIconButton(
-              icon: Icons.add,
-              tooltip: 'Add link',
-              size: M3EIconButtonSize.extraSmall,
-              color: secondary,
-              onPressed: _showAddLinkDialog,
-            ),
-          ],
-        ),
-        const SizedBox(height: 8),
-        if (_links.isEmpty)
-          Text('No links', style: theme.textTheme.bodySmall)
-        else
-          ..._links.map((link) => InkWell(
-                onTap: () {
-                  // Show URL in a snackbar since url_launcher is not available
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text(link.url)),
-                  );
-                },
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 4),
-                  child: Row(
-                    children: [
-                      Icon(Icons.link,
-                          size: 16, color: theme.colorScheme.primary),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              link.title ?? link.url,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: theme.textTheme.titleSmall?.copyWith(
-                                color: theme.colorScheme.primary,
-                              ),
-                            ),
-                            if (link.title != null && link.title!.isNotEmpty)
+    final secondary = theme.colorScheme.onSurfaceVariant;
+    return _DetailSection(
+      title: 'Links',
+      count: _links.isEmpty ? null : _links.length,
+      action: M3EIconButton(
+        icon: Icons.add,
+        tooltip: 'Add link',
+        size: M3EIconButtonSize.extraSmall,
+        color: secondary,
+        onPressed: _showAddLinkDialog,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (_links.isEmpty)
+            Text('No links', style: theme.textTheme.bodySmall)
+          else
+            ..._links.map((link) => InkWell(
+                  onTap: () {
+                    // Show URL in a snackbar since url_launcher is not available
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text(link.url)),
+                    );
+                  },
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 4),
+                    child: Row(
+                      children: [
+                        Icon(Icons.link,
+                            size: 16, color: theme.colorScheme.primary),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
                               Text(
-                                link.url,
+                                link.title ?? link.url,
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
-                                style: theme.textTheme.labelSmall
-                                    ?.copyWith(color: secondary),
+                                style: theme.textTheme.titleSmall?.copyWith(
+                                  color: theme.colorScheme.primary,
+                                ),
                               ),
-                          ],
+                              if (link.title != null && link.title!.isNotEmpty)
+                                Text(
+                                  link.url,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: theme.textTheme.labelSmall
+                                      ?.copyWith(color: secondary),
+                                ),
+                            ],
+                          ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
-                ),
-              )),
-      ],
+                )),
+        ],
+      ),
     );
   }
 
@@ -2005,7 +2148,7 @@ class _IssueDetailScreenState extends ConsumerState<IssueDetailScreen> {
       builder: (ctx) => SafeArea(
         child: Column(
           mainAxisSize: MainAxisSize.min,
-          children: widget.states.values
+          children: _states.values
               .map((s) => ListTile(
                     leading: Icon(PlaneTheme.stateIcon(s.group),
                         color: PlaneTheme.stateGroupColor(context, s.group),
@@ -2354,6 +2497,96 @@ class _IssueDetailScreenState extends ConsumerState<IssueDetailScreen> {
   }
 }
 
+/// A titled block of the work item screen.
+///
+/// Six of these existed as hand-rolled `Row(Text, count, Spacer, action)`
+/// headers, each with its own spacing underneath. Sharing one widget is what
+/// turns six near-misses into a rhythm, and it is what lets the property block
+/// become a section like the others instead of a loose pile of chips under the
+/// title.
+class _DetailSection extends StatelessWidget {
+  final String title;
+
+  /// Shown beside the title. Null hides it, which is how a section with
+  /// nothing in it avoids announcing a zero.
+  final int? count;
+
+  /// Trailing control, usually the section's add button.
+  ///
+  /// It sits as a sibling of the title rather than nested inside anything
+  /// pressable: [M3EPressable] replaces its subtree's semantics, so a labelled
+  /// button inside one disappears from the accessibility tree entirely.
+  final Widget? action;
+
+  final Widget child;
+
+  const _DetailSection({
+    required this.title,
+    required this.child,
+    this.count,
+    this.action,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final secondary = theme.colorScheme.onSurfaceVariant;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Text(title,
+                style: theme.textTheme.labelLarge?.copyWith(color: secondary)),
+            if (count != null) ...[
+              const SizedBox(width: 6),
+              Text('$count', style: theme.textTheme.bodySmall),
+            ],
+            if (action != null) ...[
+              const Spacer(),
+              action!,
+            ],
+          ],
+        ),
+        const SizedBox(height: _headerGap),
+        child,
+      ],
+    );
+  }
+}
+
+/// An icon-and-word note about the work item as a whole — archived, overdue.
+///
+/// Not a chip: these are not editable and must not look like the property
+/// pills they sit under.
+class _StatusFlag extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final Color color;
+
+  const _StatusFlag({
+    required this.icon,
+    required this.label,
+    required this.color,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(icon, size: PlaneTheme.iconSmall, color: color),
+        const SizedBox(width: 6),
+        Text(label,
+            style: Theme.of(context)
+                .textTheme
+                .labelMedium
+                ?.copyWith(color: color)),
+      ],
+    );
+  }
+}
+
 // --- Activity entry for sorting ---
 class _ActivityEntry {
   final DateTime date;
@@ -2576,30 +2809,51 @@ class _LabelPill extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final color = _parseColor(label.color);
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(M3EShape.full),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-        decoration: BoxDecoration(
-          color: color.withValues(alpha: 0.15),
-          borderRadius: BorderRadius.circular(M3EShape.full),
-          border: Border.all(color: color.withValues(alpha: 0.4), width: 0.8),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: 8,
-              height: 8,
-              decoration: BoxDecoration(
-                color: color,
-                shape: BoxShape.circle,
-              ),
+    final pill = Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.15),
+        borderRadius: BorderRadius.circular(M3EShape.full),
+        border: Border.all(color: color.withValues(alpha: 0.4), width: 0.8),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 8,
+            height: 8,
+            decoration: BoxDecoration(
+              color: color,
+              shape: BoxShape.circle,
             ),
-            const SizedBox(width: 5),
-            Text(label.name, style: Theme.of(context).textTheme.labelMedium),
-          ],
+          ),
+          const SizedBox(width: 5),
+          Text(label.name, style: Theme.of(context).textTheme.labelMedium),
+        ],
+      ),
+    );
+
+    if (onTap == null) return pill;
+
+    return Semantics(
+      // The pill renders only the label's name, which says nothing about the
+      // fact that touching it opens the label picker. Several of these sit in
+      // one row, so the name has to stay in the composed label to keep them
+      // distinguishable to anything driving the app by label.
+      label: 'Label ${label.name}. Tap to edit labels',
+      button: true,
+      container: true,
+      excludeSemantics: true,
+      onTap: onTap,
+      child: M3EPressable(
+        pressedScale: 0.94,
+        onTap: onTap,
+        // Matches PropertyChip exactly: a 48dp target with the pill centred in
+        // it. These share a Wrap with the property chips, and a 22dp pill
+        // beside a 48dp one is what made those rows look ragged.
+        child: SizedBox(
+          height: 48,
+          child: Center(widthFactor: 1.0, child: pill),
         ),
       ),
     );

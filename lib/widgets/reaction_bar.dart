@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../config/m3e/motion.dart';
 import '../config/m3e/shapes.dart';
 import '../models/reaction.dart';
 
@@ -66,6 +67,16 @@ class ReactionBar extends StatelessWidget {
         _AddReactionButton(
           compact: compact,
           targetDescription: targetDescription,
+          // An outlined circle in an otherwise empty band says nothing about
+          // what it does until it has been tapped once. With no reactions
+          // beside it there is no context to infer from either, so the button
+          // names itself. Once chips are there the row explains itself and the
+          // button shrinks back to the circle rather than repeating the word
+          // next to every emoji.
+          //
+          // Comment cards stay on the circle throughout: they are denser than
+          // the work item header and there is one of these per card.
+          named: groups.isEmpty && !compact,
           // The picker reports the chosen code straight into the same toggle:
           // choosing one already reacted with is a removal, which is what the
           // web client does too.
@@ -118,9 +129,13 @@ class _ReactionChip extends StatelessWidget {
       // means anything read aloud, so the composed label above replaces the
       // subtree rather than sitting alongside it.
       excludeSemantics: true,
-      child: InkWell(
+      // Excluding the subtree drops the gesture's own tap action, so it is
+      // re-declared here — otherwise the node is announced as a button that
+      // assistive tech cannot actually activate.
+      onTap: onTap,
+      child: M3EPressable(
+        pressedScale: 0.92,
         onTap: onTap,
-        borderRadius: BorderRadius.circular(M3EShape.full),
         child: Container(
           padding: EdgeInsets.symmetric(
             horizontal: compact ? 7 : 9,
@@ -172,10 +187,15 @@ class _AddReactionButton extends StatelessWidget {
   final String targetDescription;
   final bool compact;
 
+  /// Draws the button as a labelled pill rather than a bare circle. See the
+  /// call site in [ReactionBar] for when that is worth the width.
+  final bool named;
+
   const _AddReactionButton({
     required this.onPicked,
     required this.targetDescription,
     required this.compact,
+    this.named = false,
   });
 
   @override
@@ -184,37 +204,69 @@ class _AddReactionButton extends StatelessWidget {
     final scheme = theme.colorScheme;
     final size = compact ? 24.0 : 28.0;
 
+    Future<void> pick() async {
+      final code = await showReactionPicker(context, targetDescription);
+      if (code != null) onPicked(code);
+    }
+
+    // Both forms are the same control at the same 48dp target; only the shape
+    // and whether it says its own name differ.
+    final Widget face = named
+        ? Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(M3EShape.full),
+              // The named form is an invitation, so it takes the
+              // control-boundary outline rather than the divider one the bare
+              // circle uses beside chips that already carry the meaning.
+              border: Border.all(color: scheme.outline, width: 0.8),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.add_reaction_outlined,
+                    size: 15, color: scheme.onSurfaceVariant),
+                const SizedBox(width: 6),
+                Text(
+                  'React',
+                  style: theme.textTheme.labelMedium
+                      ?.copyWith(color: scheme.onSurfaceVariant),
+                ),
+              ],
+            ),
+          )
+        : Container(
+            width: size,
+            height: size,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              border: Border.all(color: scheme.outlineVariant, width: 0.8),
+            ),
+            child: Icon(
+              Icons.add_reaction_outlined,
+              size: compact ? 13 : 15,
+              color: scheme.onSurfaceVariant,
+            ),
+          );
+
     return Semantics(
       label: 'Add reaction to $targetDescription',
       button: true,
       container: true,
       excludeSemantics: true,
-      child: InkWell(
-        onTap: () async {
-          final code = await showReactionPicker(context, targetDescription);
-          if (code != null) onPicked(code);
-        },
-        borderRadius: BorderRadius.circular(M3EShape.full),
-        // The chip itself is small, but the tap target is not allowed to be.
-        child: SizedBox(
-          width: 48,
-          height: 48,
-          child: Center(
-            child: Container(
-              width: size,
-              height: size,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                border: Border.all(color: scheme.outlineVariant, width: 0.8),
-              ),
-              child: Icon(
-                Icons.add_reaction_outlined,
-                size: compact ? 13 : 15,
-                color: scheme.onSurfaceVariant,
-              ),
-            ),
-          ),
-        ),
+      // Re-declared because excluding the subtree takes the gesture's own tap
+      // action with it.
+      onTap: pick,
+      child: M3EPressable(
+        pressedScale: 0.92,
+        onTap: pick,
+        // The face itself is small, but the tap target is not allowed to be.
+        // The circle is padded out to 48 in both axes; the pill is already
+        // wider than that, so it only needs the height, and `widthFactor`
+        // keeps it from claiming the whole Wrap row.
+        child: named
+            ? SizedBox(height: 48, child: Center(widthFactor: 1.0, child: face))
+            : SizedBox(width: 48, height: 48, child: Center(child: face)),
       ),
     );
   }
@@ -247,6 +299,9 @@ Future<String?> showReactionPicker(
                   button: true,
                   container: true,
                   excludeSemantics: true,
+                  // As above: excluding the subtree would leave a button with
+                  // no action on it.
+                  onTap: () => Navigator.pop(ctx, code),
                   child: InkWell(
                     onTap: () => Navigator.pop(ctx, code),
                     borderRadius: BorderRadius.circular(M3EShape.full),
