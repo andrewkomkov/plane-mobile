@@ -29,8 +29,7 @@ class PageDetailScreen extends ConsumerStatefulWidget {
   });
 
   @override
-  ConsumerState<PageDetailScreen> createState() =>
-      _PageDetailScreenState();
+  ConsumerState<PageDetailScreen> createState() => _PageDetailScreenState();
 }
 
 class _PageDetailScreenState extends ConsumerState<PageDetailScreen> {
@@ -74,6 +73,39 @@ class _PageDetailScreenState extends ConsumerState<PageDetailScreen> {
     if (result == true) _load();
   }
 
+  Future<void> _deletePage() async {
+    if (_page == null) return;
+    final name = _page!.name.isEmpty ? 'Untitled' : _page!.name;
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Delete Page'),
+        content: Text('Delete "$name"?'),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Cancel')),
+          TextButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              child: const Text('Delete')),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    try {
+      await PageService.deletePage(
+          widget.workspaceSlug, widget.projectId, widget.pageId);
+      // The list screen invalidates its page cache on every return from here,
+      // so popping is all that is needed to make the row disappear.
+      if (mounted) Navigator.pop(context);
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('Error: $e')));
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -81,6 +113,16 @@ class _PageDetailScreenState extends ConsumerState<PageDetailScreen> {
       appBar: M3EAppBar(
         title: _page?.name ?? widget.pageName,
         actions: [
+          // Delete stays available on a locked page: the lock is Plane's guard
+          // against concurrent edits to the body, and the server enforces it on
+          // PATCH only — DELETE is gated by project permission instead.
+          if (_page != null)
+            M3EAppBarAction(
+              icon: Icons.delete_outline,
+              tooltip: 'Delete page',
+              color: theme.colorScheme.error,
+              onPressed: _deletePage,
+            ),
           if (_page != null && !_page!.isLocked)
             M3EAppBarAction(
                 icon: Icons.edit,
@@ -91,8 +133,7 @@ class _PageDetailScreenState extends ConsumerState<PageDetailScreen> {
       ),
       body: _loading
           ? const LoadingStateWidget()
-          : _page?.descriptionHtml != null &&
-                  _page!.descriptionHtml!.isNotEmpty
+          : _page?.descriptionHtml != null && _page!.descriptionHtml!.isNotEmpty
               ? SingleChildScrollView(
                   padding: const EdgeInsets.all(20),
                   child: MarkdownBody(
@@ -104,12 +145,11 @@ class _PageDetailScreenState extends ConsumerState<PageDetailScreen> {
                       h3: theme.textTheme.titleMedium,
                       code: theme.textTheme.bodyMedium?.copyWith(
                         color: theme.colorScheme.primary,
-                        backgroundColor: theme.colorScheme.primary
-                            .withValues(alpha: 0.08),
+                        backgroundColor:
+                            theme.colorScheme.primary.withValues(alpha: 0.08),
                       ),
                       codeblockDecoration: BoxDecoration(
-                        color:
-                            theme.colorScheme.surfaceContainerHighest,
+                        color: theme.colorScheme.surfaceContainerHighest,
                         borderRadius: BorderRadius.circular(M3EShape.large),
                       ),
                       codeblockPadding: const EdgeInsets.all(12),
@@ -118,11 +158,9 @@ class _PageDetailScreenState extends ConsumerState<PageDetailScreen> {
                       blockquoteDecoration: BoxDecoration(
                         border: Border(
                             left: BorderSide(
-                                color: theme.colorScheme.primary,
-                                width: 3)),
+                                color: theme.colorScheme.primary, width: 3)),
                       ),
-                      blockquotePadding:
-                          const EdgeInsets.fromLTRB(12, 4, 0, 4),
+                      blockquotePadding: const EdgeInsets.fromLTRB(12, 4, 0, 4),
                       listBullet: theme.textTheme.bodyLarge,
                     ),
                     selectable: true,
@@ -167,9 +205,8 @@ class _PageEditScreenState extends State<PageEditScreen> {
   void initState() {
     super.initState();
     _nameController = TextEditingController(text: widget.initialName);
-    final markdown = widget.initialHtml.isNotEmpty
-        ? htmlToMarkdown(widget.initialHtml)
-        : '';
+    final markdown =
+        widget.initialHtml.isNotEmpty ? htmlToMarkdown(widget.initialHtml) : '';
     _contentController = TextEditingController(text: markdown);
   }
 

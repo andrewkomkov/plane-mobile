@@ -60,11 +60,11 @@ webhooks, exports.
 | Sub-issues | read; can set `parent` on an item | creating/linking a sub-issue from the parent | P2 |
 | Issue relations | read (`getIssueRelations`) | **add/remove** — blocks/blocked-by/duplicate/relates-to are read-only | P2 |
 | Issue links | list, add | **edit, delete** | P3 |
-| Pages | list, get, create, update | **delete**, versions, lock, archive, duplicate, access control | P2 |
+| Pages | list, get, create, update, delete — all on Plane's own `pages/` routes | versions, lock, archive, duplicate, access control | P2 |
 | Projects | list, detail, update settings | **create** (deliberate — see M3_EXPRESSIVE.md), archive, join, leave | P2 |
 | Members | read workspace + project members | **invite, remove, change role** | P2 |
 | Workspaces | list, switch, update | invitations, themes, slug check | P3 |
-| Intake / Inbox | list and triage via `inboxes/{}/inbox-issues/` | ⚠ uses the **legacy** route; this server also serves `intakes/` and `intake-issues/`, and Plane renamed the feature. Working today, deprecation risk | P2 |
+| Intake | list, get and triage via `intake-issues/` (`intake_service.dart`) | no UI is wired to it — the service has no caller, and the "Inbox" tab is the notification feed, not this queue | P2 |
 | Analytics | a screen that computes counts client-side from fetched issues | the server's own `analytics/`, `advance-analytics*`, `project-stats`, `export-analytics` — so numbers are limited to what the app already paged in, and will disagree with web on large projects | P1 |
 
 ## Missing
@@ -91,14 +91,13 @@ other four exist), **AI assistant** (`ai-assistant/`), **Unsplash** covers,
 
 ## Architectural risk worth flagging
 
-The app does not talk only to Plane. Four capabilities route through the
+The app does not talk only to Plane. Three capabilities route through the
 separate `plane-mobile-api` FastAPI service, which reaches into Plane's
 **PostgreSQL directly** rather than through Plane's API:
 
 | Path | Feature |
 |---|---|
 | `/auth/mobile/{slug}/search/` | global search |
-| `/auth/mobile/{slug}/projects/{id}/pages/` | pages list/get/create/update |
 | `/auth/mobile/{slug}/notifications/` | notification list, read, dismiss |
 | `/auth/mobile/register-device/`, `workspaces/`, `issue-info/` | auth, push, workspace list |
 
@@ -106,9 +105,12 @@ Two consequences. First, those features bypass Plane's permission checks and
 serialisers, so they can drift from what the web app enforces. Second, a Plane
 schema change breaks them silently — the service's own history shows this
 (`fix pages SQL: use project_pages join table instead of project_id column`).
-Pages in particular exist on **both** paths: `page_service.dart` calls the
-shim, while `/workspaces/{}/projects/{}/pages/` also appears in `lib/`. Worth
-settling on one.
+
+Pages used to be on that list and are not any more: this fork carries a v1
+pages API, so `page_service.dart` now goes to `/workspaces/{}/projects/{}/pages/`
+only. The shim's page handlers authorised nothing beyond "is this a real API
+key", so any token could read or rewrite pages in projects its owner was not a
+member of. Search and notifications still have that shape.
 
 ## What to do about it
 
@@ -120,10 +122,11 @@ Filed as tasks, highest value first:
 3. Comment edit/delete — users can create comments they cannot fix.
 4. Estimate point on the work item, plus cycle/module assignment from the item.
 5. Analytics against the server's endpoints instead of client-side counting.
-6. Intake: migrate to the `intakes/` routes before the legacy ones go.
+6. ~~Intake: migrate to the `intakes/` routes before the legacy ones go.~~ Done
+   — `intake_service.dart` is on `intake-issues/`. Still needs a screen.
 7. Issue relations write path.
 8. Members: invite / remove / role.
-9. Settle pages on one backend.
+9. ~~Settle pages on one backend.~~ Done — Plane's own API, shim dropped.
 
 P3 items above are recorded here but not filed — they are real gaps, not
 planned work.
