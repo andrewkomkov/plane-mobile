@@ -545,4 +545,76 @@ void main() {
       expect(const MemberPermissions().invitableWorkspaceRoles(), isEmpty);
     });
   });
+
+  // ---------------------------------------------------------------------------
+  //  Project — creating
+  // ---------------------------------------------------------------------------
+  //
+  //  These gate the four create flows that, until they were wired up, had no
+  //  call site at all. Getting one wrong is not cosmetic: too permissive puts a
+  //  form in front of a guest and answers it with a 403 once they have filled
+  //  it in.
+
+  group('creating in a project', () {
+    test('admin and member may create everything', () {
+      for (final role in [MemberRole.admin, MemberRole.member]) {
+        final me = caller(project: role, workspace: MemberRole.member);
+        expect(me.canCreateIssue, isTrue, reason: 'issue @ $role');
+        expect(me.canCreateCycle, isTrue, reason: 'cycle @ $role');
+        expect(me.canCreateModule, isTrue, reason: 'module @ $role');
+        expect(me.canCreatePage, isTrue, reason: 'page @ $role');
+        expect(me.canCreateView, isTrue, reason: 'view @ $role');
+      }
+    });
+
+    test('a guest gets only a view', () {
+      // The four decorated endpoints are [ADMIN, MEMBER]. IssueViewViewSet
+      // overrides neither create nor permission_classes, so nothing above
+      // IsAuthenticated runs on it — and Plane's own views list offers the
+      // empty-state action to a guest.
+      final me = caller(project: MemberRole.guest, workspace: MemberRole.guest);
+      expect(me.canCreateIssue, isFalse);
+      expect(me.canCreateCycle, isFalse);
+      expect(me.canCreateModule, isFalse);
+      expect(me.canCreatePage, isFalse);
+      expect(me.canCreateView, isTrue);
+    });
+
+    test('a workspace admin who joined as a guest still creates cycles', () {
+      // allow_permission's second arm: an active project member who is also a
+      // workspace admin passes regardless of their project role.
+      final me = caller(project: MemberRole.guest, workspace: MemberRole.admin);
+      expect(me.canCreateCycle, isTrue);
+      expect(me.canCreateModule, isTrue);
+      expect(me.canCreateIssue, isTrue);
+    });
+
+    test('but not pages, because that gate is not the decorator', () {
+      // ProjectPagePermission reads the project role and nothing else, so the
+      // workspace-admin escape does not exist for pages. Mirroring that is the
+      // difference between a hidden button and a 403.
+      final me = caller(project: MemberRole.guest, workspace: MemberRole.admin);
+      expect(me.canCreatePage, isFalse);
+    });
+
+    test('a non-member of the project may create nothing, view included', () {
+      final me = caller(project: null, workspace: MemberRole.admin);
+      expect(me.canCreateIssue, isFalse);
+      expect(me.canCreateCycle, isFalse);
+      expect(me.canCreateModule, isFalse);
+      expect(me.canCreatePage, isFalse);
+      expect(me.canCreateView, isFalse);
+    });
+
+    test('nothing before the role is known', () {
+      // Every screen builds this empty and only fills it in once the server has
+      // answered, so "unknown" must read as "no".
+      const unknown = MemberPermissions();
+      expect(unknown.canCreateIssue, isFalse);
+      expect(unknown.canCreateCycle, isFalse);
+      expect(unknown.canCreateModule, isFalse);
+      expect(unknown.canCreatePage, isFalse);
+      expect(unknown.canCreateView, isFalse);
+    });
+  });
 }

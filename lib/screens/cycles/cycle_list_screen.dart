@@ -8,27 +8,42 @@ import '../../providers/data_providers.dart';
 import '../../models/cycle.dart';
 import '../../models/favorite.dart';
 import '../../providers/favorites_provider.dart';
+import '../../utils/api_error.dart';
 import '../../widgets/archive_toggle.dart';
 import '../../widgets/favorite_toggle.dart';
+import '../../widgets/list_count_header.dart';
 import '../../widgets/loading_state.dart';
 import '../../widgets/m3e/icon_button.dart';
 import '../../widgets/plane_row.dart';
 import '../../widgets/skeleton_loader.dart';
 import '../../widgets/section_header.dart';
+import '../project/project_screen.dart' show kProjectListBottomInset;
 import 'cycle_detail_screen.dart';
 
 class CycleListScreen extends ConsumerStatefulWidget {
   final String workspaceSlug;
   final String projectId;
 
-  const CycleListScreen(
-      {super.key, required this.workspaceSlug, required this.projectId});
+  /// Whether the signed-in user may create a cycle here. Resolved by
+  /// `ProjectScreen` against the caller's project role; false until it lands,
+  /// so the control never appears for someone the server would refuse.
+  final bool canCreate;
+
+  const CycleListScreen({
+    super.key,
+    required this.workspaceSlug,
+    required this.projectId,
+    this.canCreate = false,
+  });
 
   @override
-  ConsumerState<CycleListScreen> createState() => _CycleListScreenState();
+  ConsumerState<CycleListScreen> createState() => CycleListScreenState();
 }
 
-class _CycleListScreenState extends ConsumerState<CycleListScreen>
+/// Public so that `ProjectScreen`'s primary app-bar action can start the create
+/// flow through a [GlobalKey]. The flow stays here, with the list that has to
+/// refresh after it and with the empty state that offers the same thing.
+class CycleListScreenState extends ConsumerState<CycleListScreen>
     with AutomaticKeepAliveClientMixin {
   bool _initialLoading = true;
   String? _error;
@@ -131,7 +146,10 @@ class _CycleListScreenState extends ConsumerState<CycleListScreen>
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to restore cycle: $e')),
+          SnackBar(
+            content: Text(
+                describeApiError(e, fallback: 'Could not restore the cycle')),
+          ),
         );
       }
     }
@@ -192,6 +210,17 @@ class _CycleListScreenState extends ConsumerState<CycleListScreen>
       default:
         return status[0].toUpperCase() + status.substring(1);
     }
+  }
+
+  /// Opens the "new cycle" form.
+  ///
+  /// The one entry point, called from the project screen's primary action and
+  /// from the empty state below. Does nothing when the caller's role would be
+  /// refused — the controls are already hidden in that case, and this is the
+  /// second lock on the same door.
+  void startCreate() {
+    if (!widget.canCreate) return;
+    _showCreateCycleDialog();
   }
 
   void _showCreateCycleDialog() {
@@ -300,7 +329,10 @@ class _CycleListScreenState extends ConsumerState<CycleListScreen>
                 } catch (e) {
                   if (mounted) {
                     ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text('Failed to create cycle: $e')),
+                      SnackBar(
+                        content: Text(describeApiError(e,
+                            fallback: 'Could not create the cycle')),
+                      ),
                     );
                   }
                 }
@@ -347,21 +379,14 @@ class _CycleListScreenState extends ConsumerState<CycleListScreen>
   /// Count plus the archive toggle, matching the header the work-item list
   /// already carries so the two lists do not each invent their own chrome.
   Widget _header(BuildContext context) {
-    final theme = Theme.of(context);
     final count = _showArchived ? (_archived?.length ?? 0) : _cycles.length;
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 8, 12, 4),
-      child: Row(
-        children: [
-          Text('$count ${count == 1 ? 'cycle' : 'cycles'}',
-              style: theme.textTheme.bodySmall),
-          const Spacer(),
-          ArchiveToggle(
-            showArchived: _showArchived,
-            entityPlural: 'cycles',
-            onChanged: _toggleArchived,
-          ),
-        ],
+    return ListCountHeader(
+      count: count,
+      singular: 'cycle',
+      trailing: ArchiveToggle(
+        showArchived: _showArchived,
+        entityPlural: 'cycles',
+        onChanged: _toggleArchived,
       ),
     );
   }
@@ -371,16 +396,35 @@ class _CycleListScreenState extends ConsumerState<CycleListScreen>
       return ErrorStateWidget(message: 'Failed to load cycles', onRetry: _load);
     }
     if (_cycles.isEmpty) {
-      return ListView(children: [
-        SizedBox(height: MediaQuery.of(context).size.height * 0.25),
-        const Center(
-          child: EmptyStateWidget(message: 'No cycles', icon: Icons.loop),
+      return ScrollableCenter(
+        padding: const EdgeInsets.only(bottom: kProjectListBottomInset),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const EmptyStateWidget(
+              message: 'No cycles',
+              icon: Icons.loop,
+              subtitle: 'A cycle is a time box the team works an iteration in',
+            ),
+            if (widget.canCreate) ...[
+              const SizedBox(height: 16),
+              FilledButton.tonalIcon(
+                onPressed: startCreate,
+                icon: const Icon(Icons.add),
+                label: const Text('New cycle'),
+              ),
+            ],
+          ],
         ),
-      ]);
+      );
     }
 
     final entries = _groupedCycles(favorites).entries.toList();
     return ListView.builder(
+      // Without this a list too short to scroll cannot be pulled, so the
+      // RefreshIndicator wrapping it never fires.
+      physics: const AlwaysScrollableScrollPhysics(),
+      padding: const EdgeInsets.only(bottom: kProjectListBottomInset),
       itemCount: entries.fold<int>(0, (sum, e) => sum + 1 + e.value.length),
       itemBuilder: (ctx, index) {
         int current = 0;
@@ -414,20 +458,18 @@ class _CycleListScreenState extends ConsumerState<CycleListScreen>
       return const ProjectListSkeleton();
     }
     if (archived.isEmpty) {
-      return ListView(children: [
-        SizedBox(height: MediaQuery.of(context).size.height * 0.25),
-        const Center(
-          child: EmptyStateWidget(
-            message: 'No archived cycles',
-            icon: Icons.inventory_2_outlined,
-            subtitle: 'Cycles archived from here or from the web appear here',
-          ),
-        ),
-      ]);
+      return const ScrollableEmptyState(
+        padding: EdgeInsets.only(bottom: kProjectListBottomInset),
+        message: 'No archived cycles',
+        icon: Icons.inventory_2_outlined,
+        subtitle: 'Cycles archived from here or from the web appear here',
+      );
     }
     final ordered =
         favorites.favoritesFirst(FavoriteEntity.cycle, archived, (c) => c.id);
     return ListView.builder(
+      physics: const AlwaysScrollableScrollPhysics(),
+      padding: const EdgeInsets.only(bottom: kProjectListBottomInset),
       itemCount: ordered.length,
       itemBuilder: (ctx, i) => _cycleRow(cycle: ordered[i]),
     );

@@ -5,29 +5,39 @@ import '../../providers/favorites_provider.dart';
 import '../../models/favorite.dart';
 import '../../models/page.dart';
 import '../../services/page_service.dart';
+import '../../utils/api_error.dart';
 import '../../widgets/archive_toggle.dart';
 import '../../widgets/favorite_toggle.dart';
+import '../../widgets/list_count_header.dart';
 import '../../widgets/loading_state.dart';
 import '../../widgets/m3e/icon_button.dart';
 import '../../widgets/skeleton_loader.dart';
 import '../../widgets/plane_row.dart';
+import '../project/project_screen.dart' show kProjectListBottomInset;
 import 'page_detail_screen.dart';
 
 class PageListScreen extends ConsumerStatefulWidget {
   final String workspaceSlug;
   final String projectId;
 
+  /// Whether the signed-in user may create a page here. Resolved by
+  /// `ProjectScreen` against the caller's project role; false until it lands,
+  /// so the control never appears for someone the server would refuse.
+  final bool canCreate;
+
   const PageListScreen({
     super.key,
     required this.workspaceSlug,
     required this.projectId,
+    this.canCreate = false,
   });
 
   @override
-  ConsumerState<PageListScreen> createState() => _PageListScreenState();
+  ConsumerState<PageListScreen> createState() => PageListScreenState();
 }
 
-class _PageListScreenState extends ConsumerState<PageListScreen>
+/// Public so `ProjectScreen` can start the create flow through a [GlobalKey].
+class PageListScreenState extends ConsumerState<PageListScreen>
     with AutomaticKeepAliveClientMixin {
   bool _initialLoading = true;
   String? _error;
@@ -81,6 +91,17 @@ class _PageListScreenState extends ConsumerState<PageListScreen>
     }
   }
 
+  /// Opens the "new page" editor.
+  ///
+  /// The one entry point, called from the project screen's primary action and
+  /// from the empty state below. Does nothing when the caller's role would be
+  /// refused — the controls are already hidden in that case, and this is the
+  /// second lock on the same door.
+  Future<void> startCreate() async {
+    if (!widget.canCreate) return;
+    await _createPage();
+  }
+
   Future<void> _createPage() async {
     final result = await Navigator.push<bool>(
       context,
@@ -129,7 +150,10 @@ class _PageListScreenState extends ConsumerState<PageListScreen>
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to restore page: $e')),
+          SnackBar(
+            content: Text(
+                describeApiError(e, fallback: 'Could not restore the page')),
+          ),
         );
       }
     }
@@ -158,21 +182,13 @@ class _PageListScreenState extends ConsumerState<PageListScreen>
   }
 
   Widget _header(BuildContext context) {
-    final theme = Theme.of(context);
-    final count = _pages.length;
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 8, 12, 4),
-      child: Row(
-        children: [
-          Text('$count ${count == 1 ? 'page' : 'pages'}',
-              style: theme.textTheme.bodySmall),
-          const Spacer(),
-          ArchiveToggle(
-            showArchived: _showArchived,
-            entityPlural: 'pages',
-            onChanged: (v) => setState(() => _showArchived = v),
-          ),
-        ],
+    return ListCountHeader(
+      count: _pages.length,
+      singular: 'page',
+      trailing: ArchiveToggle(
+        showArchived: _showArchived,
+        entityPlural: 'pages',
+        onChanged: (v) => setState(() => _showArchived = v),
       ),
     );
   }
@@ -185,25 +201,46 @@ class _PageListScreenState extends ConsumerState<PageListScreen>
         .watch(favoritesProvider)
         .favoritesFirst(FavoriteEntity.page, _pages, (p) => p.id);
     if (pages.isEmpty) {
-      return ListView(children: [
-        SizedBox(height: MediaQuery.of(context).size.height * 0.3),
-        Center(
-          child: _showArchived
-              ? const EmptyStateWidget(
-                  message: 'No archived pages',
-                  icon: Icons.inventory_2_outlined,
-                  subtitle:
-                      'Pages archived from here or from the web appear here',
-                )
-              : const EmptyStateWidget(
-                  message: 'No pages',
-                  icon: Icons.description_outlined,
-                  subtitle: 'Create a page to get started',
-                ),
+      if (_showArchived) {
+        return const ScrollableEmptyState(
+          padding: EdgeInsets.only(bottom: kProjectListBottomInset),
+          message: 'No archived pages',
+          icon: Icons.inventory_2_outlined,
+          subtitle: 'Pages archived from here or from the web appear here',
+        );
+      }
+      return ScrollableCenter(
+        padding: const EdgeInsets.only(bottom: kProjectListBottomInset),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            EmptyStateWidget(
+              message: 'No pages',
+              icon: Icons.description_outlined,
+              // The old copy said "Create a page to get started" with nothing
+              // to tap. It now either has a button under it or, for a guest,
+              // says nothing it cannot back up.
+              subtitle: widget.canCreate
+                  ? 'Notes, specs and docs that live with the project'
+                  : 'Pages written by the team appear here',
+            ),
+            if (widget.canCreate) ...[
+              const SizedBox(height: 16),
+              FilledButton.tonalIcon(
+                onPressed: startCreate,
+                icon: const Icon(Icons.add),
+                label: const Text('New page'),
+              ),
+            ],
+          ],
         ),
-      ]);
+      );
     }
     return ListView.builder(
+      // Without this a list too short to scroll cannot be pulled, so the
+      // RefreshIndicator wrapping it never fires.
+      physics: const AlwaysScrollableScrollPhysics(),
+      padding: const EdgeInsets.only(bottom: kProjectListBottomInset),
       itemCount: pages.length,
       itemBuilder: (ctx, i) => _pageRow(pages[i]),
     );

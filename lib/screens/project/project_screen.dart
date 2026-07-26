@@ -4,9 +4,12 @@ import '../../config/m3e/typography.dart';
 import '../../config/theme.dart';
 import '../../widgets/m3e/app_bar.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../models/member_permissions.dart';
 import '../../models/project.dart';
 import '../../providers/data_providers.dart';
 import '../../services/intake_service.dart';
+import '../../services/member_service.dart';
+import '../../services/workspace_service.dart';
 import '../../widgets/app_navbar.dart';
 import '../intake/intake_screen.dart';
 import '../issues/issues_tab_screen.dart';
@@ -16,6 +19,14 @@ import '../modules/module_list_screen.dart';
 import '../cycles/cycle_list_screen.dart';
 import '../views/view_list_screen.dart';
 import '../search/search_screen.dart';
+
+/// Room under the floating nav bar, for the lists this screen stacks.
+///
+/// [ProjectScreen] sets `extendBody: true`, so its lists run beneath the glass
+/// bar and the last row of each was sitting under it. One number, declared
+/// where the bar is, rather than the four different guesses the four lists were
+/// making — and it matches what the home tabs already pad by for the same bar.
+const double kProjectListBottomInset = 100;
 
 class ProjectScreen extends ConsumerStatefulWidget {
   final String workspaceSlug;
@@ -39,6 +50,25 @@ class _ProjectScreenState extends ConsumerState<ProjectScreen> {
   /// It is confirmed against the server anyway because a project read out of
   /// the SQLite cache predates both columns and would report intake off.
   IntakeAvailability _intake = const IntakeAvailability(enabled: false);
+
+  /// What the signed-in user may create in this project.
+  ///
+  /// Starts fully closed and is only opened by an answer from the server.
+  /// Plane gates creation by role — a cycle, module, page and work item all
+  /// need admin or member — so guessing would mean offering a guest a button
+  /// that returns a 403 after they have filled the form in. The cost of failing
+  /// closed is that the action appears a moment after the screen does, which is
+  /// the same trade the intake badge makes above.
+  MemberPermissions _permissions = const MemberPermissions();
+
+  /// Each list owns its own create flow: it is the thing that has to refresh
+  /// afterwards, and the same flow backs the button in its empty state. The
+  /// app-bar action reaches the visible one through its key rather than keeping
+  /// a second copy of the flow up here.
+  final _pagesKey = GlobalKey<PageListScreenState>();
+  final _modulesKey = GlobalKey<ModuleListScreenState>();
+  final _viewsKey = GlobalKey<ViewListScreenState>();
+  final _cyclesKey = GlobalKey<CycleListScreenState>();
 
   /// The bottom-bar destinations. Intake is deliberately not one of them.
   ///
@@ -83,6 +113,29 @@ class _ProjectScreenState extends ConsumerState<ProjectScreen> {
       pendingCount: widget.project.pendingIntakeCount,
     );
     _refreshIntake();
+    _resolvePermissions();
+  }
+
+  /// Read the caller's project and workspace roles, once per visit.
+  ///
+  /// Both are needed, not just the project one: Plane's `allow_permission`
+  /// decorator also passes anyone who is an active project member *and* a
+  /// workspace admin, which is how a workspace admin who joined a project as a
+  /// guest can still create in it. Both service calls swallow their own errors
+  /// and answer null, so a failure leaves every create control hidden rather
+  /// than offering one that cannot work.
+  Future<void> _resolvePermissions() async {
+    final project =
+        MemberService.getMyMembership(widget.workspaceSlug, widget.project.id);
+    final workspace = WorkspaceService.getMyMembership(widget.workspaceSlug);
+    final roles = (project: await project, workspace: await workspace);
+    if (!mounted) return;
+    setState(() {
+      _permissions = MemberPermissions(
+        projectRole: roles.project?.role,
+        workspaceRole: roles.workspace?.role,
+      );
+    });
   }
 
   Future<void> _refreshIntake() async {
@@ -131,8 +184,65 @@ class _ProjectScreenState extends ConsumerState<ProjectScreen> {
     );
   }
 
+  /// The create action for whichever destination is on screen.
+  ///
+  /// One primary action, always in the same place, that means whatever the
+  /// current tab is about. Before this, the four lists behind the other four
+  /// destinations had create flows with no call site anywhere in the app: a
+  /// cycle, module, page or view could not be created at all from the phone.
+  ///
+  /// Null when the user's role would be refused, which is also when the empty
+  /// state below drops its button — one gate, read in two places.
+  ///
+  /// Work items keep the compose glyph they have always had. The four lists
+  /// share one plus rather than each picking a glyph of its own: the
+  /// destination underneath already says what is being added, and the tooltip
+  /// — which is the accessible name — says it again.
+  ({IconData icon, String tooltip, VoidCallback onPressed})? get _createAction {
+    switch (_tab) {
+      case 0:
+        if (!_permissions.canCreateIssue) return null;
+        return (
+          icon: Icons.edit_square,
+          tooltip: 'New issue',
+          onPressed: _createIssue
+        );
+      case 1:
+        if (!_permissions.canCreatePage) return null;
+        return (
+          icon: Icons.add,
+          tooltip: 'New page',
+          onPressed: () => _pagesKey.currentState?.startCreate()
+        );
+      case 2:
+        if (!_permissions.canCreateModule) return null;
+        return (
+          icon: Icons.add,
+          tooltip: 'New module',
+          onPressed: () => _modulesKey.currentState?.startCreate()
+        );
+      case 3:
+        if (!_permissions.canCreateView) return null;
+        return (
+          icon: Icons.add,
+          tooltip: 'New view',
+          onPressed: () => _viewsKey.currentState?.startCreate()
+        );
+      case 4:
+        if (!_permissions.canCreateCycle) return null;
+        return (
+          icon: Icons.add,
+          tooltip: 'New cycle',
+          onPressed: () => _cyclesKey.currentState?.startCreate()
+        );
+    }
+    return null;
+  }
+
   @override
   Widget build(BuildContext context) {
+    final create = _createAction;
+
     return Scaffold(
       appBar: M3EAppBar(
         title: widget.project.name,
@@ -144,13 +254,16 @@ class _ProjectScreenState extends ConsumerState<ProjectScreen> {
               onPressed: _openIntake,
             ),
           // The one primary action on this screen, so it takes the emphasized
-          // tonal treatment rather than being another grey glyph.
-          M3EAppBarAction(
-            icon: Icons.edit_square,
-            tooltip: 'New issue',
-            emphasized: true,
-            onPressed: _createIssue,
-          ),
+          // tonal treatment rather than being another grey glyph. The tooltip
+          // is the accessible name and it names what will be created, so the
+          // action does not read as "add" with no object.
+          if (create != null)
+            M3EAppBarAction(
+              icon: create.icon,
+              tooltip: create.tooltip,
+              emphasized: true,
+              onPressed: create.onPressed,
+            ),
         ],
       ),
       extendBody: true,
@@ -162,17 +275,25 @@ class _ProjectScreenState extends ConsumerState<ProjectScreen> {
               projectId: widget.project.id,
               projectIdentifier: widget.project.identifier),
           PageListScreen(
+              key: _pagesKey,
               workspaceSlug: widget.workspaceSlug,
-              projectId: widget.project.id),
+              projectId: widget.project.id,
+              canCreate: _permissions.canCreatePage),
           ModuleListScreen(
+              key: _modulesKey,
               workspaceSlug: widget.workspaceSlug,
-              projectId: widget.project.id),
+              projectId: widget.project.id,
+              canCreate: _permissions.canCreateModule),
           ViewListScreen(
+              key: _viewsKey,
               workspaceSlug: widget.workspaceSlug,
-              projectId: widget.project.id),
+              projectId: widget.project.id,
+              canCreate: _permissions.canCreateView),
           CycleListScreen(
+              key: _cyclesKey,
               workspaceSlug: widget.workspaceSlug,
-              projectId: widget.project.id),
+              projectId: widget.project.id,
+              canCreate: _permissions.canCreateCycle),
         ],
       ),
       bottomNavigationBar: AppNavBar(

@@ -1,6 +1,7 @@
 import 'member.dart';
 
-/// What the signed-in user may do to a project's or a workspace's members.
+/// What the signed-in user may do to a project's or a workspace's members, and
+/// what they may create inside a project.
 ///
 /// Everything here is a mirror of a rule that already exists on the server, and
 /// every method names where it was read from. Two sources matter, and they do
@@ -158,6 +159,56 @@ class MemberPermissions {
     if (projectRole != MemberRole.admin) return true;
     return members.where((m) => m.role == MemberRole.admin).length > 1;
   }
+
+  // ---------------------------------------------------------------------------
+  //  Project content
+  // ---------------------------------------------------------------------------
+  //
+  //  Not members, but the same question asked of the same two roles, and the
+  //  same reason for asking it: a create control that is offered to a guest is
+  //  a 403 with a tap in front of it. `_projectGate` is the decorator these
+  //  four endpoints are written with, so they belong beside it rather than in
+  //  a second copy of it somewhere else.
+
+  /// Whether to offer "new work item".
+  ///
+  /// `IssueViewSet.create` is `@allow_permission([ROLE.ADMIN, ROLE.MEMBER])` —
+  /// `plane/app/views/issue/base.py`.
+  bool get canCreateIssue =>
+      _projectGate({MemberRole.admin, MemberRole.member});
+
+  /// Whether to offer "new cycle".
+  ///
+  /// `CycleViewSet.create` is `@allow_permission([ROLE.ADMIN, ROLE.MEMBER])`,
+  /// and Plane's own cycles header gates its button on exactly those two.
+  bool get canCreateCycle =>
+      _projectGate({MemberRole.admin, MemberRole.member});
+
+  /// Whether to offer "new module".
+  ///
+  /// `ModuleViewSet.create` is `@allow_permission([ROLE.ADMIN, ROLE.MEMBER])`.
+  bool get canCreateModule =>
+      _projectGate({MemberRole.admin, MemberRole.member});
+
+  /// Whether to offer "new page".
+  ///
+  /// Pages are the exception. `PageViewSet` is guarded by
+  /// `ProjectPagePermission`, not by the `allow_permission` decorator, and that
+  /// class reads the caller's *project* role and nothing else — its POST branch
+  /// admits admin and member. So this gate has **no workspace-admin arm**: a
+  /// workspace admin who joined the project as a guest may create a cycle here
+  /// and may not create a page, and that asymmetry is the server's, not ours.
+  bool get canCreatePage =>
+      projectRole == MemberRole.admin || projectRole == MemberRole.member;
+
+  /// Whether to offer "new view".
+  ///
+  /// `IssueViewViewSet` overrides neither `create` nor `permission_classes`, so
+  /// the only check that runs is `BaseViewSet`'s `IsAuthenticated` — a project
+  /// guest may create a view, and Plane's web client offers it to one. Active
+  /// project membership is still required for the view to be listed afterwards,
+  /// so that is what is asked for.
+  bool get canCreateView => projectRole != null;
 
   // ---------------------------------------------------------------------------
   //  Workspace

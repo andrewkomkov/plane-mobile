@@ -7,27 +7,41 @@ import '../../providers/data_providers.dart';
 import '../../models/favorite.dart';
 import '../../models/module.dart';
 import '../../providers/favorites_provider.dart';
+import '../../utils/api_error.dart';
 import '../../widgets/archive_toggle.dart';
+import '../../widgets/bottom_sheet_picker.dart';
 import '../../widgets/favorite_toggle.dart';
+import '../../widgets/list_count_header.dart';
 import '../../widgets/loading_state.dart';
 import '../../widgets/m3e/icon_button.dart';
 import '../../widgets/plane_row.dart';
 import '../../widgets/skeleton_loader.dart';
 import '../../widgets/property_chip.dart';
+import '../project/project_screen.dart' show kProjectListBottomInset;
 import 'module_detail_screen.dart';
 
 class ModuleListScreen extends ConsumerStatefulWidget {
   final String workspaceSlug;
   final String projectId;
 
-  const ModuleListScreen(
-      {super.key, required this.workspaceSlug, required this.projectId});
+  /// Whether the signed-in user may create a module here. Resolved by
+  /// `ProjectScreen` against the caller's project role; false until it lands,
+  /// so the control never appears for someone the server would refuse.
+  final bool canCreate;
+
+  const ModuleListScreen({
+    super.key,
+    required this.workspaceSlug,
+    required this.projectId,
+    this.canCreate = false,
+  });
 
   @override
-  ConsumerState<ModuleListScreen> createState() => _ModuleListScreenState();
+  ConsumerState<ModuleListScreen> createState() => ModuleListScreenState();
 }
 
-class _ModuleListScreenState extends ConsumerState<ModuleListScreen>
+/// Public so `ProjectScreen` can start the create flow through a [GlobalKey].
+class ModuleListScreenState extends ConsumerState<ModuleListScreen>
     with AutomaticKeepAliveClientMixin {
   bool _initialLoading = true;
   String? _error;
@@ -127,7 +141,10 @@ class _ModuleListScreenState extends ConsumerState<ModuleListScreen>
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to restore module: $e')),
+          SnackBar(
+            content: Text(
+                describeApiError(e, fallback: 'Could not restore the module')),
+          ),
         );
       }
     }
@@ -177,6 +194,28 @@ class _ModuleListScreenState extends ConsumerState<ModuleListScreen>
         .join(' ');
   }
 
+  /// Opens the "new module" form.
+  ///
+  /// The one entry point, called from the project screen's primary action and
+  /// from the empty state below. Does nothing when the caller's role would be
+  /// refused — the controls are already hidden in that case, and this is the
+  /// second lock on the same door.
+  void startCreate() {
+    if (!widget.canCreate) return;
+    _showCreateModuleDialog();
+  }
+
+  /// Every status a module can be opened in, in the order the server declares
+  /// them.
+  static const List<String> _statuses = [
+    'backlog',
+    'planned',
+    'in-progress',
+    'paused',
+    'completed',
+    'cancelled',
+  ];
+
   void _showCreateModuleDialog() {
     final nameController = TextEditingController();
     final descController = TextEditingController();
@@ -203,23 +242,36 @@ class _ModuleListScreenState extends ConsumerState<ModuleListScreen>
                   maxLines: 2,
                 ),
                 const SizedBox(height: 12),
-                DropdownButtonFormField<String>(
-                  initialValue: selectedStatus,
-                  decoration: moduleStatusFieldDecoration(ctx),
-                  items: [
-                    'backlog',
-                    'planned',
-                    'in-progress',
-                    'paused',
-                    'completed',
-                    'cancelled',
-                  ]
-                      .map((s) => DropdownMenuItem(
-                          value: s, child: Text(_statusLabel(s))))
-                      .toList(),
-                  onChanged: (v) =>
-                      setDialogState(() => selectedStatus = v ?? 'planned'),
-                  isExpanded: true,
+                // A picker rather than a `DropdownButtonFormField`, so that
+                // choosing a status here looks like choosing one anywhere else
+                // in the app — and so the status hues come along, which the
+                // dropdown never showed.
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton.icon(
+                    onPressed: () async {
+                      final picked = await BottomSheetPicker.show<String>(
+                        context: ctx,
+                        title: 'Status',
+                        selectedValue: selectedStatus,
+                        items: _statuses
+                            .map((s) => BottomSheetPickerItem(
+                                  value: s,
+                                  label: _statusLabel(s),
+                                  icon: Icons.circle,
+                                  iconColor: _statusColor(s),
+                                ))
+                            .toList(),
+                      );
+                      if (picked != null) {
+                        setDialogState(() => selectedStatus = picked);
+                      }
+                    },
+                    icon: Icon(Icons.circle,
+                        size: PlaneTheme.iconSmall,
+                        color: _statusColor(selectedStatus)),
+                    label: Text(_statusLabel(selectedStatus)),
+                  ),
                 ),
               ],
             ),
@@ -251,7 +303,10 @@ class _ModuleListScreenState extends ConsumerState<ModuleListScreen>
                 } catch (e) {
                   if (mounted) {
                     ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text('Failed to create module: $e')),
+                      SnackBar(
+                        content: Text(describeApiError(e,
+                            fallback: 'Could not create the module')),
+                      ),
                     );
                   }
                 }
@@ -292,21 +347,14 @@ class _ModuleListScreenState extends ConsumerState<ModuleListScreen>
   }
 
   Widget _header(BuildContext context) {
-    final theme = Theme.of(context);
     final count = _showArchived ? (_archived?.length ?? 0) : _modules.length;
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 8, 12, 4),
-      child: Row(
-        children: [
-          Text('$count ${count == 1 ? 'module' : 'modules'}',
-              style: theme.textTheme.bodySmall),
-          const Spacer(),
-          ArchiveToggle(
-            showArchived: _showArchived,
-            entityPlural: 'modules',
-            onChanged: _toggleArchived,
-          ),
-        ],
+    return ListCountHeader(
+      count: count,
+      singular: 'module',
+      trailing: ArchiveToggle(
+        showArchived: _showArchived,
+        entityPlural: 'modules',
+        onChanged: _toggleArchived,
       ),
     );
   }
@@ -317,13 +365,27 @@ class _ModuleListScreenState extends ConsumerState<ModuleListScreen>
           message: 'Failed to load modules', onRetry: _load);
     }
     if (_modules.isEmpty) {
-      return ListView(children: [
-        SizedBox(height: MediaQuery.of(context).size.height * 0.25),
-        const Center(
-          child:
-              EmptyStateWidget(message: 'No modules', icon: Icons.view_module),
+      return ScrollableCenter(
+        padding: const EdgeInsets.only(bottom: kProjectListBottomInset),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const EmptyStateWidget(
+              message: 'No modules',
+              icon: Icons.view_module,
+              subtitle: 'A module groups the work items that ship one feature',
+            ),
+            if (widget.canCreate) ...[
+              const SizedBox(height: 16),
+              FilledButton.tonalIcon(
+                onPressed: startCreate,
+                icon: const Icon(Icons.add),
+                label: const Text('New module'),
+              ),
+            ],
+          ],
         ),
-      ]);
+      );
     }
     // Favourites first. Plane's own module list already orders `-is_favorite`,
     // so this only changes what happens between a star being tapped and the
@@ -332,6 +394,10 @@ class _ModuleListScreenState extends ConsumerState<ModuleListScreen>
     final ordered =
         favorites.favoritesFirst(FavoriteEntity.module, _modules, (m) => m.id);
     return ListView.builder(
+      // Without this a list too short to scroll cannot be pulled, so the
+      // RefreshIndicator wrapping it never fires.
+      physics: const AlwaysScrollableScrollPhysics(),
+      padding: const EdgeInsets.only(bottom: kProjectListBottomInset),
       itemCount: ordered.length,
       itemBuilder: (ctx, i) => _moduleRow(module: ordered[i]),
     );
@@ -347,20 +413,18 @@ class _ModuleListScreenState extends ConsumerState<ModuleListScreen>
       return const ProjectListSkeleton();
     }
     if (archived.isEmpty) {
-      return ListView(children: [
-        SizedBox(height: MediaQuery.of(context).size.height * 0.25),
-        const Center(
-          child: EmptyStateWidget(
-            message: 'No archived modules',
-            icon: Icons.inventory_2_outlined,
-            subtitle: 'Modules archived from here or from the web appear here',
-          ),
-        ),
-      ]);
+      return const ScrollableEmptyState(
+        padding: EdgeInsets.only(bottom: kProjectListBottomInset),
+        message: 'No archived modules',
+        icon: Icons.inventory_2_outlined,
+        subtitle: 'Modules archived from here or from the web appear here',
+      );
     }
     final ordered =
         favorites.favoritesFirst(FavoriteEntity.module, archived, (m) => m.id);
     return ListView.builder(
+      physics: const AlwaysScrollableScrollPhysics(),
+      padding: const EdgeInsets.only(bottom: kProjectListBottomInset),
       itemCount: ordered.length,
       itemBuilder: (ctx, i) => _moduleRow(module: ordered[i]),
     );
