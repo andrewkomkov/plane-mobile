@@ -58,7 +58,14 @@ class _InboxTabState extends ConsumerState<InboxTab>
       }
     } catch (_) {}
 
-    // Then fetch from API in background
+    // Then fetch from API in background.
+    //
+    // This stays on the mobile service's derived feed rather than Plane's
+    // workspaces/{slug}/users/notifications/, which the Notifications screen
+    // uses. Plane never notifies the actor of their own activity, so on a
+    // deployment where one person does all the work its notifications table is
+    // empty and that endpoint returns []. Reading it here would leave the
+    // Inbox permanently blank.
     if (!_loaded && _notifications.isEmpty) {
       if (mounted) setState(() => _loading = true);
     }
