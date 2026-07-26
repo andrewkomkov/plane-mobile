@@ -28,8 +28,12 @@ cd android && ./gradlew :app:dependencies --configuration debugRuntimeClasspath 
   | grep material3
 # +--- androidx.compose.material3:material3:1.5.0-alpha24
 
-unzip -p build/app/outputs/flutter-apk/app-debug.apk classes.dex \
-  | strings | grep -c MaterialExpressiveTheme
+# The app is multidex — 18 classes*.dex — so pick the right one rather than
+# assuming classes.dex, and grep the extracted files rather than piping
+# through strings, which drops the match here.
+cd $(mktemp -d) && unzip -qo <path>/app-debug.apk 'classes*.dex' \
+  && grep -la MaterialExpressiveTheme *.dex
+# classes.dex classes14.dex
 ```
 
 **What this route costs**, which is why it is opt-in per call site rather than

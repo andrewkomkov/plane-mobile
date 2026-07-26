@@ -38,10 +38,6 @@ android {
 
     kotlinOptions {
         jvmTarget = '17'
-        // Kotlin 2.1 crashes lowering Compose's ComposableSingletons holder when
-        // it emits lambdas via invokedynamic (LambdaMetafactory). Compiling
-        // lambdas as classes is the documented workaround and is what the
-        // Compose compiler plugin expects anyway.
         freeCompilerArgs += ['-Xlambdas=class']
     }
 
