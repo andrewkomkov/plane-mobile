@@ -6,6 +6,7 @@ import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:plane_mobile/config/m3e/motion.dart';
 import 'package:plane_mobile/models/cycle.dart';
 import 'package:plane_mobile/models/state.dart';
 import 'package:plane_mobile/providers/data_providers.dart';
@@ -154,11 +155,11 @@ void main() {
       await tester.pumpWidget(wrap());
       await tester.pump();
 
-      final inkwell = find.ancestor(
+      final pressable = find.ancestor(
         of: find.text('Fix the thing'),
-        matching: find.byType(InkWell),
+        matching: find.byType(M3EPressable),
       );
-      expect(tester.getSize(inkwell.first).height,
+      expect(tester.getSize(pressable.first).height,
           greaterThanOrEqualTo(_minTarget));
     });
   });

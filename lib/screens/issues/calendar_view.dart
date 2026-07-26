@@ -1,11 +1,14 @@
 import 'package:flutter/material.dart';
+import '../../config/m3e/motion.dart';
 import '../../config/m3e/shapes.dart';
 import '../../config/m3e/typography.dart';
 import '../../widgets/m3e/icon_button.dart';
 import '../../models/issue.dart';
 import '../../models/state.dart';
 import '../../widgets/issue_row.dart';
+import '../../widgets/loading_state.dart';
 import '../../widgets/plane_row.dart';
+import '../../widgets/section_header.dart';
 import '../../models/label.dart';
 import '../../models/member.dart';
 import 'issue_detail_screen.dart';
@@ -133,17 +136,19 @@ class _CalendarViewState extends State<CalendarView> {
         ),
         const SizedBox(height: 4),
         // Calendar grid
-        _buildCalendarGrid(theme, secondary),
-        const Divider(height: 1),
+        _buildCalendarGrid(theme),
+        // Bare, so `dividerTheme` decides the colour, the thickness and the
+        // space — a local `height: 1` overrode its `space: 0`.
+        const Divider(),
         // Selected day issues or no-date issues
         Expanded(
-          child: _buildIssueList(theme, secondary),
+          child: _buildIssueList(),
         ),
       ],
     );
   }
 
-  Widget _buildCalendarGrid(ThemeData theme, Color secondary) {
+  Widget _buildCalendarGrid(ThemeData theme) {
     final firstDay = DateTime(_currentMonth.year, _currentMonth.month, 1);
     final daysInMonth =
         DateTime(_currentMonth.year, _currentMonth.month + 1, 0).day;
@@ -183,74 +188,81 @@ class _CalendarViewState extends State<CalendarView> {
                 // The cell renders a bare number, which is useless as a name:
                 // the label carries the full date and the issue count so a
                 // day can be picked out without reading the grid geometry.
-                child: Semantics(
-                  label: issueCount > 0
+                // M3EPressable replaces its subtree's semantics, so the label
+                // it is given is the whole node — the day number and the dot
+                // inside it are not reported twice.
+                child: M3EPressable(
+                  semanticLabel: issueCount > 0
                       ? 'Select day $dateKey, $issueCount issues'
                       : 'Select day $dateKey, no issues',
-                  button: true,
                   selected: isSelected,
-                  container: true,
-                  // The cell draws the day number and the count, both of which
-                  // the label already carries; without the exclusion the node
-                  // reads "Select day 2026-07-14, 3 issues, 14, 3". The tap is
-                  // re-declared because excluding drops the child's.
-                  excludeSemantics: true,
+                  // A cell is small; the card squeeze would swallow it.
+                  pressedScale: 0.94,
                   onTap: () => setState(() => _selectedDay = date),
-                  child: GestureDetector(
-                    onTap: () => setState(() => _selectedDay = date),
-                    child: Container(
-                      // A day cell is a tap target, so it holds the 48dp
-                      // minimum even though the number inside is small.
-                      height: 48,
-                      decoration: BoxDecoration(
+                  child: Container(
+                    // A day cell is a tap target, so it holds the 48dp
+                    // minimum even though the number inside is small.
+                    height: 48,
+                    margin: const EdgeInsets.all(1),
+                    decoration: BoxDecoration(
+                      color: isSelected
+                          ? theme.colorScheme.primary.withValues(alpha: 0.15)
+                          : Colors.transparent,
+                      // Selection pulls the corner in and adds an outline as
+                      // well as tinting the fill. A tint on its own is one
+                      // channel, and 42 cells is a lot of screen to be
+                      // distinguishing by colour alone.
+                      borderRadius: BorderRadius.circular(
+                          isSelected ? M3EShape.small : M3EShape.medium),
+                      border: Border.all(
                         color: isSelected
-                            ? theme.colorScheme.primary.withValues(alpha: 0.15)
+                            ? theme.colorScheme.primary
                             : Colors.transparent,
-                        borderRadius: BorderRadius.circular(M3EShape.medium),
+                        width: 0.8,
                       ),
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Container(
-                            width: 24,
-                            height: 24,
-                            decoration: isToday
-                                ? BoxDecoration(
-                                    color: theme.colorScheme.primary,
-                                    shape: BoxShape.circle,
-                                  )
-                                : null,
-                            alignment: Alignment.center,
-                            child: Text(
-                              '$dayNum',
-                              // Today is the one day that has to dominate the
-                              // grid, which is what the emphasized cut is for.
-                              style: (isToday
-                                      ? M3EType.emphasized(
-                                          theme.textTheme.labelMedium!)
-                                      : theme.textTheme.bodySmall!)
-                                  .copyWith(
-                                color: isToday
-                                    // Dark `primary` is a light lavender, so
-                                    // white on it is 1.70:1. Roles come in
-                                    // pairs for exactly this reason.
-                                    ? theme.colorScheme.onPrimary
-                                    : theme.colorScheme.onSurface,
-                              ),
+                    ),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Container(
+                          width: 24,
+                          height: 24,
+                          decoration: isToday
+                              ? BoxDecoration(
+                                  color: theme.colorScheme.primary,
+                                  shape: BoxShape.circle,
+                                )
+                              : null,
+                          alignment: Alignment.center,
+                          child: Text(
+                            '$dayNum',
+                            // Today is the one day that has to dominate the
+                            // grid, which is what the emphasized cut is for.
+                            style: (isToday
+                                    ? M3EType.emphasized(
+                                        theme.textTheme.labelMedium!)
+                                    : theme.textTheme.bodySmall!)
+                                .copyWith(
+                              color: isToday
+                                  // Dark `primary` is a light lavender, so
+                                  // white on it is 1.70:1. Roles come in
+                                  // pairs for exactly this reason.
+                                  ? theme.colorScheme.onPrimary
+                                  : theme.colorScheme.onSurface,
                             ),
                           ),
-                          if (issueCount > 0)
-                            Container(
-                              margin: const EdgeInsets.only(top: 2),
-                              width: 6,
-                              height: 6,
-                              decoration: BoxDecoration(
-                                color: theme.colorScheme.primary,
-                                shape: BoxShape.circle,
-                              ),
+                        ),
+                        if (issueCount > 0)
+                          Container(
+                            margin: const EdgeInsets.only(top: 2),
+                            width: 6,
+                            height: 6,
+                            decoration: BoxDecoration(
+                              color: theme.colorScheme.primary,
+                              shape: BoxShape.circle,
                             ),
-                        ],
-                      ),
+                          ),
+                      ],
                     ),
                   ),
                 ),
@@ -262,24 +274,26 @@ class _CalendarViewState extends State<CalendarView> {
     );
   }
 
-  Widget _buildIssueList(ThemeData theme, Color secondary) {
+  Widget _buildIssueList() {
     if (_selectedDay != null) {
       final issues = _selectedDayIssues;
+      final day = _selectedDay!;
       return Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
-            child: Text(
-              '${_formatDate(_selectedDay!)} (${issues.length} issues)',
-              style: theme.textTheme.titleSmall?.copyWith(color: secondary),
-            ),
+          // The same header every other grouped list draws. It used to be a
+          // bare `Text` reading "2026-07-26 (3 issues)" — a machine date and a
+          // count welded into the string, where the shared header has a count
+          // pill for exactly that.
+          SectionHeader(
+            label: '${day.day} ${_monthName(day.month)}',
+            count: issues.length,
           ),
           Expanded(
             child: issues.isEmpty
-                ? Center(
-                    child: Text('No issues due this day',
-                        style: theme.textTheme.bodySmall),
+                ? const EmptyStateWidget(
+                    message: 'Nothing due this day',
+                    icon: Icons.event_available,
                   )
                 : ListView.builder(
                     itemCount: issues.length,
@@ -326,18 +340,13 @@ class _CalendarViewState extends State<CalendarView> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Padding(
-          padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
-          child: Text(
-            'No date (${noDate.length} issues)',
-            style: theme.textTheme.titleSmall?.copyWith(color: secondary),
-          ),
-        ),
+        SectionHeader(label: 'No date', count: noDate.length),
         Expanded(
           child: noDate.isEmpty
-              ? Center(
-                  child: Text('All issues have dates',
-                      style: theme.textTheme.bodySmall),
+              ? const EmptyStateWidget(
+                  message: 'Every work item has a date',
+                  icon: Icons.event_available,
+                  subtitle: 'Pick a day above to see what is due on it',
                 )
               : ListView.builder(
                   itemCount: noDate.length,

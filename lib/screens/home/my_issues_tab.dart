@@ -7,14 +7,13 @@ import '../../models/state.dart';
 import '../../models/label.dart';
 import '../../models/member.dart';
 import '../../utils/issue_grouping.dart';
+import '../../widgets/bottom_sheet_picker.dart';
+import '../../widgets/display_options.dart';
 import '../../widgets/filter_bar.dart';
 import '../../widgets/loading_state.dart';
 import '../../widgets/skeleton_loader.dart';
-import '../../config/m3e/shapes.dart';
-import '../../config/m3e/typography.dart';
 import '../../widgets/m3e/flexible_app_bar.dart';
 import '../../widgets/m3e/button_group.dart';
-import '../../widgets/m3e/chip.dart';
 import '../../widgets/m3e/fab_menu.dart';
 import '../../widgets/m3e/icon_button.dart';
 import '../../widgets/section_header.dart';
@@ -43,7 +42,11 @@ class _MyIssuesTabState extends ConsumerState<MyIssuesTab>
   bool _loading = true;
   bool _loaded = false;
   String? _error;
-  FilterState _filterState = const FilterState();
+
+  /// Grouping, ordering and row properties, in the same object the project
+  /// issue list uses. This screen used to keep seven loose fields of its own
+  /// beside a 250-line copy of the sheet that wrote them.
+  final DisplayState _display = DisplayState();
 
   @override
   bool get wantKeepAlive => true;
@@ -121,15 +124,6 @@ class _MyIssuesTabState extends ConsumerState<MyIssuesTab>
     }
   }
 
-  bool get _hasStateFilterForDone {
-    if (_filterState.selectedStates.isEmpty) return false;
-    return _filterState.selectedStates.any((stateId) {
-      final state = _allStates[stateId];
-      return state != null &&
-          (state.group == 'completed' || state.group == 'cancelled');
-    });
-  }
-
   List<Issue> get _filteredAndSorted {
     var result = _issues.toList();
     if (_filterMode == 'assigned' && widget.currentUserId != null) {
@@ -141,13 +135,12 @@ class _MyIssuesTabState extends ConsumerState<MyIssuesTab>
           result.where((i) => i.createdBy == widget.currentUserId).toList();
     }
     // 'all' mode: no user filtering — show all issues from all projects
-    result = applyFilters(result, _filterState);
-    if (_completedFilter == 'none') {
+    if (_display.completedFilter == 'none') {
       result = result.where((i) {
         final group = _allStates[i.state]?.group ?? 'backlog';
         return group != 'completed' && group != 'cancelled';
       }).toList();
-    } else if (_completedFilter == 'week') {
+    } else if (_display.completedFilter == 'week') {
       final weekAgo = DateTime.now().subtract(const Duration(days: 7));
       result = result.where((i) {
         final group = _allStates[i.state]?.group ?? 'backlog';
@@ -155,11 +148,10 @@ class _MyIssuesTabState extends ConsumerState<MyIssuesTab>
         return i.updatedAt.isAfter(weekAgo);
       }).toList();
     }
-    if (!_showSubIssues) {
+    if (!_display.showSubIssues) {
       result = result.where((i) => i.parent == null).toList();
     }
-    result = applySorting(
-        result, _filterState.sortField, _filterState.sortAscending);
+    result = applySorting(result, _display.sortField, !_display.sortNewest);
     return result;
   }
 
@@ -197,7 +189,7 @@ class _MyIssuesTabState extends ConsumerState<MyIssuesTab>
 
   Map<String, List<Issue>> get _grouped {
     return groupIssuesBy(
-      _filterState.groupBy,
+      _display.groupByField,
       _filteredAndSorted,
       _allStates,
       members: _allMembers,
@@ -206,7 +198,7 @@ class _MyIssuesTabState extends ConsumerState<MyIssuesTab>
   }
 
   Color _groupColor(String key) {
-    switch (_filterState.groupBy) {
+    switch (_display.groupByField) {
       case GroupByField.state:
         return PlaneTheme.stateGroupColor(context, key);
       case GroupByField.priority:
@@ -219,7 +211,7 @@ class _MyIssuesTabState extends ConsumerState<MyIssuesTab>
 
   String _filterMode = 'assigned';
 
-  void _createIssue() {
+  Future<void> _createIssue() async {
     final cache = _cache;
     final projects = cache.getProjects(widget.workspaceSlug) ?? [];
     if (projects.isEmpty) {
@@ -232,32 +224,22 @@ class _MyIssuesTabState extends ConsumerState<MyIssuesTab>
       _openCreateScreen(projects.first);
       return;
     }
-    // Show project picker
-    showModalBottomSheet(
+    // A work item belongs to exactly one project, so which one is a single
+    // choice — the shared picker, rather than a fifth hand-rolled sheet.
+    final chosen = await BottomSheetPicker.show<Project>(
       context: context,
-      builder: (ctx) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Padding(
-              padding: const EdgeInsets.all(16),
-              child: Text('Select project',
-                  style: Theme.of(ctx).textTheme.titleLarge),
-            ),
-            ...projects.map((p) => ListTile(
-                  leading: const Icon(Icons.folder_outlined, size: 20),
-                  title: Text('${p.identifier} - ${p.name}',
-                      style: Theme.of(ctx).textTheme.bodyMedium),
-                  onTap: () {
-                    Navigator.pop(ctx);
-                    _openCreateScreen(p);
-                  },
-                )),
-            const SizedBox(height: 8),
-          ],
-        ),
-      ),
+      title: 'New issue',
+      subtitle: 'Which project?',
+      items: projects
+          .map((p) => BottomSheetPickerItem(
+                value: p,
+                label: p.name,
+                subtitle: p.identifier,
+                icon: Icons.folder_outlined,
+              ))
+          .toList(),
     );
+    if (chosen != null) _openCreateScreen(chosen);
   }
 
   void _openCreateScreen(Project project) async {
@@ -278,299 +260,30 @@ class _MyIssuesTabState extends ConsumerState<MyIssuesTab>
     _load();
   }
 
-  void _showOptionsMenu() {
-    showModalBottomSheet(
+  Future<void> _showOptionsMenu() async {
+    final chosen = await BottomSheetPicker.show<String>(
       context: context,
-      builder: (ctx) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ListTile(
-              leading: const Icon(Icons.tune, size: 20),
-              title: Text('Display options',
-                  style: Theme.of(ctx).textTheme.bodyLarge),
-              onTap: () {
-                Navigator.pop(ctx);
-                _showDisplayOptions();
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.refresh, size: 20),
-              title: Text('Refresh', style: Theme.of(ctx).textTheme.bodyLarge),
-              onTap: () {
-                Navigator.pop(ctx);
-                _load();
-              },
-            ),
-          ],
-        ),
-      ),
+      title: 'List options',
+      items: const [
+        BottomSheetPickerItem(
+            value: 'display', label: 'Display options', icon: Icons.tune),
+        BottomSheetPickerItem(
+            value: 'refresh', label: 'Refresh', icon: Icons.refresh),
+      ],
     );
+    switch (chosen) {
+      case 'display':
+        _showDisplayOptions();
+      case 'refresh':
+        _load();
+    }
   }
 
-  String _grouping = 'state';
-  String _ordering = 'created';
-  bool _sortNewest = true;
-  String _completedFilter = 'none';
-  bool _showSubIssues = true;
-  int _maxTitleLines = 1;
-  Set<String> _rowProperties = {'status', 'priority', 'id'};
-
-  void _showDisplayOptions() {
-    showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setSheetState) {
-          final theme = Theme.of(ctx);
-          final secondary = theme.colorScheme.onSurfaceVariant;
-
-          Widget optionRow(String label, String value, VoidCallback onTap) {
-            return InkWell(
-              onTap: onTap,
-              child: Padding(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
-                child: Row(
-                  children: [
-                    Text(label, style: theme.textTheme.bodyLarge),
-                    const Spacer(),
-                    Text(value,
-                        style: theme.textTheme.bodyLarge
-                            ?.copyWith(color: secondary)),
-                    const SizedBox(width: 4),
-                    Icon(Icons.unfold_more,
-                        size: PlaneTheme.iconMedium, color: secondary),
-                  ],
-                ),
-              ),
-            );
-          }
-
-          void cycleOption(String field, List<(String, String)> options,
-              String current, Function(String) onChanged) {
-            final idx = options.indexWhere((o) => o.$1 == current);
-            final next = options[(idx + 1) % options.length];
-            onChanged(next.$1);
-          }
-
-          return SafeArea(
-            child: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const SizedBox(height: 12),
-                  Center(
-                      child: Container(
-                          width: 36,
-                          height: 4,
-                          decoration: BoxDecoration(
-                              color: secondary.withValues(alpha: 0.3),
-                              borderRadius:
-                                  BorderRadius.circular(M3EShape.full)))),
-                  const SizedBox(height: 16),
-                  optionRow('Grouping',
-                      _grouping[0].toUpperCase() + _grouping.substring(1), () {
-                    setSheetState(() {
-                      cycleOption(
-                          'grouping',
-                          [
-                            ('state', 'Status'),
-                            ('priority', 'Priority'),
-                            ('assignee', 'Assignee'),
-                            ('label', 'Label')
-                          ],
-                          _grouping,
-                          (v) => _grouping = v);
-                    });
-                    setState(() {
-                      _filterState = FilterState(
-                          groupBy: {
-                                'state': GroupByField.state,
-                                'priority': GroupByField.priority,
-                                'assignee': GroupByField.assignee,
-                                'label': GroupByField.label,
-                              }[_grouping] ??
-                              GroupByField.state);
-                    });
-                  }),
-                  optionRow('Ordering',
-                      _ordering[0].toUpperCase() + _ordering.substring(1), () {
-                    setSheetState(() {
-                      cycleOption(
-                          'ordering',
-                          [
-                            ('created', 'Created'),
-                            ('updated', 'Updated'),
-                            ('priority', 'Priority')
-                          ],
-                          _ordering, (v) {
-                        _ordering = v;
-                      });
-                    });
-                    setState(() {
-                      _filterState = FilterState(
-                        groupBy: _filterState.groupBy,
-                        sortField: _ordering == 'updated'
-                            ? SortField.updatedAt
-                            : _ordering == 'priority'
-                                ? SortField.priority
-                                : SortField.createdAt,
-                        sortAscending: !_sortNewest,
-                      );
-                    });
-                  }),
-                  optionRow(
-                      'Sort', _sortNewest ? 'Newest first' : 'Oldest first',
-                      () {
-                    setSheetState(() => _sortNewest = !_sortNewest);
-                    setState(() {
-                      _filterState = FilterState(
-                        groupBy: _filterState.groupBy,
-                        sortField: _filterState.sortField,
-                        sortAscending: !_sortNewest,
-                      );
-                    });
-                  }),
-                  const SizedBox(height: 8),
-                  optionRow(
-                      'Completed issues',
-                      _completedFilter == 'none'
-                          ? 'None'
-                          : _completedFilter == 'week'
-                              ? 'Past week'
-                              : 'All', () {
-                    setSheetState(() {
-                      cycleOption(
-                          'completed',
-                          [
-                            ('none', 'None'),
-                            ('week', 'Past week'),
-                            ('all', 'All')
-                          ],
-                          _completedFilter,
-                          (v) => _completedFilter = v);
-                    });
-                    setState(() {});
-                  }),
-                  Padding(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 20, vertical: 6),
-                    // The switch sits in a Row next to its caption, so on its
-                    // own it is an unnamed toggle. A `Semantics(label:)` on
-                    // the Switch does not fix that — the label forms a node
-                    // *above* the toggle rather than joining it, so the node
-                    // that carries the action is still nameless. Merging the
-                    // caption and the control into one node is what a
-                    // SwitchListTile does internally, and it names the toggle
-                    // without repeating the caption as a second node.
-                    child: MergeSemantics(
-                      child: Row(
-                        children: [
-                          Text('Show sub-issues',
-                              style: theme.textTheme.bodyLarge),
-                          const Spacer(),
-                          Switch(
-                            value: _showSubIssues,
-                            onChanged: (v) {
-                              setSheetState(() => _showSubIssues = v);
-                              setState(() {});
-                            },
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                  optionRow('Maximum title length',
-                      '$_maxTitleLines line${_maxTitleLines > 1 ? 's' : ''}',
-                      () {
-                    setSheetState(
-                        () => _maxTitleLines = _maxTitleLines == 1 ? 2 : 1);
-                    setState(() {});
-                  }),
-                  const SizedBox(height: 12),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 20),
-                    child: Row(
-                      children: [
-                        Text('Row properties',
-                            style: theme.textTheme.titleSmall
-                                ?.copyWith(color: secondary)),
-                        const Spacer(),
-                        // A TextButton rather than a bare tap target: it
-                        // carries the 48dp minimum without extra layout.
-                        TextButton(
-                          onPressed: () {
-                            setSheetState(() =>
-                                _rowProperties = {'status', 'priority', 'id'});
-                            setState(() {});
-                          },
-                          style: TextButton.styleFrom(
-                            foregroundColor: secondary,
-                            minimumSize: const Size(48, 48),
-                            textStyle:
-                                M3EType.emphasized(theme.textTheme.titleSmall!),
-                          ),
-                          child: const Text('Reset'),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 10),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 20),
-                    child: Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
-                      children: [
-                        for (final prop in [
-                          'Status',
-                          'Priority',
-                          'Assignee',
-                          'ID',
-                          'Labels',
-                          'Project',
-                          'Due date',
-                          'Cycle',
-                          'Estimate'
-                        ])
-                          // No Semantics wrapper: M3EChip already hands
-                          // `selected` to M3EPressable, which declares both
-                          // the flag and the button role, and its Text names
-                          // the chip. Wrapping it added a second node
-                          // claiming the same selection with no name on it —
-                          // two nodes per chip for automation to choose
-                          // between, and nothing gained.
-                          M3EChip(
-                            label: prop,
-                            selected: _rowProperties.contains(
-                                prop.toLowerCase().replaceAll(' ', '_')),
-                            onTap: () {
-                              final key =
-                                  prop.toLowerCase().replaceAll(' ', '_');
-                              setSheetState(() {
-                                if (_rowProperties.contains(key)) {
-                                  _rowProperties.remove(key);
-                                } else {
-                                  _rowProperties.add(key);
-                                }
-                              });
-                              setState(() {});
-                            },
-                          ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 24),
-                ],
-              ),
-            ),
-          );
-        },
-      ),
-    ).then((_) => setState(() {}));
-  }
+  /// The shared sheet. This screen used to carry its own 250-line copy of it,
+  /// which had already drifted in five ways — and whose "Grouping" row wrote a
+  /// field the list below never read.
+  void _showDisplayOptions() =>
+      showDisplayOptions(context, _display, () => setState(() {}));
 
   @override
   Widget build(BuildContext context) {
@@ -641,25 +354,27 @@ class _MyIssuesTabState extends ConsumerState<MyIssuesTab>
   static const List<String> _filterModes = ['assigned', 'created', 'all'];
 
   Widget _buildLinearList() {
-    final grouped = groupIssuesByStateGroup(_filteredAndSorted, _allStates);
+    // Grouped by whatever the display sheet says, which is the whole point of
+    // that row. It used to group by state group unconditionally, so choosing
+    // "Priority", "Assignee" or "Label" changed the word on the sheet and
+    // nothing else on the screen.
+    final grouped = _grouped;
     if (grouped.isEmpty) {
-      return ListView(children: [
-        SizedBox(height: MediaQuery.of(context).size.height * 0.2),
-        const Center(
-          child: EmptyStateWidget(
-            message: 'No issues',
-            icon: Icons.check_circle_outline,
-            subtitle: 'All caught up',
-          ),
-        ),
-      ]);
+      return const ScrollableEmptyState(
+        message: 'No issues',
+        icon: Icons.check_circle_outline,
+        subtitle: 'All caught up',
+        padding: EdgeInsets.only(bottom: 100),
+      );
     }
 
     final items = <Widget>[];
     for (final entry in grouped.entries) {
       items.add(SectionHeader(
-        label: groupLabel(entry.key),
-        color: PlaneTheme.stateGroupColor(context, entry.key),
+        label: groupByLabel(_display.groupByField, entry.key),
+        // Every other call site shows the count pill.
+        count: entry.value.length,
+        color: _groupColor(entry.key),
       ));
       for (final issue in entry.value) {
         final state = _allStates[issue.state];
@@ -667,14 +382,14 @@ class _MyIssuesTabState extends ConsumerState<MyIssuesTab>
           issue: issue,
           state: state,
           identifier: _projectIdentifiers[issue.project],
-          showPriority: _rowProperties.contains('priority'),
-          showState: _rowProperties.contains('status'),
+          showPriority: _display.rowProperties.contains('priority'),
+          showState: _display.rowProperties.contains('status'),
           showId: true,
-          showLabels: _rowProperties.contains('labels'),
-          showProject: _rowProperties.contains('project'),
-          showDueDate: _rowProperties.contains('due_date'),
-          showAssignee: _rowProperties.contains('assignee'),
-          maxTitleLines: _maxTitleLines,
+          showLabels: _display.rowProperties.contains('labels'),
+          showProject: _display.rowProperties.contains('project'),
+          showDueDate: _display.rowProperties.contains('due_date'),
+          showAssignee: _display.rowProperties.contains('assignee'),
+          maxTitleLines: _display.maxTitleLines,
           onTap: () async {
             if (issue.project == null) return;
             await Navigator.push(

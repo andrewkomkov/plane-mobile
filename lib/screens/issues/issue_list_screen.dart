@@ -1,17 +1,18 @@
+import 'package:flutter/foundation.dart' show setEquals;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../config/theme.dart';
 import '../../widgets/m3e/icon_button.dart';
 import '../../widgets/m3e/text_field.dart';
 import '../../services/archived_issue_service.dart';
 import '../../services/draft_issue_service.dart';
-import '../../services/issue_service.dart';
 import '../../services/view_service.dart';
+import '../../config/theme.dart';
 import '../../models/draft_issue.dart';
 import '../../models/issue.dart';
 import '../../models/label.dart';
 import '../../models/member.dart';
 import '../../models/state.dart';
+import '../../utils/api_error.dart';
 import '../../utils/issue_grouping.dart';
 import '../../widgets/archive_toggle.dart';
 import '../../widgets/issue_listing_switcher.dart';
@@ -20,7 +21,7 @@ import '../../widgets/section_header.dart';
 import '../../widgets/loading_state.dart';
 import '../../widgets/filter_bar.dart';
 import '../../widgets/display_options.dart';
-import '../../widgets/bottom_sheet_picker.dart';
+import '../../widgets/skeleton_loader.dart';
 import 'issue_create_screen.dart';
 import 'issue_detail_screen.dart';
 
@@ -54,6 +55,14 @@ class IssueListScreen extends ConsumerStatefulWidget {
 class _IssueListScreenState extends ConsumerState<IssueListScreen>
     with AutomaticKeepAliveClientMixin {
   final DisplayState _display = DisplayState();
+
+  /// The four selections the [FilterBar] holds.
+  ///
+  /// Only the selection sets of this are read — [applyFilters] and
+  /// [FilterState.hasActiveFilters] use nothing else. Its sort and grouping
+  /// fields are handed to the bar from [_display] on the way out and written
+  /// back on the way in, so the bar's chips and the display sheet's rows are
+  /// two views of one setting rather than two settings that disagree.
   FilterState _filterState = const FilterState();
 
   /// Which of the three listings is on screen.
@@ -185,64 +194,109 @@ class _IssueListScreenState extends ConsumerState<IssueListScreen>
     }
   }
 
+  /// What the [FilterBar] is shown, which is the four selections plus the
+  /// ordering and grouping [_display] holds. See [_filterState].
+  FilterState get _barState => _filterState.copyWith(
+        sortField: _display.sortField,
+        sortAscending: !_display.sortNewest,
+        groupBy: _display.groupByField,
+      );
+
+  /// Takes what the bar changed, and keeps the two controls in step.
+  ///
+  /// The bar can produce three kinds of change, and only one of them is about
+  /// ordering: its four filter sheets keep the ordering they were handed, its
+  /// sort and group sheets keep the selections they were handed, and its
+  /// "Clear" chip resets both at once. Adopting the incoming ordering only when
+  /// the selections did not move is what tells the third case from the second —
+  /// otherwise clearing a filter would silently throw away a grouping the user
+  /// chose in the display sheet.
+  void _onFilterChanged(FilterState next) {
+    final sameSelection = setEquals(
+            next.selectedStates, _filterState.selectedStates) &&
+        setEquals(next.selectedPriorities, _filterState.selectedPriorities) &&
+        setEquals(next.selectedAssignees, _filterState.selectedAssignees) &&
+        setEquals(next.selectedLabels, _filterState.selectedLabels);
+    setState(() {
+      _filterState = next;
+      if (sameSelection) {
+        _display.grouping = _groupingKeys[next.groupBy]!;
+        _display.ordering = _orderingKeys[next.sortField]!;
+        _display.sortNewest = !next.sortAscending;
+      }
+    });
+  }
+
+  /// The inverse of [DisplayState.groupByField] and [DisplayState.sortField],
+  /// which the shared state offers in one direction only.
+  static const _groupingKeys = {
+    GroupByField.state: 'state',
+    GroupByField.priority: 'priority',
+    GroupByField.assignee: 'assignee',
+    GroupByField.label: 'label',
+  };
+
+  static const _orderingKeys = {
+    SortField.createdAt: 'created',
+    SortField.updatedAt: 'updated',
+    SortField.priority: 'priority',
+  };
+
+  /// Stores the current filters as a project view, which is the only way to
+  /// create one anywhere in the app.
   Future<void> _saveAsView() async {
+    final controller = TextEditingController();
     final name = await showDialog<String>(
       context: context,
-      builder: (ctx) {
-        final controller = TextEditingController();
-        return AlertDialog(
-          title: const Text('Save as View'),
-          content: M3ETextField(
-            label: 'View name',
-            controller: controller,
-            autofocus: true,
-          ),
-          actions: [
-            TextButton(
-                onPressed: () => Navigator.pop(ctx),
-                child: const Text('Cancel')),
-            TextButton(
-                onPressed: () => Navigator.pop(ctx, controller.text.trim()),
-                child: const Text('Save')),
-          ],
-        );
-      },
+      builder: (ctx) => AlertDialog(
+        title: const Text('Save as view'),
+        content: M3ETextField(
+          label: 'View name',
+          controller: controller,
+          autofocus: true,
+        ),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+          TextButton(
+              onPressed: () => Navigator.pop(ctx, controller.text.trim()),
+              child: const Text('Save')),
+        ],
+      ),
     );
-    if (name != null && name.isNotEmpty) {
-      final queryData = <String, dynamic>{};
-      if (_filterState.selectedStates.isNotEmpty) {
-        queryData['state'] = _filterState.selectedStates.toList();
-      }
-      if (_filterState.selectedPriorities.isNotEmpty) {
-        queryData['priority'] = _filterState.selectedPriorities.toList();
-      }
-      if (_filterState.selectedAssignees.isNotEmpty) {
-        queryData['assignees'] = _filterState.selectedAssignees.toList();
-      }
-      if (_filterState.selectedLabels.isNotEmpty) {
-        queryData['label'] = _filterState.selectedLabels.toList();
-      }
-      try {
-        await ViewService.createView(
-          widget.workspaceSlug,
-          widget.projectId,
-          {'name': name, 'query_data': queryData},
-        );
-        if (mounted) {
-          ScaffoldMessenger.of(context)
-              .showSnackBar(const SnackBar(content: Text('View saved')));
-        }
-      } catch (e) {
-        if (mounted) {
-          ScaffoldMessenger.of(context)
-              .showSnackBar(SnackBar(content: Text('Error: $e')));
-        }
-      }
+    controller.dispose();
+    if (name == null || name.isEmpty || !mounted) return;
+
+    final messenger = ScaffoldMessenger.of(context);
+    final queryData = <String, dynamic>{};
+    if (_filterState.selectedStates.isNotEmpty) {
+      queryData['state'] = _filterState.selectedStates.toList();
+    }
+    if (_filterState.selectedPriorities.isNotEmpty) {
+      queryData['priority'] = _filterState.selectedPriorities.toList();
+    }
+    if (_filterState.selectedAssignees.isNotEmpty) {
+      queryData['assignees'] = _filterState.selectedAssignees.toList();
+    }
+    if (_filterState.selectedLabels.isNotEmpty) {
+      queryData['label'] = _filterState.selectedLabels.toList();
+    }
+    try {
+      await ViewService.createView(
+        widget.workspaceSlug,
+        widget.projectId,
+        {'name': name, 'query_data': queryData},
+      );
+      messenger.showSnackBar(SnackBar(content: Text('Saved view "$name"')));
+    } catch (e) {
+      // The exception used to be dumped at the user verbatim.
+      messenger.showSnackBar(SnackBar(
+          content: Text(describeApiError(e, fallback: 'Could not save view'))));
     }
   }
 
   List<Issue> get _filteredAndSorted {
-    var result = _issues.toList();
+    var result = applyFilters(_issues, _filterState);
     // Completed filter
     if (_display.completedFilter == 'none') {
       result = result.where((i) {
@@ -292,68 +346,86 @@ class _IssueListScreenState extends ConsumerState<IssueListScreen>
     final theme = Theme.of(context);
 
     final secondary = theme.colorScheme.onSurfaceVariant;
-    return Scaffold(
-      body: Column(
-        children: [
-          // Minimal header: which listing, and the display sheet for the one
-          // listing that has anything to display-option.
-          //
-          // The per-listing count used to live here as a leading label. It now
-          // sits on the section header of whichever list is showing, where the
-          // live list's group counts already were — so nothing was lost and the
-          // switcher gets the width it needs at large font scales.
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-            child: Row(
-              children: [
-                Expanded(
-                  child: IssueListingSwitcher(
-                    value: _listing,
-                    onChanged: _selectListing,
-                  ),
+    // A plain Column, not a Scaffold: this is one of four view modes inside
+    // IssuesTabScreen's Column, inside ProjectScreen's Scaffold, and the other
+    // three do not paint a second scaffold background.
+    return Column(
+      children: [
+        // Minimal header: which listing, and the display sheet for the one
+        // listing that has anything to display-option.
+        //
+        // The per-listing count used to live here as a leading label. It now
+        // sits on the section header of whichever list is showing, where the
+        // live list's group counts already were — so nothing was lost and the
+        // switcher gets the width it needs at large font scales.
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+          child: Row(
+            children: [
+              Expanded(
+                child: IssueListingSwitcher(
+                  value: _listing,
+                  onChanged: _selectListing,
                 ),
-                const SizedBox(width: 8),
-                // A fixed slot rather than a conditional child: the button is
-                // only offered on the live list, and without reserving its
-                // width the switcher would resize every time the listing
-                // changed, under the finger that changed it.
-                SizedBox(
-                  // The slot is the touch-target minimum, not the button's
-                  // visible diameter. `M3EIconButtonSize.small.container` is
-                  // 40, which tightly constrained the 48dp box the button
-                  // builds for itself and silently cancelled its guarantee.
-                  width: kMinInteractiveDimension,
-                  child: _listing == IssueListing.live
-                      // The display sheet drives grouping and sorting, neither
-                      // of which the drafts or archive listings use.
-                      ? M3EIconButton(
-                          icon: Icons.tune,
-                          tooltip: 'Display options',
-                          size: M3EIconButtonSize.small,
-                          color: secondary,
-                          onPressed: () => showDisplayOptions(
-                              context, _display, () => setState(() {})),
-                        )
-                      : null,
-                ),
-              ],
-            ),
+              ),
+              const SizedBox(width: 8),
+              // A fixed slot rather than a conditional child: the button is
+              // only offered on the live list, and without reserving its
+              // width the switcher would resize every time the listing
+              // changed, under the finger that changed it.
+              SizedBox(
+                // The slot is the touch-target minimum, not the button's
+                // visible diameter. `M3EIconButtonSize.small.container` is
+                // 40, which tightly constrained the 48dp box the button
+                // builds for itself and silently cancelled its guarantee.
+                width: kMinInteractiveDimension,
+                child: _listing == IssueListing.live
+                    // The display sheet drives grouping and sorting, neither
+                    // of which the drafts or archive listings use.
+                    ? M3EIconButton(
+                        icon: Icons.tune,
+                        tooltip: 'Display options',
+                        size: M3EIconButtonSize.small,
+                        color: secondary,
+                        onPressed: () => showDisplayOptions(
+                          context,
+                          _display,
+                          // The bar beside it shows the same ordering and
+                          // grouping, so it has to be rebuilt too.
+                          () => setState(() {}),
+                        ),
+                      )
+                    : null,
+              ),
+            ],
           ),
-          Expanded(
-            child: switch (_listing) {
-              IssueListing.live => _liveList(),
-              IssueListing.drafts => RefreshIndicator(
-                  onRefresh: _loadDrafts,
-                  child: _draftsList(),
-                ),
-              IssueListing.archived => RefreshIndicator(
-                  onRefresh: _loadArchived,
-                  child: _archivedList(),
-                ),
-            },
+        ),
+        // Filters, for the one listing that has any. The drafts and archive
+        // listings come back from their own endpoints unfiltered, and the
+        // display sheet is not offered on them either.
+        if (_listing == IssueListing.live)
+          FilterBar(
+            filterState: _barState,
+            states: _states,
+            labels: _labels,
+            members: _members,
+            onFilterChanged: _onFilterChanged,
+            onSaveAsView: _saveAsView,
           ),
-        ],
-      ),
+        Expanded(
+          child: switch (_listing) {
+            IssueListing.live => _liveList(),
+            IssueListing.drafts => RefreshIndicator(
+                onRefresh: _loadDrafts,
+                child: _draftsList(),
+              ),
+            IssueListing.archived => RefreshIndicator(
+                onRefresh: _loadArchived,
+                child: _archivedList(),
+              ),
+          },
+        ),
+      ],
     );
   }
 
@@ -365,23 +437,19 @@ class _IssueListScreenState extends ConsumerState<IssueListScreen>
       );
     }
     if (_drafts == null && _draftsLoading) {
-      return const LoadingStateWidget();
+      // The same skeleton the live list beside it uses. A spinner here and a
+      // skeleton one tab over is two answers to one question.
+      return const IssueListSkeleton();
     }
     final drafts = _draftIssues;
     if (drafts.isEmpty) {
-      return ListView(children: [
-        SizedBox(height: MediaQuery.of(context).size.height * 0.25),
-        const Center(
-          child: EmptyStateWidget(
-            message: 'No drafts',
-            icon: Icons.edit_note,
-            // Both halves are worth saying: the endpoint only ever returns the
-            // caller's own drafts, and it is the same set the web client
-            // writes to.
-            subtitle: 'Your unfinished work items, saved here or on the web',
-          ),
-        ),
-      ]);
+      return const ScrollableEmptyState(
+        message: 'No drafts',
+        icon: Icons.edit_note,
+        // Both halves are worth saying: the endpoint only ever returns the
+        // caller's own drafts, and it is the same set the web client writes to.
+        subtitle: 'Your unfinished work items, saved here or on the web',
+      );
     }
     return ListView.builder(
       itemCount: drafts.length + 1,
@@ -422,20 +490,15 @@ class _IssueListScreenState extends ConsumerState<IssueListScreen>
       );
     }
     if (_archived == null && _archivedLoading) {
-      return const LoadingStateWidget();
+      return const IssueListSkeleton();
     }
     final archived = _archivedIssues;
     if (archived.isEmpty) {
-      return ListView(children: [
-        SizedBox(height: MediaQuery.of(context).size.height * 0.25),
-        const Center(
-          child: EmptyStateWidget(
-            message: 'No archived work items',
-            icon: Icons.inventory_2_outlined,
-            subtitle: 'Work items archived here or on the web appear here',
-          ),
-        ),
-      ]);
+      return const ScrollableEmptyState(
+        message: 'No archived work items',
+        icon: Icons.inventory_2_outlined,
+        subtitle: 'Work items archived here or on the web appear here',
+      );
     }
     return ListView.builder(
       itemCount: archived.length + 1,
@@ -484,20 +547,15 @@ class _IssueListScreenState extends ConsumerState<IssueListScreen>
     return RefreshIndicator(
       onRefresh: widget.onRefresh,
       child: _filteredAndSorted.isEmpty
-          ? ListView(children: [
-              SizedBox(height: MediaQuery.of(context).size.height * 0.25),
-              Center(
-                child: EmptyStateWidget(
-                  message: _filterState.hasActiveFilters
-                      ? 'No issues match filters'
-                      : 'No issues',
-                  icon: Icons.check_circle_outline,
-                  subtitle: _filterState.hasActiveFilters
-                      ? 'Try adjusting your filters'
-                      : null,
-                ),
-              ),
-            ])
+          ? ScrollableEmptyState(
+              message: _filterState.hasActiveFilters
+                  ? 'No work items match these filters'
+                  : 'No work items',
+              icon: Icons.check_circle_outline,
+              subtitle: _filterState.hasActiveFilters
+                  ? 'Clear a filter to see more'
+                  : 'Start one with New issue, at the top of the screen',
+            )
           : ListView.builder(
               itemCount: grouped.entries
                   .fold<int>(0, (sum, e) => sum + 1 + e.value.length),

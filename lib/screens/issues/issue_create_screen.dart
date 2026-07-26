@@ -5,6 +5,8 @@ import '../../config/m3e/typography.dart';
 import '../../widgets/m3e/app_bar.dart';
 import '../../widgets/m3e/loading_indicator.dart';
 import '../../widgets/m3e/text_field.dart';
+import '../../widgets/bottom_sheet_picker.dart';
+import '../../widgets/confirm_dialog.dart';
 import '../../config/theme.dart';
 import '../../models/draft_issue.dart';
 import '../../services/draft_issue_service.dart';
@@ -258,25 +260,17 @@ class _IssueCreateScreenState extends State<IssueCreateScreen> {
   Future<void> _discardDraft() async {
     final draft = _draft;
     if (draft == null) return;
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Discard draft?'),
-        content: const Text(
-            'This draft will be deleted. Plane offers no way to bring it back.'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Keep'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Discard'),
-          ),
-        ],
-      ),
+    // The shared confirm. Its "Discard" carries the error role, where this
+    // dialog's own was styled exactly like the button that keeps the draft.
+    final confirmed = await confirmDestructive(
+      context,
+      title: 'Discard draft?',
+      message:
+          'This draft will be deleted. Plane offers no way to bring it back.',
+      confirmLabel: 'Discard',
+      cancelLabel: 'Keep',
     );
-    if (confirmed != true) return;
+    if (!confirmed) return;
     await _run(_Busy.discarding, () async {
       await DraftIssueService.deleteDraft(widget.workspaceSlug, draft.id);
       return IssueCreateOutcome.draftDiscarded;
@@ -351,7 +345,7 @@ class _IssueCreateScreenState extends State<IssueCreateScreen> {
             // Markdown hint
             Row(
               children: [
-                Icon(Icons.code, size: 14, color: hintColor),
+                Icon(Icons.code, size: PlaneTheme.iconSmall, color: hintColor),
                 const SizedBox(width: 6),
                 Text(
                   'MARKDOWN SUPPORTED',
@@ -364,126 +358,44 @@ class _IssueCreateScreenState extends State<IssueCreateScreen> {
               const _RichTextWarning(),
             ],
             const SizedBox(height: 24),
-            // Status & Priority row
+            // Status & Priority row. One widget drawn twice: the two used to
+            // be forty lines of copy-paste that had already begun to differ in
+            // their leading glyph's size.
             Row(
               children: [
                 Expanded(
-                  // The card reads as an input but is a raw GestureDetector:
-                  // it announced "STATUS Backlog" with no button role, and
-                  // deferToChild meant only the glyphs answered a tap, not the
-                  // 16dp of padding that looks like part of the control.
-                  child: Semantics(
-                    label: 'Status: ${_currentState?.name ?? 'Backlog'}. '
+                  child: _PickerField(
+                    label: 'STATUS',
+                    // A state with no colour of its own would draw the backlog
+                    // swatch and the word "Backlog", which is a real state in
+                    // every Plane project — "nothing chosen" has to look
+                    // different from "Backlog chosen".
+                    isSet: _currentState != null,
+                    leading: _StateDot(state: _currentState),
+                    value: _currentState?.name ?? 'No status',
+                    semanticLabel:
+                        'Status: ${_currentState?.name ?? 'none chosen'}. '
                         'Change status',
-                    button: true,
-                    container: true,
-                    excludeSemantics: true,
                     onTap: _showStatePicker,
-                    child: GestureDetector(
-                      onTap: () => _showStatePicker(),
-                      behavior: HitTestBehavior.opaque,
-                      child: Container(
-                        padding: const EdgeInsets.all(16),
-                        decoration: BoxDecoration(
-                          color: scheme.surfaceContainerLow,
-                          borderRadius: BorderRadius.circular(M3EShape.large),
-                          // Same outline as the fields above — these are inputs
-                          // too, they just open a sheet instead of a keyboard.
-                          border: Border.all(
-                              color: scheme.outlineVariant, width: 0.8),
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'STATUS',
-                              style: M3EType.overline(scheme.onSurfaceVariant),
-                            ),
-                            const SizedBox(height: 8),
-                            Row(
-                              children: [
-                                Container(
-                                  width: 8,
-                                  height: 8,
-                                  decoration: BoxDecoration(
-                                    shape: BoxShape.circle,
-                                    color: _currentState != null
-                                        ? PlaneTheme.stateGroupColor(
-                                            context, _currentState!.group)
-                                        : PlaneTheme.backlog,
-                                  ),
-                                ),
-                                const SizedBox(width: 8),
-                                Expanded(
-                                  child: Text(
-                                    _currentState?.name ?? 'Backlog',
-                                    style: theme.textTheme.labelLarge,
-                                  ),
-                                ),
-                                Icon(Icons.expand_more,
-                                    size: 18, color: scheme.onSurfaceVariant),
-                              ],
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
                   ),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
-                  // Same treatment as the status card beside it.
-                  child: Semantics(
-                    label: 'Priority: '
+                  child: _PickerField(
+                    label: 'PRIORITY',
+                    isSet: true,
+                    leading: Icon(
+                      PlaneTheme.priorityIcon(_selectedPriority),
+                      size: PlaneTheme.iconMedium,
+                      color:
+                          PlaneTheme.priorityColor(context, _selectedPriority),
+                    ),
+                    value: _selectedPriority[0].toUpperCase() +
+                        _selectedPriority.substring(1),
+                    semanticLabel: 'Priority: '
                         '${_selectedPriority[0].toUpperCase()}'
                         '${_selectedPriority.substring(1)}. Change priority',
-                    button: true,
-                    container: true,
-                    excludeSemantics: true,
                     onTap: _showPriorityPicker,
-                    child: GestureDetector(
-                      onTap: () => _showPriorityPicker(),
-                      behavior: HitTestBehavior.opaque,
-                      child: Container(
-                        padding: const EdgeInsets.all(16),
-                        decoration: BoxDecoration(
-                          color: scheme.surfaceContainerLow,
-                          borderRadius: BorderRadius.circular(M3EShape.large),
-                          border: Border.all(
-                              color: scheme.outlineVariant, width: 0.8),
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'PRIORITY',
-                              style: M3EType.overline(scheme.onSurfaceVariant),
-                            ),
-                            const SizedBox(height: 8),
-                            Row(
-                              children: [
-                                Icon(
-                                  PlaneTheme.priorityIcon(_selectedPriority),
-                                  size: 16,
-                                  color: PlaneTheme.priorityColor(
-                                      context, _selectedPriority),
-                                ),
-                                const SizedBox(width: 8),
-                                Expanded(
-                                  child: Text(
-                                    _selectedPriority[0].toUpperCase() +
-                                        _selectedPriority.substring(1),
-                                    style: theme.textTheme.labelLarge,
-                                  ),
-                                ),
-                                Icon(Icons.expand_more,
-                                    size: 18, color: scheme.onSurfaceVariant),
-                              ],
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
                   ),
                 ),
               ],
@@ -504,67 +416,140 @@ class _IssueCreateScreenState extends State<IssueCreateScreen> {
     );
   }
 
-  void _showStatePicker() {
-    showModalBottomSheet(
+  Future<void> _showStatePicker() async {
+    final chosen = await BottomSheetPicker.show<String>(
       context: context,
-      builder: (ctx) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Padding(
-              padding: const EdgeInsets.all(16),
-              child: Text('Status', style: Theme.of(ctx).textTheme.titleLarge),
-            ),
-            ...widget.states.values.map((s) => ListTile(
-                  leading: Icon(
-                    PlaneTheme.stateIcon(s.group),
-                    size: 18,
-                    color: PlaneTheme.stateGroupColor(context, s.group),
-                  ),
-                  title:
-                      Text(s.name, style: Theme.of(ctx).textTheme.bodyMedium),
-                  trailing: _selectedState == s.id
-                      ? const Icon(Icons.check, size: 18)
-                      : null,
-                  onTap: () {
-                    setState(() => _selectedState = s.id);
-                    Navigator.pop(ctx);
-                  },
-                )),
-          ],
-        ),
+      title: 'Status',
+      selectedValue: _selectedState,
+      items: widget.states.values
+          .map((s) => BottomSheetPickerItem(
+                value: s.id,
+                label: s.name,
+                icon: PlaneTheme.stateIcon(s.group),
+                iconColor: PlaneTheme.stateGroupColor(context, s.group),
+              ))
+          .toList(),
+    );
+    if (chosen != null && mounted) setState(() => _selectedState = chosen);
+  }
+
+  Future<void> _showPriorityPicker() async {
+    final chosen = await BottomSheetPicker.show<String>(
+      context: context,
+      title: 'Priority',
+      selectedValue: _selectedPriority,
+      items: ['urgent', 'high', 'medium', 'low', 'none']
+          .map((p) => BottomSheetPickerItem(
+                value: p,
+                label: p[0].toUpperCase() + p.substring(1),
+                icon: PlaneTheme.priorityIcon(p),
+                iconColor: PlaneTheme.priorityColor(context, p),
+              ))
+          .toList(),
+    );
+    if (chosen != null && mounted) setState(() => _selectedPriority = chosen);
+  }
+}
+
+/// The dot in front of the status field.
+///
+/// Unset draws a hollow ring rather than a filled swatch, because a filled one
+/// in the backlog hue is indistinguishable from having chosen Backlog.
+class _StateDot extends StatelessWidget {
+  final IssueState? state;
+
+  const _StateDot({required this.state});
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final set = state != null;
+    final color = set
+        ? PlaneTheme.stateGroupColor(context, state!.group)
+        : scheme.outline;
+    return Container(
+      width: 8,
+      height: 8,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        color: set ? color : null,
+        border: set ? null : Border.all(color: color, width: 1),
       ),
     );
   }
+}
 
-  void _showPriorityPicker() {
-    showModalBottomSheet(
-      context: context,
-      builder: (ctx) => SafeArea(
+/// A field that opens a sheet instead of a keyboard.
+///
+/// It is drawn as an input because that is what it is, and it carries the same
+/// outline as the text fields above it. The status and priority cards were two
+/// copies of this.
+class _PickerField extends StatelessWidget {
+  final String label;
+  final Widget leading;
+  final String value;
+
+  /// False when [value] is a placeholder. It then takes the quiet, italic cut
+  /// so a chosen value and an unchosen one are not one colour apart.
+  final bool isSet;
+  final String semanticLabel;
+  final VoidCallback onTap;
+
+  const _PickerField({
+    required this.label,
+    required this.leading,
+    required this.value,
+    required this.isSet,
+    required this.semanticLabel,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+
+    // M3EPressable rather than a bare GestureDetector: it hit-tests opaquely
+    // over the whole card — the 16dp of padding that looks like part of the
+    // control answers a tap too — and it brings the press spring every other
+    // surface in the app has.
+    return M3EPressable(
+      pressedScale: 0.98,
+      semanticLabel: semanticLabel,
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: scheme.surfaceContainerLow,
+          borderRadius: BorderRadius.circular(M3EShape.large),
+          border: Border.all(color: scheme.outlineVariant, width: 0.8),
+        ),
         child: Column(
-          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Padding(
-              padding: const EdgeInsets.all(16),
-              child:
-                  Text('Priority', style: Theme.of(ctx).textTheme.titleLarge),
-            ),
-            ...['urgent', 'high', 'medium', 'low', 'none'].map((p) => ListTile(
-                  leading: Icon(
-                    PlaneTheme.priorityIcon(p),
-                    size: 18,
-                    color: PlaneTheme.priorityColor(context, p),
+            Text(label, style: M3EType.overline(scheme.onSurfaceVariant)),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                leading,
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    value,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: isSet
+                        ? theme.textTheme.labelLarge
+                        : theme.textTheme.labelLarge?.copyWith(
+                            color: scheme.onSurfaceVariant,
+                            fontStyle: FontStyle.italic,
+                          ),
                   ),
-                  title: Text(p[0].toUpperCase() + p.substring(1),
-                      style: Theme.of(ctx).textTheme.bodyMedium),
-                  trailing: _selectedPriority == p
-                      ? const Icon(Icons.check, size: 18)
-                      : null,
-                  onTap: () {
-                    setState(() => _selectedPriority = p);
-                    Navigator.pop(ctx);
-                  },
-                )),
+                ),
+                Icon(Icons.expand_more,
+                    size: PlaneTheme.iconLarge, color: scheme.onSurfaceVariant),
+              ],
+            ),
           ],
         ),
       ),
@@ -632,7 +617,12 @@ class _BarAction extends StatelessWidget {
                     child: Text(
                       label,
                       style: theme.textTheme.labelLarge?.copyWith(
-                        color: foreground,
+                        // Dimming the fill and leaving the label at full
+                        // strength does not read as disabled. 0.38 on the
+                        // foreground is what M3EIconButton uses.
+                        color: onTap == null
+                            ? foreground.withValues(alpha: 0.38)
+                            : foreground,
                       ),
                     ),
                   ),
@@ -664,7 +654,8 @@ class _RichTextWarning extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(Icons.info_outline, size: 16, color: scheme.onSurfaceVariant),
+          Icon(Icons.info_outline,
+              size: PlaneTheme.iconMedium, color: scheme.onSurfaceVariant),
           const SizedBox(width: 8),
           Expanded(
             child: Text(
@@ -713,7 +704,8 @@ class _DiscardDraftButton extends StatelessWidget {
                   if (busy)
                     const M3ELoadingIndicator(size: 16)
                   else
-                    Icon(Icons.delete_outline, size: 18, color: scheme.error),
+                    Icon(Icons.delete_outline,
+                        size: PlaneTheme.iconLarge, color: scheme.error),
                   const SizedBox(width: 8),
                   Text(
                     'Discard draft',

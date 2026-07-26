@@ -1,11 +1,14 @@
 import 'package:flutter/material.dart';
+import '../../config/m3e/motion.dart';
 import '../../config/m3e/shapes.dart';
 import '../../config/theme.dart';
 import '../../models/issue.dart';
 import '../../models/state.dart';
 import '../../services/issue_service.dart';
 import '../../widgets/issue_row.dart';
+import '../../widgets/loading_state.dart';
 import '../../widgets/plane_row.dart';
+import '../../widgets/section_header.dart';
 import 'issue_detail_screen.dart';
 
 class KanbanBoardScreen extends StatefulWidget {
@@ -107,86 +110,80 @@ class _KanbanBoardScreenState extends State<KanbanBoardScreen> {
               // this label, so the drop target reports its name once and the
               // cards below keep theirs.
               explicitChildNodes: true,
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 200),
-                width: 280,
-                margin: const EdgeInsets.only(right: 8, top: 8, bottom: 8),
-                decoration: isTarget
-                    ? BoxDecoration(
-                        borderRadius: BorderRadius.circular(M3EShape.large),
-                        // Drop targets read through the tint, not through a
-                        // thicker outline — one border width across the board.
-                        border: Border.all(
-                          color: theme.colorScheme.primary,
-                          width: 0.8,
-                        ),
-                        color:
-                            theme.colorScheme.primary.withValues(alpha: 0.05),
-                      )
-                    : null,
+              // A tint and a border are effects, not travel, so this is the
+              // critically damped effects spring rather than a hand-picked
+              // 200ms curve — a drop highlight that overshoots reads as a
+              // wobble under the finger.
+              child: M3ESpringBuilder(
+                value: isTarget ? 1 : 0,
+                spring: M3EMotion.defaultEffects,
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Column header
-                    Padding(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 8, vertical: 8),
-                      child: Row(
-                        children: [
-                          Icon(
-                            PlaneTheme.stateIcon(state?.group ?? 'backlog'),
-                            size: PlaneTheme.iconSmall,
-                            color: PlaneTheme.stateGroupColor(
-                                context, state?.group ?? 'backlog'),
-                          ),
-                          const SizedBox(width: 6),
-                          Text(
-                            state?.name ?? 'Unknown',
-                            style: theme.textTheme.titleSmall?.copyWith(
-                              color: theme.colorScheme.onSurfaceVariant,
-                            ),
-                          ),
-                          const SizedBox(width: 6),
-                          Text(
-                            '${columnIssues.length}',
-                            style: theme.textTheme.labelSmall?.copyWith(
-                              color: theme.colorScheme.onSurfaceVariant
-                                  .withValues(alpha: 0.6),
-                            ),
-                          ),
-                        ],
-                      ),
+                    // The same group header the list view draws for the same
+                    // states. The board used to invent its own — icon plus
+                    // titleSmall plus a faded count — so one project's states
+                    // looked like two different things in two view modes.
+                    SectionHeader(
+                      label: state?.name ?? 'Unknown',
+                      count: columnIssues.length,
+                      color: PlaneTheme.stateGroupColor(
+                          context, state?.group ?? 'backlog'),
                     ),
                     // Cards
                     Expanded(
-                      child: ListView.builder(
-                        itemCount: columnIssues.length,
-                        itemBuilder: (ctx, j) {
-                          final issue = columnIssues[j];
-                          return _DraggableKanbanCard(
-                            issue: issue,
-                            identifier: widget.projectIdentifier,
-                            stateName: state?.name ?? 'Unknown',
-                            onTap: () async {
-                              await Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (_) => IssueDetailScreen(
-                                      workspaceSlug: widget.workspaceSlug,
-                                      projectId: widget.projectId,
-                                      issueId: issue.id,
-                                      projectIdentifier:
-                                          widget.projectIdentifier,
-                                      states: widget.states,
-                                    ),
-                                  ));
-                              widget.onRefresh();
-                            },
-                          );
-                        },
-                      ),
+                      child: columnIssues.isEmpty
+                          ? const EmptyStateWidget(
+                              message: 'Empty',
+                              subtitle: 'Drag a card here to move it',
+                            )
+                          : ListView.builder(
+                              itemCount: columnIssues.length,
+                              itemBuilder: (ctx, j) {
+                                final issue = columnIssues[j];
+                                return _DraggableKanbanCard(
+                                  issue: issue,
+                                  identifier: widget.projectIdentifier,
+                                  stateName: state?.name ?? 'Unknown',
+                                  onTap: () async {
+                                    await Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder: (_) => IssueDetailScreen(
+                                            workspaceSlug: widget.workspaceSlug,
+                                            projectId: widget.projectId,
+                                            issueId: issue.id,
+                                            projectIdentifier:
+                                                widget.projectIdentifier,
+                                            states: widget.states,
+                                          ),
+                                        ));
+                                    widget.onRefresh();
+                                  },
+                                );
+                              },
+                            ),
                     ),
                   ],
+                ),
+                builder: (ctx, t, child) => Container(
+                  width: 280,
+                  margin: const EdgeInsets.only(right: 8, top: 8, bottom: 8),
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(M3EShape.large),
+                    // Drawn at rest as well, transparent. The border used to
+                    // appear only while a card hovered, so accepting one
+                    // shifted the whole column's content inward by its width
+                    // at the same moment the user was aiming at it.
+                    border: Border.all(
+                      color: theme.colorScheme.primary
+                          .withValues(alpha: t.clamp(0.0, 1.0)),
+                      width: 0.8,
+                    ),
+                    color: theme.colorScheme.primary
+                        .withValues(alpha: (0.05 * t).clamp(0.0, 1.0)),
+                  ),
+                  child: child,
                 ),
               ),
             );

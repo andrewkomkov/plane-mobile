@@ -6,6 +6,7 @@ import '../../models/state.dart';
 import '../../models/label.dart';
 import '../../models/member.dart';
 import '../../providers/data_providers.dart';
+import '../../widgets/loading_state.dart';
 import '../../widgets/skeleton_loader.dart';
 import 'issue_list_screen.dart';
 import 'kanban_board_screen.dart';
@@ -35,6 +36,11 @@ class _IssuesTabScreenState extends ConsumerState<IssuesTabScreen>
   _ViewMode _viewMode = _ViewMode.list;
   bool _initialLoading = true;
 
+  /// Set when the first load fails. This screen owns the data for all four view
+  /// modes, so without it a failed fetch left every one of them showing its
+  /// empty state — "this project has no work items" is not what happened.
+  bool _failed = false;
+
   @override
   bool get wantKeepAlive => true;
 
@@ -48,12 +54,22 @@ class _IssuesTabScreenState extends ConsumerState<IssuesTabScreen>
 
   Future<void> _load() async {
     final cache = _cache;
-    // Load states + issues in parallel (deduped by cache)
-    await cache.loadProjectCoreData(widget.workspaceSlug, widget.projectId);
-    if (mounted) setState(() => _initialLoading = false);
-    // Load labels + members in background
-    await cache.loadProjectExtras(widget.workspaceSlug, widget.projectId);
-    if (mounted) setState(() {});
+    if (_failed) setState(() => _failed = false);
+    try {
+      // Load states + issues in parallel (deduped by cache)
+      await cache.loadProjectCoreData(widget.workspaceSlug, widget.projectId);
+      if (mounted) setState(() => _initialLoading = false);
+      // Load labels + members in background
+      await cache.loadProjectExtras(widget.workspaceSlug, widget.projectId);
+      if (mounted) setState(() {});
+    } catch (_) {
+      if (mounted) {
+        setState(() {
+          _initialLoading = false;
+          _failed = true;
+        });
+      }
+    }
   }
 
   Future<void> _refresh() async {
@@ -73,22 +89,20 @@ class _IssuesTabScreenState extends ConsumerState<IssuesTabScreen>
   List<Member> get _members =>
       _cache.getMembers(widget.workspaceSlug, widget.projectId) ?? [];
 
-  bool get _fromCache {
-    final cache = _cache;
-    return cache.isIssuesLoading(widget.workspaceSlug, widget.projectId) &&
-        _issues.isNotEmpty;
-  }
-
-  bool get _refreshing =>
-      _cache.isIssuesLoading(widget.workspaceSlug, widget.projectId) &&
-      _issues.isNotEmpty;
-
   @override
   Widget build(BuildContext context) {
     super.build(context);
 
     if (_initialLoading && _issues.isEmpty) {
       return const IssueListSkeleton();
+    }
+    // Only when there is nothing to show. A refresh that fails over a list
+    // already on screen keeps the stale rows, as the sibling list screens do.
+    if (_failed && _issues.isEmpty) {
+      return ErrorStateWidget(
+        message: 'Failed to load work items',
+        onRetry: _load,
+      );
     }
 
     return Column(
