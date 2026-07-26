@@ -16,6 +16,7 @@ import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialExpressiveTheme
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.MotionScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -26,6 +27,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.ComposeView
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.setViewTreeLifecycleOwner
 import androidx.lifecycle.setViewTreeViewModelStoreOwner
@@ -131,8 +134,13 @@ private data class HostColors(
 
 /**
  * ButtonGroup requires an overflow indicator for the case where items do not
- * fit. The groups here are short and fixed, so nothing ever overflows and the
- * indicator draws nothing.
+ * fit. Every item here is weighted, so the group always divides the width it is
+ * given and the overflow path is never taken — this draws nothing.
+ *
+ * It has to stay that way. An indicator that measures to zero is fine only
+ * while overflow is unreachable: the overflow branch in 1.5.0-alpha24 measures
+ * the remaining width as `remaining + indicatorWidth`, which goes negative and
+ * throws. Dropping the weights would make this reachable again.
  *
  * This is a named composable rather than an inline `{}` on purpose: an empty
  * composable lambda literal trips a codegen crash in the Kotlin 2.1 compiler
@@ -141,6 +149,13 @@ private data class HostColors(
 @Composable
 private fun NoOverflow(@Suppress("UNUSED_PARAMETER") state: ButtonGroupMenuState) {
 }
+
+/**
+ * Everything a toggle button spends on width that is not the label itself —
+ * content padding either side. Only the ratio between items matters here, so
+ * this needs to be about right rather than exact.
+ */
+private val ToggleButtonChrome = 48.dp
 
 @Composable
 private fun ExpressiveHost(colors: HostColors, content: @Composable () -> Unit) {
@@ -188,6 +203,25 @@ private class ButtonGroupView(
         var selected by remember { mutableIntStateOf(initialIndex) }
 
         ExpressiveHost(colors) {
+            val measurer = rememberTextMeasurer()
+            val labelStyle = MaterialTheme.typography.labelLarge
+            val density = LocalDensity.current
+
+            // Weights are the width each button would take if it sized itself:
+            // its measured label plus the button's own padding. ButtonGroup then
+            // hands out the width it actually has in those proportions, so the
+            // row reads like a content-sized group and still fits exactly.
+            //
+            // Equal weights would be simpler but wrong at the sizes that matter:
+            // "Calendar" is roughly twice "List", so an even split visibly cuts
+            // it off on a 360dp screen. Splitting proportionally means the
+            // shortfall on a narrow screen is a few pixels spread across four
+            // buttons rather than all of it landing on the longest label.
+            val weights = remember(labels, labelStyle, density) {
+                val chrome = with(density) { ToggleButtonChrome.toPx() }
+                labels.map { measurer.measure(it, labelStyle).size.width + chrome }
+            }
+
             Box(
                 modifier = Modifier.fillMaxSize(),
                 contentAlignment = Alignment.Center,
@@ -204,6 +238,15 @@ private class ButtonGroupView(
                                 selected = index
                                 channel.invokeMethod("onSelected", index)
                             },
+                            // Not optional. `weight` defaults to NaN — size to
+                            // content — and content that does not fit takes the
+                            // overflow path described on NoOverflow, which
+                            // throws out of the measure pass and kills the
+                            // process. These four labels stop fitting below
+                            // ~411dp of window width: every common phone except
+                            // the Pixel 8 this was first checked on, and that
+                            // one too once the system font scale goes up.
+                            weight = weights[index],
                         )
                     }
                 }

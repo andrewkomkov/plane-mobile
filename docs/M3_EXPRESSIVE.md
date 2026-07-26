@@ -16,7 +16,7 @@ inside a `ComposeView` exposed to Dart as an Android platform view:
 - Live call site: the List/Board/Table/Calendar switch in `issues_tab_screen.dart`
 
 Currently bridged: `ButtonGroup` (with the library's own `animateWidth` press
-expansion) and `LoadingIndicator`, both wrapped in `MaterialExpressiveTheme`
+expansion, every item weighted — see "Known gaps") and `LoadingIndicator`, both wrapped in `MaterialExpressiveTheme`
 with `MotionScheme.expressive()` — that theme call is what puts the library into
 the expressive token set rather than the standard one. The Compose `ColorScheme`
 is built from roles passed over from the Dart theme so the two never diverge.
@@ -171,6 +171,16 @@ remain anywhere in `lib/`.
   built and tested, but no current screen has the contextual-action row or the
   primary-plus-variants action that would justify them. They are there for the
   next screen that needs one rather than being retrofitted somewhere awkward.
+- **Compose's `ButtonGroup` cannot be allowed to overflow.** Its overflow path
+  in 1.5.0-alpha24 measures the width left for the items as
+  `remaining + overflowIndicatorWidth`; with an indicator that draws nothing
+  that value goes negative, `Constraints.copy` throws, and because this is an
+  uncaught exception on Android's main thread inside `View.measure`, it takes
+  the whole process down — no Dart error, no crash screen, the app is just
+  gone. Every item therefore passes an explicit `weight`, which keeps the group
+  inside whatever width it is given and never reaches that branch. Do not
+  restore the default `weight` (NaN, "size to content") without giving the
+  overflow indicator real width.
 
 ## Tests
 
@@ -198,7 +208,15 @@ Pixel 8, Android 17, debug build, driven with `tool/adb_drive.py`:
   view modes, issue detail, Pages / Modules / Views / Cycles, the More menu,
   Notifications, Analytics, Profile.
 
-Two real defects were found this way and fixed:
+A Pixel 8 turned out to be a misleading thing to verify a `ButtonGroup` on: at
+411dp it is a few dp wider than the point where the four view labels stop
+fitting, so it was the one common device that did not crash. The group is now
+re-checked on a Galaxy S20 FE across window widths 308–432dp (via
+`adb shell wm density`) and font scales 1.0–1.8. Before the weight fix
+everything below 411dp died, as did 411dp itself at font scale 1.3; after it,
+all of them pass.
+
+Three real defects were found this way and fixed:
 
 1. **The Projects search field was anonymous.** It relied on `hintText`, which
    Android drops from the accessible name as soon as the field has content — so
@@ -208,6 +226,10 @@ Two real defects were found this way and fixed:
    selected state.** Compose's `ButtonGroup` is built on `ToggleButton`, whose
    checked state fills with `primary`; the Dart port used `primaryContainer`.
    The Dart side now follows the library.
+3. **Opening any project killed the app on a normal-width phone.** The Compose
+   `ButtonGroup` was left at its default sizing, which overflows below ~411dp
+   and throws out of the measure pass. See "Known gaps"; items now carry
+   weights, as `M3EButtonGroup` already did on the Dart side.
 
 ## Driving the app from adb
 
