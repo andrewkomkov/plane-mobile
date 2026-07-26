@@ -1,4 +1,9 @@
+// For `CupertinoPageTransitionsBuilder`, which material.dart does not re-export
+// and which iOS keeps for its edge-swipe back gesture.
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'm3e/page_transitions.dart';
 import 'm3e/shapes.dart';
 import 'm3e/typography.dart';
 
@@ -221,6 +226,33 @@ class PlaneTheme {
   static const _outlineLight = Color(0xFF8A8A8A);
   static const _outlineVariantLight = Color(0xFFD0D0D0);
 
+  /// How the system status bar is drawn over a given theme.
+  ///
+  /// This used to be set once in `main()` and pinned to `Brightness.light`,
+  /// which names the *icon* colour on Android: white clock, white battery,
+  /// white signal — on a `#FFFFFF` scaffold. The entire light theme shipped
+  /// with an unreadable status bar, and because it was set imperatively at
+  /// startup it did not follow the user switching themes either.
+  ///
+  /// Applied through an `AnnotatedRegion` in `main.dart`, so it is re-derived
+  /// from whichever theme is live rather than being a one-shot.
+  static SystemUiOverlayStyle overlayStyle(Brightness brightness) {
+    final light = brightness == Brightness.light;
+    return SystemUiOverlayStyle(
+      statusBarColor: Colors.transparent,
+      // The two platforms name this from opposite ends: Android's
+      // `statusBarIconBrightness` is the brightness of the icons, iOS's
+      // `statusBarBrightness` is the brightness of what sits behind them. Both
+      // have to be set, and they are always opposites.
+      statusBarIconBrightness: light ? Brightness.dark : Brightness.light,
+      statusBarBrightness: light ? Brightness.light : Brightness.dark,
+      // The navigation bar is deliberately left alone: the app draws a floating
+      // glass bar of its own over an `extendBody` scaffold, and taking the
+      // system bar transparent from here without owning the insets would put
+      // list content under it.
+    );
+  }
+
   static ThemeData light() => _build(
         brightness: Brightness.light,
         scaffoldBackground: _bgLight,
@@ -291,7 +323,35 @@ class PlaneTheme {
       useMaterial3: true,
       fontFamily: M3EType.fontFamily,
       textTheme: textTheme,
+      // The ambient icon colour was the last literal left in the app: Material
+      // defaults it to `black87` on light and pure `white` on dark, neither of
+      // which is a role. `onSurface` is within a step of both, so nothing moves
+      // visually — but it means an icon with no colour of its own now agrees
+      // with the text beside it by construction, and it gives widgets a stable
+      // value to recognise. `M3ELoadingIndicator` uses exactly that: an ambient
+      // icon colour that is *not* this one means something up the tree — a
+      // filled button's foreground — has claimed it, and the indicator follows
+      // it instead of painting the accent onto the button's own fill.
+      iconTheme: IconThemeData(color: scheme.onSurface),
       splashFactory: InkSparkle.splashFactory,
+      // Springs, not curves — including the largest movement in the app.
+      //
+      // Every push was a stock platform transition, which on Android means
+      // Flutter's own approximation of an expressive spring with a 450ms cubic.
+      // One builder here replaces all 47 of them; no call site changes. iOS and
+      // macOS keep `CupertinoPageTransitionsBuilder`, because that is where the
+      // interactive edge-swipe back gesture lives and losing it would cost more
+      // than the motion gains.
+      pageTransitionsTheme: const PageTransitionsTheme(
+        builders: <TargetPlatform, PageTransitionsBuilder>{
+          TargetPlatform.android: M3ESpringPageTransitionsBuilder(),
+          TargetPlatform.fuchsia: M3ESpringPageTransitionsBuilder(),
+          TargetPlatform.linux: M3ESpringPageTransitionsBuilder(),
+          TargetPlatform.windows: M3ESpringPageTransitionsBuilder(),
+          TargetPlatform.iOS: CupertinoPageTransitionsBuilder(),
+          TargetPlatform.macOS: CupertinoPageTransitionsBuilder(),
+        },
+      ),
       appBarTheme: AppBarTheme(
         backgroundColor: scaffoldBackground,
         foregroundColor: scheme.onSurface,
@@ -299,6 +359,10 @@ class PlaneTheme {
         scrolledUnderElevation: 0,
         centerTitle: false,
         titleTextStyle: textTheme.headlineSmall,
+        // No Material `AppBar` survives in `lib/` — every bar is `M3EAppBar` —
+        // but a bar that did appear would otherwise re-pin the overlay style to
+        // its own guess and undo the annotated region.
+        systemOverlayStyle: overlayStyle(brightness),
       ),
       cardTheme: CardThemeData(
         color: scheme.surfaceContainerLow,
@@ -340,8 +404,17 @@ class PlaneTheme {
         isDense: true,
       ),
       // Buttons adopt the expressive pill shape and heavier label weight.
+      //
+      // The fill has to be named. Left to M3's default a `FilledButton` paints
+      // `colorScheme.primary`, and in the dark scheme that is `#BDC2FF` — the
+      // *pale* tone, the one meant to sit on a dark surface, not to be one. Two
+      // screens had already worked around it locally with a copy of this style
+      // and two more had not, so a filled button meant one thing on the setup
+      // screen and another on the profile screen.
       filledButtonTheme: FilledButtonThemeData(
         style: FilledButton.styleFrom(
+          backgroundColor: scheme.primaryContainer,
+          foregroundColor: scheme.onPrimaryContainer,
           shape: const StadiumBorder(),
           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
           textStyle: textTheme.labelLarge?.copyWith(fontWeight: FontWeight.w600),
@@ -387,15 +460,25 @@ class PlaneTheme {
         trackOutlineColor:
             WidgetStateProperty.resolveWith((_) => scheme.outline),
       ),
+      // The three floating surfaces all carry the hairline.
+      //
+      // "Flat everywhere, hairline outlines" is the documented trade against
+      // M3E's tonal elevation, and `popupMenuTheme` below was the only place it
+      // had actually been carried out. On the dark ramp the surface steps do
+      // the job on their own; on the light one they do not — a floating
+      // snackbar is `#E5E5E5` on `#FFFFFF`, 1.13:1, with nothing at its edge to
+      // say where it ends. In a zero-elevation app the hairline *is* the
+      // boundary, and a surface that floats over arbitrary content needs one.
       bottomSheetTheme: BottomSheetThemeData(
         backgroundColor: scheme.surfaceContainer,
         elevation: 0,
         showDragHandle: true,
         dragHandleColor: scheme.onSurfaceVariant.withValues(alpha: 0.3),
-        shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadius.vertical(
+        shape: RoundedRectangleBorder(
+          borderRadius: const BorderRadius.vertical(
             top: Radius.circular(M3EShape.extraLargeIncreased),
           ),
+          side: BorderSide(color: scheme.outlineVariant, width: 0.5),
         ),
       ),
       dialogTheme: DialogThemeData(
@@ -403,6 +486,7 @@ class PlaneTheme {
         elevation: 0,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(M3EShape.extraLarge),
+          side: BorderSide(color: scheme.outlineVariant, width: 0.5),
         ),
       ),
       snackBarTheme: SnackBarThemeData(
@@ -412,6 +496,7 @@ class PlaneTheme {
         elevation: 0,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(M3EShape.large),
+          side: BorderSide(color: scheme.outlineVariant, width: 0.5),
         ),
       ),
       popupMenuTheme: PopupMenuThemeData(

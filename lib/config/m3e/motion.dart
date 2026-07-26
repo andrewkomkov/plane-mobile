@@ -70,6 +70,73 @@ class M3EMotion {
   static const Duration morphCycle = Duration(milliseconds: 650);
 }
 
+/// A spring simulation replayed as a [Curve].
+///
+/// [M3ESpringBuilder] is the honest way to run a spring — it retargets with the
+/// current velocity and never needs a duration — and it is what everything in
+/// this app that owns its own animation uses. Routes are the exception: a
+/// [PageRoute] owns an `AnimationController`, drives it with a duration, and
+/// hands `buildTransitions` a plain 0→1 `Animation`. There is no seam to push a
+/// `Simulation` into. So for that one case the simulation is sampled ahead of
+/// time and worn as a curve.
+///
+/// The sample window is the spring's own [settleTime], mapped onto the unit
+/// interval: the *shape* is the real spring, including its overshoot, and only
+/// the clock is borrowed. A route that uses this curve should take [settleTime]
+/// as its duration so the two agree and the motion runs at its natural rate.
+///
+/// [restDelta] is how close to the target counts as arrived. The default 1%
+/// rather than the framework's 0.1% is deliberate: the last 0.9% of a spring's
+/// travel is invisible, and waiting for it would add ~150ms of nothing to every
+/// screen change.
+class M3ESpringCurve extends Curve {
+  final SpringSimulation _simulation;
+
+  /// How long the simulation takes to come to rest, in seconds.
+  final double settleTime;
+
+  M3ESpringCurve(SpringDescription spring, {double restDelta = 0.01})
+      : this._(
+          SpringSimulation(
+            spring,
+            0,
+            1,
+            0,
+            tolerance: Tolerance(
+              distance: restDelta,
+              // Position is what is visible; the velocity gate only has to stop
+              // `isDone` firing while the spring is passing through its target
+              // at speed.
+              velocity: restDelta * 10,
+            ),
+          ),
+        );
+
+  M3ESpringCurve._(SpringSimulation simulation)
+      : _simulation = simulation,
+        settleTime = _settleTimeOf(simulation);
+
+  /// Rounded to whole milliseconds, ready for an `AnimationController`.
+  Duration get settleDuration =>
+      Duration(microseconds: (settleTime * Duration.microsecondsPerSecond).round());
+
+  static double _settleTimeOf(SpringSimulation simulation) {
+    // 240Hz, so the answer is finer than any frame that will render it.
+    const double step = 1 / 240;
+    double t = step;
+    // Two seconds is far past any spring in the scheme; the fallback exists so
+    // a mistyped stiffness cannot hang the app at startup.
+    while (t < 2.0) {
+      if (simulation.isDone(t)) return t;
+      t += step;
+    }
+    return 2.0;
+  }
+
+  @override
+  double transformInternal(double t) => _simulation.x(t * settleTime);
+}
+
 /// Drives a single `double` toward [value] with a spring simulation.
 ///
 /// Flutter has no built-in "animate to target with physics" widget: implicit

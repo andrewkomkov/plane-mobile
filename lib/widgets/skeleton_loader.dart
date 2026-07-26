@@ -13,9 +13,40 @@ mixin _ShimmerMixin<T extends StatefulWidget> on State<T>
     _shimmerController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 1500),
-    )..repeat(reverse: true);
+    );
     _shimmerAnimation =
         Tween<double>(begin: 0.3, end: 0.7).animate(_shimmerController);
+  }
+
+  /// Start or stop the pulse according to the system's reduce-motion setting.
+  ///
+  /// This is the one animation in the app the framework cannot rescue.
+  /// `AnimationController.forward()` and `reverse()` are scaled to 5% of their
+  /// duration when `disableAnimations` is set, which is why every other moving
+  /// thing here is effectively instant for a user who asked for no motion —
+  /// but `repeat()` is not scaled at all. Left alone, the loading state of
+  /// every list screen in the app pulses at full speed at exactly the moment
+  /// that user is waiting and looking at it.
+  ///
+  /// Held at the midpoint rather than at either end so the placeholder still
+  /// reads as a placeholder: 0.3 is nearly invisible and 0.7 is close enough to
+  /// real content to be mistaken for it.
+  void _syncShimmer() {
+    final reduced = MediaQuery.maybeDisableAnimationsOf(context) ?? false;
+    if (reduced) {
+      if (_shimmerController.isAnimating) _shimmerController.stop();
+      _shimmerController.value = 0.5;
+    } else if (!_shimmerController.isAnimating) {
+      _shimmerController.repeat(reverse: true);
+    }
+  }
+
+  // On the mixin rather than on each of the five skeletons, so a sixth cannot
+  // be added without it.
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _syncShimmer();
   }
 
   void disposeShimmer() {

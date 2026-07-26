@@ -22,6 +22,28 @@ class M3ELoadingIndicator extends StatefulWidget {
     this.contained = false,
   });
 
+  /// What to paint when the caller did not say.
+  ///
+  /// `scheme.primary` is right for the 44dp indicator that owns an empty
+  /// screen, and wrong for the 16dp one inside a button: a filled button paints
+  /// `primaryContainer`, which in the light scheme *is* `primary`, so the
+  /// indicator was drawn in the fill colour and the button simply looked empty
+  /// for the whole of the save.
+  ///
+  /// An ambient `IconTheme` is the signal. A `ButtonStyleButton` publishes its
+  /// resolved foreground through one, and so does anything else that colours
+  /// what sits inside it, so following it puts the indicator in the same colour
+  /// as the icon the button would otherwise be showing. When nothing has
+  /// overridden it the ambient colour is the theme's own `onSurface` — see
+  /// `PlaneTheme._build` — which means this is a plain page and the accent is
+  /// what belongs here.
+  static Color resolveColor(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final ambient = IconTheme.of(context).color;
+    if (ambient == null || ambient == scheme.onSurface) return scheme.primary;
+    return ambient;
+  }
+
   @override
   State<M3ELoadingIndicator> createState() => _M3ELoadingIndicatorState();
 }
@@ -50,7 +72,7 @@ class _M3ELoadingIndicatorState extends State<M3ELoadingIndicator>
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    final color = widget.color ?? scheme.primary;
+    final color = widget.color ?? M3ELoadingIndicator.resolveColor(context);
 
     return SizedBox(
       width: widget.size,

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
-import '../config/m3e/shapes.dart';
 import '../models/member.dart';
+import 'bottom_sheet_picker.dart';
+import 'confirm_dialog.dart';
 import 'm3e/icon_button.dart';
 import 'plane_row.dart';
 
@@ -121,41 +122,26 @@ class _Avatar extends StatelessWidget {
 }
 
 /// The overflow menu for a member row.
+///
+/// Built from [BottomSheetPicker] rather than hand-rolled, which is also what
+/// proves the component: an action sheet is a picker with nothing selected.
 Future<void> showMemberActions(
   BuildContext context,
   String name,
   List<MemberAction> actions,
 ) async {
-  final selected = await showModalBottomSheet<MemberAction>(
+  final selected = await BottomSheetPicker.show<MemberAction>(
     context: context,
-    builder: (ctx) {
-      final theme = Theme.of(ctx);
-      return SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Padding(
-              padding: const EdgeInsets.all(16),
-              child: Text(name, style: theme.textTheme.titleMedium),
-            ),
-            for (final action in actions)
-              ListTile(
-                leading: Icon(
-                  action.icon,
-                  color: action.destructive ? theme.colorScheme.error : null,
-                ),
-                title: Text(
-                  action.label,
-                  style: theme.textTheme.bodyLarge?.copyWith(
-                    color: action.destructive ? theme.colorScheme.error : null,
-                  ),
-                ),
-                onTap: () => Navigator.pop(ctx, action),
-              ),
-          ],
+    title: name,
+    items: [
+      for (final action in actions)
+        BottomSheetPickerItem<MemberAction>(
+          value: action,
+          label: action.label,
+          icon: action.icon,
+          destructive: action.destructive,
         ),
-      );
-    },
+    ],
   );
   selected?.onSelected();
 }
@@ -171,68 +157,36 @@ Future<int?> showRolePicker(
   required List<int> allowed,
   int? current,
 }) {
-  return showModalBottomSheet<int>(
+  return BottomSheetPicker.show<int>(
     context: context,
-    builder: (ctx) {
-      final theme = Theme.of(ctx);
-      return SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Padding(
-              padding: const EdgeInsets.all(16),
-              child: Text(title, style: theme.textTheme.titleMedium),
-            ),
-            for (final role in allowed)
-              ListTile(
-                title: Text(MemberRole.label(role),
-                    style: theme.textTheme.bodyLarge),
-                subtitle: Text(MemberRole.description(role),
-                    style: theme.textTheme.bodySmall),
-                trailing: role == current
-                    ? Icon(Icons.check, color: theme.colorScheme.primary)
-                    : null,
-                onTap: () => Navigator.pop(ctx, role),
-              ),
-          ],
+    title: title,
+    selectedValue: current,
+    items: [
+      for (final role in allowed)
+        BottomSheetPickerItem<int>(
+          value: role,
+          label: MemberRole.label(role),
+          subtitle: MemberRole.description(role),
         ),
-      );
-    },
+    ],
   );
 }
 
 /// Confirm something that cannot be undone from here.
+///
+/// Superseded by `confirmDestructive`, which is the same dialog without the
+/// word "member" in its name and is what the other fifteen sites that need one
+/// should call. Kept as a forwarder so the six existing call sites do not have
+/// to move in the same change that generalised it.
 Future<bool> confirmMemberAction(
   BuildContext context, {
   required String title,
   required String message,
   required String confirmLabel,
-}) async {
-  final result = await showDialog<bool>(
-    context: context,
-    builder: (ctx) {
-      final theme = Theme.of(ctx);
-      return AlertDialog(
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(M3EShape.extraLarge),
-        ),
-        title: Text(title),
-        content: Text(message),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            style: TextButton.styleFrom(
-              foregroundColor: theme.colorScheme.error,
-            ),
-            child: Text(confirmLabel),
-          ),
-        ],
-      );
-    },
-  );
-  return result == true;
-}
+}) =>
+    confirmDestructive(
+      context,
+      title: title,
+      message: message,
+      confirmLabel: confirmLabel,
+    );

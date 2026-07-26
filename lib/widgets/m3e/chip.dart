@@ -22,6 +22,15 @@ class M3EChip extends StatelessWidget {
 
   final bool dense;
 
+  /// The touch-target floor every tappable chip is padded out to.
+  ///
+  /// `M3EIconButton` has enforced this since it was written; a chip did not,
+  /// and the dense variant is the one that pays for it — the archive toggle on
+  /// the cycle, module and page lists draws at about 24dp, half the minimum,
+  /// and it is the control those screens are steered by. The padding is
+  /// invisible: the chip keeps its drawn size and only its hit area grows.
+  static const double minTapTarget = 48;
+
   const M3EChip({
     super.key,
     required this.label,
@@ -44,6 +53,10 @@ class M3EChip extends StatelessWidget {
     // Selected borrows the accent so the outline agrees with the fill; at rest
     // it is the one neutral outline every bordered surface in the app uses.
     final selectedBorder = accent.withValues(alpha: 0.4);
+
+    // A chip with no `onTap` is a label, not a control, and owes nothing to the
+    // touch-target floor — padding it out would only push its neighbours apart.
+    final double minHeight = onTap == null ? 0 : minTapTarget;
 
     return M3EPressable(
       pressedScale: 0.94,
@@ -77,7 +90,7 @@ class M3EChip extends StatelessWidget {
             const rest = M3EShape.largeIncreased;
             final corner =
                 rest - (rest - M3EShape.small) * shapeT.clamp(0.0, 1.0);
-            return Container(
+            final chip = Container(
               padding: EdgeInsets.symmetric(
                 horizontal: dense ? 10 : 14,
                 vertical: dense ? 5 : 7,
@@ -125,6 +138,15 @@ class M3EChip extends StatelessWidget {
                   ],
                 ],
               ),
+            );
+
+            if (minHeight == 0) return chip;
+            // `widthFactor: 1` so the box never stretches horizontally when a
+            // parent hands it a bounded width — a chip that grows to fill a row
+            // stops looking like a chip. Only the height floor is enforced.
+            return ConstrainedBox(
+              constraints: BoxConstraints(minHeight: minHeight),
+              child: Center(widthFactor: 1, child: chip),
             );
           },
         ),

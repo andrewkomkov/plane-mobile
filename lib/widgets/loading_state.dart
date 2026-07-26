@@ -42,6 +42,79 @@ class ErrorStateWidget extends StatelessWidget {
   }
 }
 
+/// Centres [child] in the viewport and keeps the list pullable.
+///
+/// Ten screens hand-rolled this as
+/// `ListView(children: [SizedBox(height: MediaQuery.height * X), Center(…)])`,
+/// with X being 0.2, 0.25 or 0.3 depending on the screen — three different
+/// guesses at a number that should not exist. The spacer was never about
+/// spacing: [EmptyStateWidget] is already a `Center`, and the height was there
+/// to give a `ListView` something tall enough to scroll so that the
+/// `RefreshIndicator` around it would still fire.
+///
+/// A viewport-height constraint says that directly, and
+/// `AlwaysScrollableScrollPhysics` says the rest — a short list that cannot
+/// scroll cannot be pulled to refresh, which is the same bug nine list screens
+/// have in their non-empty branch as well.
+class ScrollableCenter extends StatelessWidget {
+  final Widget child;
+
+  /// Room under the floating nav bar, where the screen sits behind one.
+  final EdgeInsetsGeometry padding;
+
+  const ScrollableCenter({
+    super.key,
+    required this.child,
+    this.padding = EdgeInsets.zero,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) => SingleChildScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: padding,
+        child: ConstrainedBox(
+          constraints: BoxConstraints(minHeight: constraints.maxHeight),
+          child: child,
+        ),
+      ),
+    );
+  }
+}
+
+/// [EmptyStateWidget] in the branch of a list screen that has no rows.
+///
+/// The one call that replaces the spacer-and-`ListView` pattern above. Half the
+/// existing call sites pass a guidance [subtitle] and half do not; they should
+/// — "No cycles" alone tells a user nothing about whether that is a problem.
+class ScrollableEmptyState extends StatelessWidget {
+  final String message;
+  final IconData? icon;
+  final String? subtitle;
+  final EdgeInsetsGeometry padding;
+
+  const ScrollableEmptyState({
+    super.key,
+    required this.message,
+    this.icon,
+    this.subtitle,
+    this.padding = EdgeInsets.zero,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return ScrollableCenter(
+      padding: padding,
+      child: EmptyStateWidget(
+        message: message,
+        icon: icon,
+        subtitle: subtitle,
+      ),
+    );
+  }
+}
+
 class EmptyStateWidget extends StatelessWidget {
   final String message;
   final IconData? icon;

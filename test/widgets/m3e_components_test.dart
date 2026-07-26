@@ -168,6 +168,65 @@ void main() {
         reason: 'an implicit animation here would filter the spring',
       );
     });
+
+    testWidgets('a tappable chip is at least 48dp, dense or not',
+        (tester) async {
+      for (final dense in [false, true]) {
+        await tester.pumpWidget(wrap(
+          M3EChip(label: 'Archived', dense: dense, onTap: () {}),
+        ));
+
+        // The drawn chip stays the size it was — a dense chip is dense on
+        // purpose — and only the box around it grows.
+        final drawn = tester.getSize(find
+            .descendant(
+              of: find.byType(M3EChip),
+              matching: find.byType(Container),
+            )
+            .first);
+        expect(drawn.height, lessThan(48), reason: 'dense: $dense');
+        expect(tester.getSize(find.byType(M3EChip)).height,
+            greaterThanOrEqualTo(M3EChip.minTapTarget),
+            reason: 'dense: $dense');
+      }
+    });
+
+    testWidgets('the whole 48dp box is tappable, not just the chip',
+        (tester) async {
+      var taps = 0;
+      await tester.pumpWidget(wrap(
+        M3EChip(label: 'Archived', dense: true, onTap: () => taps++),
+      ));
+
+      final box = tester.getRect(find.byType(M3EChip));
+      // Two device pixels inside the top edge — padding, well above the drawn
+      // chip, and the part a thumb reaching for a 24dp control actually lands
+      // on.
+      await tester.tapAt(Offset(box.center.dx, box.top + 2));
+      await tester.pump();
+      expect(taps, 1);
+    });
+
+    testWidgets('a chip with no action is not padded out', (tester) async {
+      // A label is not a control and owes nothing to the touch-target floor;
+      // padding it would only push its neighbours apart.
+      await tester.pumpWidget(wrap(const M3EChip(label: 'Bug', dense: true)));
+      expect(tester.getSize(find.byType(M3EChip)).height, lessThan(48));
+    });
+
+    testWidgets('a chip in a tight row keeps its own width', (tester) async {
+      // The filter bar hands its chips a fixed-height horizontal viewport; the
+      // padding box must not turn into a stretch in the other axis.
+      await tester.pumpWidget(wrap(SizedBox(
+        width: 300,
+        child: Row(children: [
+          M3EChip(label: 'State', dense: true, onTap: () {}),
+          const Spacer(),
+        ]),
+      )));
+
+      expect(tester.getSize(find.byType(M3EChip)).width, lessThan(200));
+    });
   });
 
   group('M3ESplitButton', () {

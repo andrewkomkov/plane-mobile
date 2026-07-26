@@ -11,10 +11,6 @@ import 'services/push_notification_service.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
-  SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
-    statusBarColor: Colors.transparent,
-    statusBarIconBrightness: Brightness.light,
-  ));
   runApp(const ProviderScope(child: PlaneApp()));
 }
 
@@ -57,6 +53,15 @@ class _PlaneAppState extends ConsumerState<PlaneApp> {
       theme: PlaneTheme.light(),
       darkTheme: PlaneTheme.dark(),
       themeMode: themeMode,
+      // The status bar has to follow the theme, and the theme is only known
+      // below `MaterialApp` — `themeMode: system` resolves here, not in
+      // `main()`. An annotated region re-derives the overlay style on every
+      // build, so switching themes from the profile screen takes the clock and
+      // the battery with it.
+      builder: (context, child) => AnnotatedRegion<SystemUiOverlayStyle>(
+        value: PlaneTheme.overlayStyle(Theme.of(context).brightness),
+        child: child ?? const SizedBox.shrink(),
+      ),
       home: _checking
           ? const Scaffold(body: Center(child: M3ELoadingIndicator(size: 44)))
           : _configured

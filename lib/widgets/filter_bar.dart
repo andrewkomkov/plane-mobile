@@ -153,6 +153,11 @@ class FilterBar extends StatelessWidget {
             Semantics(
               label: 'Clear all filters',
               button: true,
+              // See _buildFilterChip: an explicit label only replaces the
+              // chip's own text if the subtree is excluded.
+              container: true,
+              excludeSemantics: true,
+              onTap: () => onFilterChanged(const FilterState()),
               child: M3EChip(
                 label: 'Clear',
                 dense: true,
@@ -179,10 +184,20 @@ class FilterBar extends StatelessWidget {
     // The visible text is just the dimension ("State"), which does not say what
     // tapping does, and the active/inactive state is carried by colour alone —
     // both are spelled out here for screen readers and uiautomator.
+    //
+    // A bare `Semantics(label:)` *appends* — both this label and the chip's own
+    // "State" reach the tree, so a screen reader says "Filter by State, State"
+    // and `adb_drive.py tap "State"` matches two nodes. Excluding the subtree
+    // is what makes the label a replacement, exactly as `M3EPressable` does
+    // when it is given one; the tap has to be re-declared here because
+    // excluding drops the child's gesture along with its text.
     return Semantics(
       label: 'Filter by $label',
       button: true,
       selected: activeCount > 0,
+      container: true,
+      excludeSemantics: true,
+      onTap: onTap,
       child: M3EChip(
         label: label,
         icon: icon,
@@ -206,6 +221,9 @@ class FilterBar extends StatelessWidget {
     return Semantics(
       label: action,
       button: true,
+      container: true,
+      excludeSemantics: true,
+      onTap: onTap,
       child: M3EChip(
         label: label,
         icon: icon,
