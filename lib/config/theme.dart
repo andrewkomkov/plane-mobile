@@ -163,33 +163,49 @@ class PlaneTheme {
   static Color priorityColor(BuildContext context, String priority) {
     final light = _isLight(context);
     switch (priority) {
-      case 'urgent': return urgent;
-      case 'high': return light ? _highLight : high;
-      case 'medium': return light ? _mediumLight : medium;
-      case 'low': return low;
-      default: return noPriority;
+      case 'urgent':
+        return urgent;
+      case 'high':
+        return light ? _highLight : high;
+      case 'medium':
+        return light ? _mediumLight : medium;
+      case 'low':
+        return low;
+      default:
+        return noPriority;
     }
   }
 
   static Color stateGroupColor(BuildContext context, String group) {
     final light = _isLight(context);
     switch (group) {
-      case 'backlog': return backlog;
-      case 'unstarted': return light ? _unstartedLight : unstarted;
-      case 'started': return light ? _startedLight : started;
-      case 'completed': return light ? _completedLight : completed;
-      case 'cancelled': return cancelled;
-      default: return backlog;
+      case 'backlog':
+        return backlog;
+      case 'unstarted':
+        return light ? _unstartedLight : unstarted;
+      case 'started':
+        return light ? _startedLight : started;
+      case 'completed':
+        return light ? _completedLight : completed;
+      case 'cancelled':
+        return cancelled;
+      default:
+        return backlog;
     }
   }
 
   static IconData priorityIcon(String priority) {
     switch (priority) {
-      case 'urgent': return Icons.error;
-      case 'high': return Icons.signal_cellular_alt;
-      case 'medium': return Icons.signal_cellular_alt_2_bar;
-      case 'low': return Icons.signal_cellular_alt_1_bar;
-      default: return Icons.more_horiz;
+      case 'urgent':
+        return Icons.error;
+      case 'high':
+        return Icons.signal_cellular_alt;
+      case 'medium':
+        return Icons.signal_cellular_alt_2_bar;
+      case 'low':
+        return Icons.signal_cellular_alt_1_bar;
+      default:
+        return Icons.more_horiz;
     }
   }
 
@@ -199,12 +215,18 @@ class PlaneTheme {
       // greys 1.9:1 apart, which in a list is no difference at all. The state
       // is the one thing an issue row has to say, so it says it in shape:
       // queued dots for backlog, an empty ring for a todo not yet picked up.
-      case 'backlog': return Icons.pending_outlined;
-      case 'unstarted': return Icons.circle_outlined;
-      case 'started': return Icons.timelapse;
-      case 'completed': return Icons.check_circle;
-      case 'cancelled': return Icons.cancel;
-      default: return Icons.circle_outlined;
+      case 'backlog':
+        return Icons.pending_outlined;
+      case 'unstarted':
+        return Icons.circle_outlined;
+      case 'started':
+        return Icons.timelapse;
+      case 'completed':
+        return Icons.check_circle;
+      case 'cancelled':
+        return Icons.cancel;
+      default:
+        return Icons.circle_outlined;
     }
   }
 
@@ -370,6 +392,11 @@ class PlaneTheme {
         margin: EdgeInsets.zero,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(M3EShape.large),
+          // The last of the four overlay surfaces to get the hairline the
+          // decision table promises. Dropping elevation without adding the
+          // border leaves a card with no boundary at all where the surface
+          // ramp is shallow, which on the light theme is most of it.
+          side: BorderSide(color: scheme.outlineVariant, width: 0.5),
         ),
       ),
       dividerTheme: DividerThemeData(
@@ -417,7 +444,8 @@ class PlaneTheme {
           foregroundColor: scheme.onPrimaryContainer,
           shape: const StadiumBorder(),
           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
-          textStyle: textTheme.labelLarge?.copyWith(fontWeight: FontWeight.w600),
+          textStyle:
+              textTheme.labelLarge?.copyWith(fontWeight: FontWeight.w600),
         ),
       ),
       outlinedButtonTheme: OutlinedButtonThemeData(
@@ -425,13 +453,15 @@ class PlaneTheme {
           shape: const StadiumBorder(),
           side: BorderSide(color: scheme.outlineVariant),
           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
-          textStyle: textTheme.labelLarge?.copyWith(fontWeight: FontWeight.w600),
+          textStyle:
+              textTheme.labelLarge?.copyWith(fontWeight: FontWeight.w600),
         ),
       ),
       textButtonTheme: TextButtonThemeData(
         style: TextButton.styleFrom(
           shape: const StadiumBorder(),
-          textStyle: textTheme.labelLarge?.copyWith(fontWeight: FontWeight.w600),
+          textStyle:
+              textTheme.labelLarge?.copyWith(fontWeight: FontWeight.w600),
         ),
       ),
       floatingActionButtonTheme: FloatingActionButtonThemeData(

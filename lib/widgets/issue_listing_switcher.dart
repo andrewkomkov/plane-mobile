@@ -44,9 +44,16 @@ class IssueListingSwitcher extends StatelessWidget {
     required this.onChanged,
   });
 
-  /// Shorter than the group's default so the header stays a list header rather
-  /// than a toolbar. The list below it is what the screen is for.
-  static const double height = 38;
+  /// The accessibility floor, not a design choice.
+  ///
+  /// This was 38 so the header would read as a list header rather than a
+  /// toolbar — a real density argument, and the kind normally worth deferring
+  /// to. But it put three segment targets 10dp under the minimum, while the
+  /// identical control one screen over sat at 48. Density is a legitimate axis
+  /// to trade on; the touch-target floor is not one of them. The density comes
+  /// back out of horizontal padding instead, which costs nothing a finger
+  /// cares about.
+  static const double height = 48;
 
   @override
   Widget build(BuildContext context) {
