@@ -24,9 +24,9 @@ compiles but no one has watched it work.
 
 | | Areas |
 |---|---|
-| Covered | 19 |
+| Covered | 20 |
 | Partial | 6 |
-| Missing | 6 |
+| Missing | 5 |
 
 Everything that was structurally unreachable is now reachable. What remains
 missing is missing because nobody has built it, not because the transport
@@ -55,6 +55,7 @@ forbids it — which was not true of this document's first two versions.
 | Members | roles, invite, change role, remove, leave, pending invitations — *verified* |
 | Notifications | list, read/unread, archive, mark-all-read, preferences |
 | Workspace rollups | cross-project work items (paginated), workspace saved views incl. delete, cycles, modules — from the More menu. `workspaces/{}/states/` and `.../labels/` resolve the ids, which the project-scoped calls cannot |
+| Favorites | projects, cycles, modules, views and pages, starred from their list rows — *wired*. On `user-favorites/`, not the per-entity routes; see below |
 
 ## Partial
 
@@ -82,7 +83,6 @@ render as `PLM-123`.
 
 | Area | What it is | Pri |
 |---|---|---|
-| **Favorites** | `user-favorites/` and the per-entity favorite routes | P2 |
 | **Description history** | `issues/{}/versions/`, `work-items/{}/description-versions/`. The activity feed is covered; description history is not | P3 |
 | **Exports** | `export-issues/`, `export-analytics/`, `user-activity/{}/export/` | P3 |
 | **Home widgets** | stickies, quick links, the workspace home dashboard | P3 |
@@ -152,6 +152,9 @@ workaround is commented where it lives.
 | `CycleSerializer` omits `created_at` and `archived_at` | so a cycle from any endpoint using it — including the workspace rollup — has a fabricated `createdAt` and always reads as not archived. Harmless only because nothing sorts cycles by creation |
 | Draft retrieve and update guard the wrong model | both are decorated `creator=True, model=Issue` while the pk is a `DraftIssue` id, so the "you made it" fallback can never match — `Issue.objects.filter(id=<draft id>)` is always empty. `retrieve` allows only `ROLE.ADMIN` besides, so a workspace member cannot fetch their own draft at all. The app never calls `retrieve`: the list serialiser already includes `description_html`, so the listing carries everything the detail would |
 | `draft-to-issue/{id}/` does not copy the draft | it builds the work item out of `request.data` alone, takes only the project from the draft row, then deletes the row. Post an empty body and you get an empty work item and a destroyed draft. The app re-sends the whole draft, merged with any unsaved edits |
+| Every per-entity favorites `list` action 500s | `CycleFavoriteViewSet` and friends are `BaseViewSet`s with `model = UserFavorite` and no `serializer_class`, so DRF's `get_serializer_class` assertion fires. There is no working read on that side of the feature at all, which is why the app uses the generic `user-favorites/` collection for everything |
+| `projects/` drops the `is_favorite` annotation | `ProjectViewSet.get_queryset` annotates it and `ProjectViewSet.list` then builds its own `.values(...)` projection without it. Only `projects/details/` keeps it, so the project list cannot tell which projects are starred and the app reads that from `user-favorites/` like everything else |
+| `views/` create takes `filters`, not `query_data` | there is no `query_data` field on `IssueView`; the serializer discards the unknown key without complaining, so a view created with it silently saves no filters |
 
 ## Architectural risk
 

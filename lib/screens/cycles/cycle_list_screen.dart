@@ -6,7 +6,10 @@ import '../../config/theme.dart';
 import '../../services/cycle_service.dart';
 import '../../providers/data_providers.dart';
 import '../../models/cycle.dart';
+import '../../models/favorite.dart';
+import '../../providers/favorites_provider.dart';
 import '../../widgets/archive_toggle.dart';
+import '../../widgets/favorite_toggle.dart';
 import '../../widgets/loading_state.dart';
 import '../../widgets/m3e/icon_button.dart';
 import '../../widgets/plane_row.dart';
@@ -51,6 +54,8 @@ class _CycleListScreenState extends ConsumerState<CycleListScreen>
   void initState() {
     super.initState();
     _load();
+    // One read per workspace, shared with every other list that draws a star.
+    ref.read(favoritesProvider.notifier).load(widget.workspaceSlug);
   }
 
   Future<void> _load() async {
@@ -135,7 +140,12 @@ class _CycleListScreenState extends ConsumerState<CycleListScreen>
   List<Cycle> get _cycles =>
       _cache.getCycles(widget.workspaceSlug, widget.projectId) ?? [];
 
-  Map<String, List<Cycle>> get _groupedCycles {
+  /// Cycles by status, favourites first inside each status.
+  ///
+  /// Not a section of their own: a favourite cycle is still a current or a
+  /// completed one, and lifting it out of its status group would cost the
+  /// grouping that makes this list readable to save a user one glance.
+  Map<String, List<Cycle>> _groupedCycles(FavoritesState favorites) {
     final groups = <String, List<Cycle>>{
       'current': [],
       'upcoming': [],
@@ -148,7 +158,10 @@ class _CycleListScreenState extends ConsumerState<CycleListScreen>
       groups[status]!.add(c);
     }
     groups.removeWhere((_, v) => v.isEmpty);
-    return groups;
+    return groups.map((status, cycles) => MapEntry(
+          status,
+          favorites.favoritesFirst(FavoriteEntity.cycle, cycles, (c) => c.id),
+        ));
   }
 
   Color _statusColor(String status) {
@@ -312,6 +325,8 @@ class _CycleListScreenState extends ConsumerState<CycleListScreen>
       return const ProjectListSkeleton();
     }
 
+    final favorites = ref.watch(favoritesProvider);
+
     return Scaffold(
       body: Column(
         children: [
@@ -319,7 +334,9 @@ class _CycleListScreenState extends ConsumerState<CycleListScreen>
           Expanded(
             child: RefreshIndicator(
               onRefresh: _load,
-              child: _showArchived ? _archivedList() : _liveList(),
+              child: _showArchived
+                  ? _archivedList(favorites)
+                  : _liveList(favorites),
             ),
           ),
         ],
@@ -349,7 +366,7 @@ class _CycleListScreenState extends ConsumerState<CycleListScreen>
     );
   }
 
-  Widget _liveList() {
+  Widget _liveList(FavoritesState favorites) {
     if (_error != null && _cycles.isEmpty) {
       return ErrorStateWidget(message: 'Failed to load cycles', onRetry: _load);
     }
@@ -362,7 +379,7 @@ class _CycleListScreenState extends ConsumerState<CycleListScreen>
       ]);
     }
 
-    final entries = _groupedCycles.entries.toList();
+    final entries = _groupedCycles(favorites).entries.toList();
     return ListView.builder(
       itemCount: entries.fold<int>(0, (sum, e) => sum + 1 + e.value.length),
       itemBuilder: (ctx, index) {
@@ -387,7 +404,7 @@ class _CycleListScreenState extends ConsumerState<CycleListScreen>
     );
   }
 
-  Widget _archivedList() {
+  Widget _archivedList(FavoritesState favorites) {
     if (_error != null) {
       return ErrorStateWidget(
           message: 'Failed to load archived cycles', onRetry: _loadArchived);
@@ -408,9 +425,11 @@ class _CycleListScreenState extends ConsumerState<CycleListScreen>
         ),
       ]);
     }
+    final ordered =
+        favorites.favoritesFirst(FavoriteEntity.cycle, archived, (c) => c.id);
     return ListView.builder(
-      itemCount: archived.length,
-      itemBuilder: (ctx, i) => _cycleRow(cycle: archived[i]),
+      itemCount: ordered.length,
+      itemBuilder: (ctx, i) => _cycleRow(cycle: ordered[i]),
     );
   }
 
@@ -420,7 +439,10 @@ class _CycleListScreenState extends ConsumerState<CycleListScreen>
   /// Archived is the same row with different slot contents — a muted icon, the
   /// archive date where the date range would be, and a restore button in the
   /// trailing slot, which is the one part of a row that keeps its own
-  /// semantics node and so stays reachable from automation.
+  /// semantics node and so stays reachable from automation. The favourite star
+  /// shares that slot for the same reason, and is offered on archived cycles
+  /// too: a cycle starred before it was put away has nowhere else to be
+  /// unstarred from.
   Widget _cycleRow({required Cycle cycle}) {
     final theme = Theme.of(context);
     final archived = cycle.isArchived;
@@ -451,14 +473,25 @@ class _CycleListScreenState extends ConsumerState<CycleListScreen>
         '$count issues done',
         if (dates.isNotEmpty) dates,
       ].join(', '),
-      trailing: archived
-          ? M3EIconButton(
+      trailing: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          FavoriteToggle(
+            workspaceSlug: widget.workspaceSlug,
+            entity: FavoriteEntity.cycle,
+            entityId: cycle.id,
+            entityName: cycle.name,
+            projectId: widget.projectId,
+          ),
+          if (archived)
+            M3EIconButton(
               icon: Icons.unarchive_outlined,
               tooltip: 'Restore cycle ${cycle.name}',
               size: M3EIconButtonSize.small,
               onPressed: () => _confirmUnarchive(cycle),
-            )
-          : null,
+            ),
+        ],
+      ),
       onTap: () => _openCycle(cycle),
     );
   }

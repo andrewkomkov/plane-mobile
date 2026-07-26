@@ -3,7 +3,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../widgets/m3e/icon_button.dart';
 import '../../widgets/m3e/text_field.dart';
 import '../../services/view_service.dart';
+import '../../models/favorite.dart';
 import '../../models/view.dart';
+import '../../providers/favorites_provider.dart';
+import '../../widgets/favorite_toggle.dart';
 import '../../widgets/loading_state.dart';
 import '../../widgets/plane_row.dart';
 import '../../utils/time_ago.dart';
@@ -36,6 +39,8 @@ class _ViewListScreenState extends ConsumerState<ViewListScreen>
   void initState() {
     super.initState();
     _load();
+    // One read per workspace, shared with every other list that draws a star.
+    ref.read(favoritesProvider.notifier).load(widget.workspaceSlug);
   }
 
   Future<void> _load() async {
@@ -84,10 +89,15 @@ class _ViewListScreenState extends ConsumerState<ViewListScreen>
 
     if (name != null && name.isNotEmpty) {
       try {
+        // `filters`, not `query_data`: there is no such field on `IssueView`.
+        // The serializer takes `filters` and compiles it into the read-only
+        // `query` itself, and drops any key it does not recognise without
+        // complaining — so a view created with `query_data` would silently
+        // save no filters at all.
         await ViewService.createView(
           widget.workspaceSlug,
           widget.projectId,
-          {'name': name, 'query_data': {}},
+          {'name': name, 'filters': <String, dynamic>{}},
         );
         _load();
       } catch (e) {
@@ -137,10 +147,14 @@ class _ViewListScreenState extends ConsumerState<ViewListScreen>
       return ErrorStateWidget(message: 'Failed to load views', onRetry: _load);
     }
 
+    final views = ref
+        .watch(favoritesProvider)
+        .favoritesFirst(FavoriteEntity.view, _views, (v) => v.id);
+
     return Scaffold(
       body: RefreshIndicator(
         onRefresh: _load,
-        child: _views.isEmpty
+        child: views.isEmpty
             ? ListView(children: [
                 SizedBox(height: MediaQuery.of(context).size.height * 0.3),
                 const Center(
@@ -152,9 +166,9 @@ class _ViewListScreenState extends ConsumerState<ViewListScreen>
                 ),
               ])
             : ListView.builder(
-                itemCount: _views.length,
+                itemCount: views.length,
                 itemBuilder: (ctx, i) {
-                  final view = _views[i];
+                  final view = views[i];
                   final subtitle =
                       view.description ?? timeAgoShort(view.updatedAt);
                   return PlaneRow(
@@ -163,14 +177,26 @@ class _ViewListScreenState extends ConsumerState<ViewListScreen>
                     subtitle: subtitle,
                     semanticLabel: '${view.name}, view, $subtitle',
                     // Named per view so repeated rows stay distinguishable to
-                    // external automation. It sits in `trailing` rather than
-                    // inside the row so that it keeps that name — the row's
+                    // external automation. Both sit in `trailing` rather than
+                    // inside the row so that they keep those names — the row's
                     // own label replaces the semantics of everything it wraps.
-                    trailing: M3EIconButton(
-                      icon: Icons.delete_outline,
-                      tooltip: 'Delete view ${view.name}',
-                      size: M3EIconButtonSize.small,
-                      onPressed: () => _deleteView(view),
+                    trailing: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        FavoriteToggle(
+                          workspaceSlug: widget.workspaceSlug,
+                          entity: FavoriteEntity.view,
+                          entityId: view.id,
+                          entityName: view.name,
+                          projectId: widget.projectId,
+                        ),
+                        M3EIconButton(
+                          icon: Icons.delete_outline,
+                          tooltip: 'Delete view ${view.name}',
+                          size: M3EIconButtonSize.small,
+                          onPressed: () => _deleteView(view),
+                        ),
+                      ],
                     ),
                     onTap: () async {
                       await Navigator.push(

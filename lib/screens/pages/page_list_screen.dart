@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../providers/data_providers.dart';
+import '../../providers/favorites_provider.dart';
+import '../../models/favorite.dart';
 import '../../models/page.dart';
 import '../../services/page_service.dart';
 import '../../widgets/archive_toggle.dart';
+import '../../widgets/favorite_toggle.dart';
 import '../../widgets/loading_state.dart';
 import '../../widgets/m3e/icon_button.dart';
 import '../../widgets/skeleton_loader.dart';
@@ -58,6 +61,8 @@ class _PageListScreenState extends ConsumerState<PageListScreen>
   void initState() {
     super.initState();
     _load();
+    // One read per workspace, shared with every other list that draws a star.
+    ref.read(favoritesProvider.notifier).load(widget.workspaceSlug);
   }
 
   Future<void> _load() async {
@@ -176,7 +181,9 @@ class _PageListScreenState extends ConsumerState<PageListScreen>
     if (_error != null && _allPages.isEmpty) {
       return ErrorStateWidget(message: 'Failed to load pages', onRetry: _load);
     }
-    final pages = _pages;
+    final pages = ref
+        .watch(favoritesProvider)
+        .favoritesFirst(FavoriteEntity.page, _pages, (p) => p.id);
     if (pages.isEmpty) {
       return ListView(children: [
         SizedBox(height: MediaQuery.of(context).size.height * 0.3),
@@ -204,7 +211,8 @@ class _PageListScreenState extends ConsumerState<PageListScreen>
 
   /// Archived reads through the same slots as everywhere else: the archive
   /// glyph in the leading position, the archive date on the subtitle line, and
-  /// restore in the trailing slot, which keeps its own semantics node.
+  /// restore next to the favourite star in the trailing slot, which is the one
+  /// slot that keeps its own semantics node.
   Widget _pageRow(PlanePage page) {
     final name = page.name.isEmpty ? 'Untitled' : page.name;
     final archived = page.archivedAt != null;
@@ -225,14 +233,25 @@ class _PageListScreenState extends ConsumerState<PageListScreen>
         if (page.isLocked) 'locked',
         'updated ${_formatDate(page.updatedAt)}',
       ].join(', '),
-      trailing: archived
-          ? M3EIconButton(
+      trailing: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          FavoriteToggle(
+            workspaceSlug: widget.workspaceSlug,
+            entity: FavoriteEntity.page,
+            entityId: page.id,
+            entityName: name,
+            projectId: widget.projectId,
+          ),
+          if (archived)
+            M3EIconButton(
               icon: Icons.unarchive_outlined,
               tooltip: 'Restore page $name',
               size: M3EIconButtonSize.small,
               onPressed: () => _confirmUnarchive(page),
-            )
-          : null,
+            ),
+        ],
+      ),
       onTap: () async {
         await Navigator.push(
           context,

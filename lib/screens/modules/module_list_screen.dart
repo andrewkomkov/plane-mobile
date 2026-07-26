@@ -4,8 +4,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../config/theme.dart';
 import '../../services/module_service.dart';
 import '../../providers/data_providers.dart';
+import '../../models/favorite.dart';
 import '../../models/module.dart';
+import '../../providers/favorites_provider.dart';
 import '../../widgets/archive_toggle.dart';
+import '../../widgets/favorite_toggle.dart';
 import '../../widgets/loading_state.dart';
 import '../../widgets/m3e/icon_button.dart';
 import '../../widgets/plane_row.dart';
@@ -47,6 +50,8 @@ class _ModuleListScreenState extends ConsumerState<ModuleListScreen>
   void initState() {
     super.initState();
     _load();
+    // One read per workspace, shared with every other list that draws a star.
+    ref.read(favoritesProvider.notifier).load(widget.workspaceSlug);
   }
 
   List<Module> get _modules =>
@@ -267,6 +272,8 @@ class _ModuleListScreenState extends ConsumerState<ModuleListScreen>
       return const ProjectListSkeleton();
     }
 
+    final favorites = ref.watch(favoritesProvider);
+
     return Scaffold(
       body: Column(
         children: [
@@ -274,7 +281,9 @@ class _ModuleListScreenState extends ConsumerState<ModuleListScreen>
           Expanded(
             child: RefreshIndicator(
               onRefresh: _load,
-              child: _showArchived ? _archivedList() : _liveList(),
+              child: _showArchived
+                  ? _archivedList(favorites)
+                  : _liveList(favorites),
             ),
           ),
         ],
@@ -302,7 +311,7 @@ class _ModuleListScreenState extends ConsumerState<ModuleListScreen>
     );
   }
 
-  Widget _liveList() {
+  Widget _liveList(FavoritesState favorites) {
     if (_error != null && _modules.isEmpty) {
       return ErrorStateWidget(
           message: 'Failed to load modules', onRetry: _load);
@@ -316,13 +325,19 @@ class _ModuleListScreenState extends ConsumerState<ModuleListScreen>
         ),
       ]);
     }
+    // Favourites first. Plane's own module list already orders `-is_favorite`,
+    // so this only changes what happens between a star being tapped and the
+    // next fetch — but it is what keeps the projects list, which the server
+    // does not order, reading the same way.
+    final ordered =
+        favorites.favoritesFirst(FavoriteEntity.module, _modules, (m) => m.id);
     return ListView.builder(
-      itemCount: _modules.length,
-      itemBuilder: (ctx, i) => _moduleRow(module: _modules[i]),
+      itemCount: ordered.length,
+      itemBuilder: (ctx, i) => _moduleRow(module: ordered[i]),
     );
   }
 
-  Widget _archivedList() {
+  Widget _archivedList(FavoritesState favorites) {
     if (_error != null) {
       return ErrorStateWidget(
           message: 'Failed to load archived modules', onRetry: _loadArchived);
@@ -343,9 +358,11 @@ class _ModuleListScreenState extends ConsumerState<ModuleListScreen>
         ),
       ]);
     }
+    final ordered =
+        favorites.favoritesFirst(FavoriteEntity.module, archived, (m) => m.id);
     return ListView.builder(
-      itemCount: archived.length,
-      itemBuilder: (ctx, i) => _moduleRow(module: archived[i]),
+      itemCount: ordered.length,
+      itemBuilder: (ctx, i) => _moduleRow(module: ordered[i]),
     );
   }
 
@@ -353,9 +370,9 @@ class _ModuleListScreenState extends ConsumerState<ModuleListScreen>
   /// is flat where the cycle list groups by status.
   ///
   /// Archived swaps the leading glyph, replaces the date range with the
-  /// archive date, and puts a restore button in the trailing slot — the one
-  /// slot [PlaneRow] leaves outside its own semantics node, so the button
-  /// keeps a name of its own.
+  /// archive date, and adds a restore button beside the favourite star in the
+  /// trailing slot — the one slot [PlaneRow] leaves outside its own semantics
+  /// node, so both buttons keep names of their own.
   Widget _moduleRow({required Module module}) {
     final theme = Theme.of(context);
     final archived = module.isArchived;
@@ -392,14 +409,25 @@ class _ModuleListScreenState extends ConsumerState<ModuleListScreen>
         '$count issues done',
         if (dates.isNotEmpty) dates,
       ].join(', '),
-      trailing: archived
-          ? M3EIconButton(
+      trailing: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          FavoriteToggle(
+            workspaceSlug: widget.workspaceSlug,
+            entity: FavoriteEntity.module,
+            entityId: module.id,
+            entityName: module.name,
+            projectId: widget.projectId,
+          ),
+          if (archived)
+            M3EIconButton(
               icon: Icons.unarchive_outlined,
               tooltip: 'Restore module ${module.name}',
               size: M3EIconButtonSize.small,
               onPressed: () => _confirmUnarchive(module),
-            )
-          : null,
+            ),
+        ],
+      ),
       onTap: () => _openModule(module),
     );
   }

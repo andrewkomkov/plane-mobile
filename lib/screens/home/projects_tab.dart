@@ -1,16 +1,18 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../models/favorite.dart';
 import '../../models/project.dart';
 import '../../providers/data_providers.dart';
+import '../../providers/favorites_provider.dart';
 import '../project/project_screen.dart';
-import '../../widgets/loading_state.dart';
+import '../../widgets/favorite_toggle.dart';
+import '../../widgets/plane_row.dart';
 import '../../widgets/skeleton_loader.dart';
 import '../../widgets/m3e/flexible_app_bar.dart';
 import '../../widgets/m3e/icon_button.dart';
 import '../../widgets/m3e/text_field.dart';
 import '../../widgets/section_header.dart';
 import '../../config/m3e/shapes.dart';
-import '../../config/m3e/motion.dart';
 import '../../config/m3e/typography.dart';
 import '../../config/theme.dart';
 
@@ -48,6 +50,10 @@ class _ProjectsTabState extends ConsumerState<ProjectsTab>
 
   Future<void> _load() async {
     final cache = _cache;
+    // The favourites read is one request for the whole workspace and every
+    // list that draws a star shares it, so it is fired here rather than waited
+    // on: the project rows render either way, they just start unstarred.
+    ref.read(favoritesProvider.notifier).load(widget.workspaceSlug);
     await cache.loadProjects(widget.workspaceSlug);
     if (mounted) setState(() => _initialLoading = false);
     // Load issue counts in background
@@ -71,12 +77,24 @@ class _ProjectsTabState extends ConsumerState<ProjectsTab>
 
   Future<void> _refresh() async {
     final cache = _cache;
-    await cache.loadProjects(widget.workspaceSlug, force: true);
+    await Future.wait([
+      cache.loadProjects(widget.workspaceSlug, force: true),
+      ref
+          .read(favoritesProvider.notifier)
+          .load(widget.workspaceSlug, force: true),
+    ]);
     if (mounted) setState(() {});
   }
 
+  /// Everything the workspace has, before the search filter and before
+  /// favourites are lifted to the front. This is the order the badge hues are
+  /// assigned from, so that starring a project — or typing in the search box —
+  /// does not recolour it.
+  List<Project> get _allProjects =>
+      _cache.getProjects(widget.workspaceSlug) ?? [];
+
   List<Project> get _projects {
-    final all = _cache.getProjects(widget.workspaceSlug) ?? [];
+    final all = _allProjects;
     if (_searchQuery.isEmpty) return all;
     final q = _searchQuery.toLowerCase();
     return all
@@ -92,8 +110,18 @@ class _ProjectsTabState extends ConsumerState<ProjectsTab>
   @override
   Widget build(BuildContext context) {
     super.build(context);
-    final theme = Theme.of(context);
-    final projects = _projects;
+    // Plane orders its cycle, module, view and page lists `-is_favorite` on the
+    // server. It does not do it for projects: `ProjectViewSet.list` builds its
+    // own `.values(...)` projection and drops the annotation the queryset
+    // carries. Doing it here is what makes the five lists agree.
+    final projects = ref
+        .watch(favoritesProvider)
+        .favoritesFirst(FavoriteEntity.project, _projects, (p) => p.id);
+    // Hue is assigned from the unsorted, unfiltered order, so a project keeps
+    // its badge colour when it is starred or searched for.
+    final hueOf = {
+      for (final (index, p) in _allProjects.indexed) p.id: index,
+    };
 
     return M3EFlexibleHeaderScaffold(
       title: 'Projects',
@@ -118,99 +146,83 @@ class _ProjectsTabState extends ConsumerState<ProjectsTab>
         onChanged: (v) => setState(() => _searchQuery = v),
       ),
       body: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            SectionHeader(
-              label: 'Active projects',
-              count: projects.length,
-            ),
-            Expanded(
-              child: _initialLoading && projects.isEmpty
-                  ? const ProjectListSkeleton()
-                  : RefreshIndicator(
-                      onRefresh: _refresh,
-                      child: ListView.builder(
-                        padding: const EdgeInsets.only(bottom: 100, top: 4),
-                        itemCount: projects.length,
-                        itemBuilder: (ctx, i) {
-                          final p = projects[i];
-                          return Padding(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 16, vertical: 3),
-                            child: M3EPressable(
-                              onTap: () => Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (_) => ProjectScreen(
-                                      workspaceSlug: widget.workspaceSlug,
-                                      project: p),
-                                ),
-                              ),
-                              child: DecoratedBox(
-                                decoration: BoxDecoration(
-                                  color: theme.colorScheme.surfaceContainerLow,
-                                  borderRadius:
-                                      BorderRadius.circular(M3EShape.large),
-                                ),
-                                child: Padding(
-                                  padding: const EdgeInsets.all(14),
-                                  child: Row(
-                                    children: [
-                                      // Identifier badge
-                                      Container(
-                                        width: 40,
-                                        height: 40,
-                                        decoration: BoxDecoration(
-                                          color: _badgeColor(context, i).withValues(alpha: 0.20),
-                                          borderRadius: BorderRadius.circular(M3EShape.medium),
-                                        ),
-                                        child: Center(
-                                          child: Text(
-                                            p.identifier,
-                                            style: M3EType.emphasized(
-                                                    theme.textTheme.titleSmall!)
-                                                .copyWith(
-                                                    color: _badgeColor(context, i)),
-                                          ),
-                                        ),
-                                      ),
-                                      const SizedBox(width: 14),
-                                      // Project name + active issues
-                                      Expanded(
-                                        child: Column(
-                                          crossAxisAlignment:
-                                              CrossAxisAlignment.start,
-                                          children: [
-                                            Text(
-                                              p.name,
-                                              maxLines: 1,
-                                              overflow: TextOverflow.ellipsis,
-                                              style: theme.textTheme.titleMedium,
-                                            ),
-                                            const SizedBox(height: 2),
-                                            Text(
-                                              '${_issueCounts[p.id] ?? 0} active issues',
-                                              style: theme.textTheme.bodySmall,
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                                      Icon(Icons.chevron_right,
-                                          size: 20,
-                                          color: theme
-                                              .colorScheme.onSurfaceVariant),
-                                    ],
-                                  ),
-                                ),
-                              ),
-                            ),
-                          );
-                        },
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SectionHeader(
+            label: 'Active projects',
+            count: projects.length,
+          ),
+          Expanded(
+            child: _initialLoading && projects.isEmpty
+                ? const ProjectListSkeleton()
+                : RefreshIndicator(
+                    onRefresh: _refresh,
+                    child: ListView.builder(
+                      padding: const EdgeInsets.only(bottom: 100, top: 4),
+                      itemCount: projects.length,
+                      itemBuilder: (ctx, i) => _projectRow(
+                        projects[i],
+                        hueOf[projects[i].id] ?? i,
                       ),
                     ),
-            ),
-          ],
+                  ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// A project is a row like any other.
+  ///
+  /// This used to be a hand-rolled card — its own surface, its own padding, its
+  /// own chevron — which is exactly the divergence [PlaneRow] exists to stop.
+  /// It also had nowhere to put a per-row control: the whole card was one
+  /// gesture target, so a star inside it would have been swallowed. The
+  /// identifier badge survives as the `leading` slot, and the star goes in
+  /// `trailing`, the one slot outside the row's own semantics node.
+  Widget _projectRow(Project project, int hue) {
+    final theme = Theme.of(context);
+    final badge = _badgeColor(context, hue);
+    final issues = '${_issueCounts[project.id] ?? 0} active issues';
+
+    return PlaneRow(
+      leading: Container(
+        width: 40,
+        height: 40,
+        decoration: BoxDecoration(
+          color: badge.withValues(alpha: 0.20),
+          borderRadius: BorderRadius.circular(M3EShape.medium),
         ),
+        child: Center(
+          child: Text(
+            project.identifier,
+            style: M3EType.emphasized(theme.textTheme.titleSmall!)
+                .copyWith(color: badge),
+          ),
+        ),
+      ),
+      title: project.name,
+      subtitle: issues,
+      semanticLabel: '${project.name}, ${project.identifier}, $issues',
+      trailing: FavoriteToggle(
+        workspaceSlug: widget.workspaceSlug,
+        entity: FavoriteEntity.project,
+        entityId: project.id,
+        entityName: project.name,
+        // A project favourite is scoped to itself. That is what Plane's own
+        // per-entity endpoint writes, and the workspace list only returns
+        // project-scoped rows whose project the caller is still a member of.
+        projectId: project.id,
+      ),
+      onTap: () => Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => ProjectScreen(
+            workspaceSlug: widget.workspaceSlug,
+            project: project,
+          ),
+        ),
+      ),
     );
   }
 }
