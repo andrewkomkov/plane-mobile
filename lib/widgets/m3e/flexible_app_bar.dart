@@ -57,7 +57,8 @@ class _M3EFlexibleHeaderScaffoldState extends State<M3EFlexibleHeaderScaffold> {
     if (notification.metrics.axis != Axis.vertical) return false;
     if (notification.depth > 0) return false;
 
-    final offset = notification.metrics.pixels.clamp(0.0, widget.collapseDistance);
+    final offset =
+        notification.metrics.pixels.clamp(0.0, widget.collapseDistance);
     final next = offset / widget.collapseDistance;
     if ((next - _collapse).abs() > 0.005) {
       setState(() => _collapse = next);
@@ -85,8 +86,14 @@ class _M3EFlexibleHeaderScaffoldState extends State<M3EFlexibleHeaderScaffold> {
           // ─── Toolbar row ───
           Padding(
             padding: const EdgeInsets.fromLTRB(20, 6, 8, 0),
-            child: SizedBox(
-              height: 40,
+            // Minimum, not fixed. This row was pinned at 40dp, which silently
+            // capped every control in it — an M3EIconButton guarantees a 48dp
+            // target and then measured 40 here, on every screen that puts an
+            // action in a flexible header. A tap target is not something a
+            // container gets to shrink, so the row grows to whatever its
+            // children need and keeps 40 as the floor for the empty case.
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(minHeight: 40),
               child: Row(
                 children: [
                   widget.leading ?? _DefaultLeading(scheme: scheme),
