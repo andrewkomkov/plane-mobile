@@ -77,4 +77,47 @@ void main() {
       expect(module.progress, 0);
     });
   });
+
+  group('Module archive state', () {
+    Module build({String? status, String? archivedAt}) => Module.fromJson({
+          'id': '1',
+          'name': 'M1',
+          'status': status,
+          'total_issues': 0,
+          'completed_issues': 0,
+          if (archivedAt != null) 'archived_at': archivedAt,
+        });
+
+    test('reads archived_at, which only archived-modules/ ever sends', () {
+      final module =
+          build(status: 'completed', archivedAt: '2025-03-04T10:00:00Z');
+      expect(module.isArchived, isTrue);
+      expect(module.archivedAt, DateTime.utc(2025, 3, 4, 10));
+    });
+
+    test('a module from the live list is not archived', () {
+      expect(build(status: 'in-progress').isArchived, isFalse);
+      expect(build(status: 'in-progress').archivedAt, isNull);
+    });
+
+    // The server answers 400 "Only completed or cancelled modules can be
+    // archived", so those two statuses are the whole of the allowed set.
+    test('only a completed or cancelled module can be archived', () {
+      expect(build(status: 'completed').canArchive, isTrue);
+      expect(build(status: 'cancelled').canArchive, isTrue);
+      expect(build(status: 'in-progress').canArchive, isFalse);
+      expect(build(status: 'planned').canArchive, isFalse);
+      expect(build(status: 'paused').canArchive, isFalse);
+      expect(build(status: 'backlog').canArchive, isFalse);
+      expect(build().canArchive, isFalse);
+    });
+
+    test('an already archived module cannot be archived again', () {
+      expect(
+        build(status: 'completed', archivedAt: '2025-03-04T10:00:00Z')
+            .canArchive,
+        isFalse,
+      );
+    });
+  });
 }

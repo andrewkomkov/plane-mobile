@@ -153,4 +153,51 @@ void main() {
       expect(cycle.computedStatus, 'draft');
     });
   });
+
+  group('Cycle archive state', () {
+    Cycle build({String? endDate, String? archivedAt}) => Cycle.fromJson({
+          'id': '1',
+          'name': 'S1',
+          'start_date': '2020-01-01',
+          'end_date': endDate,
+          'total_issues': 0,
+          'completed_issues': 0,
+          if (archivedAt != null) 'archived_at': archivedAt,
+        });
+
+    test('reads archived_at, which only archived-cycles/ ever sends', () {
+      final cycle = build(archivedAt: '2025-03-04T10:00:00Z');
+      expect(cycle.isArchived, isTrue);
+      expect(cycle.archivedAt, DateTime.utc(2025, 3, 4, 10));
+    });
+
+    test('a cycle from the live list is not archived', () {
+      expect(build().isArchived, isFalse);
+      expect(build().archivedAt, isNull);
+    });
+
+    test('an already archived cycle cannot be archived again', () {
+      expect(
+        build(endDate: '2020-12-31', archivedAt: '2025-03-04T10:00:00Z')
+            .canArchive,
+        isFalse,
+      );
+    });
+
+    test('a cycle whose end date has passed can be archived', () {
+      expect(build(endDate: '2020-12-31').canArchive, isTrue);
+    });
+
+    test('a cycle still running cannot be archived', () {
+      // The server answers 400 "Only completed cycles can be archived".
+      expect(build(endDate: '2099-12-31').canArchive, isFalse);
+    });
+
+    // The server compares `end_date >= now()` with no null guard, so a request
+    // for a cycle with no end date is a 500 rather than a 400. The app must
+    // never send one.
+    test('a cycle with no end date cannot be archived', () {
+      expect(build().canArchive, isFalse);
+    });
+  });
 }

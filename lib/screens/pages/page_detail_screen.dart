@@ -73,14 +73,73 @@ class _PageDetailScreenState extends ConsumerState<PageDetailScreen> {
     if (result == true) _load();
   }
 
-  Future<void> _deletePage() async {
+  String get _pageLabel {
+    final name = _page?.name ?? widget.pageName;
+    return name.isEmpty ? 'Untitled' : name;
+  }
+
+  Future<void> _archivePage() async {
     if (_page == null) return;
-    final name = _page!.name.isEmpty ? 'Untitled' : _page!.name;
     final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Delete Page'),
-        content: Text('Delete "$name"?'),
+        title: const Text('Archive page'),
+        content: Text('Move "$_pageLabel" out of the project pages? Any page '
+            'nested under it is archived too. It can be restored from the '
+            'Archived list.'),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Cancel')),
+          TextButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              child: const Text('Archive')),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    try {
+      await PageService.archivePage(
+          widget.workspaceSlug, widget.projectId, widget.pageId);
+      // The list screen invalidates its page cache on every return from here,
+      // so popping is what moves the row into the archive.
+      if (mounted) Navigator.pop(context);
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('Failed to archive: $e')));
+      }
+    }
+  }
+
+  Future<void> _unarchivePage() async {
+    if (_page == null) return;
+    try {
+      await PageService.unarchivePage(
+          widget.workspaceSlug, widget.projectId, widget.pageId);
+      if (mounted) Navigator.pop(context);
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('Failed to restore: $e')));
+      }
+    }
+  }
+
+  /// Only reachable on an archived page.
+  ///
+  /// `PageViewSet.destroy` answers 400 "The page should be archived before
+  /// deleting" for a live one, so the button used to sit on every page and
+  /// fail on all of them. Archiving is the first half of the flow; this is the
+  /// second, and the wording says so.
+  Future<void> _deletePage() async {
+    if (_page == null) return;
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Delete page'),
+        content: Text('Delete "$_pageLabel" permanently? This cannot be '
+            'undone.'),
         actions: [
           TextButton(
               onPressed: () => Navigator.pop(ctx, false),
@@ -109,21 +168,38 @@ class _PageDetailScreenState extends ConsumerState<PageDetailScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final archived = _page?.archivedAt != null;
     return Scaffold(
       appBar: M3EAppBar(
         title: _page?.name ?? widget.pageName,
         actions: [
-          // Delete stays available on a locked page: the lock is Plane's guard
-          // against concurrent edits to the body, and the server enforces it on
-          // PATCH only — DELETE is gated by project permission instead.
-          if (_page != null)
+          // Delete is only offered once the page is archived, because that is
+          // the only state Plane will delete from. On a live page the archive
+          // action takes its place.
+          if (_page != null && archived)
             M3EAppBarAction(
               icon: Icons.delete_outline,
               tooltip: 'Delete page',
               color: theme.colorScheme.error,
               onPressed: _deletePage,
             ),
-          if (_page != null && !_page!.isLocked)
+          // Archive stays available on a locked page: the lock is Plane's
+          // guard against concurrent edits to the body, and the server
+          // enforces it on PATCH only — archiving is gated by ownership or
+          // project admin instead.
+          if (_page != null)
+            M3EAppBarAction(
+              icon: archived
+                  ? Icons.unarchive_outlined
+                  : Icons.inventory_2_outlined,
+              tooltip: archived ? 'Restore page' : 'Archive page',
+              onPressed: archived ? _unarchivePage : _archivePage,
+            ),
+          // `pages/{id}/` PATCH would in fact accept an edit to an archived
+          // page — only the binary-description endpoint refuses one — but an
+          // archive a user can still type into is not an archive. Restore
+          // first is the one path offered.
+          if (_page != null && !_page!.isLocked && !archived)
             M3EAppBarAction(
                 icon: Icons.edit,
                 tooltip: 'Edit page',

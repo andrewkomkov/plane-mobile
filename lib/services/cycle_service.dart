@@ -3,12 +3,63 @@ import '../models/cycle.dart';
 import '../models/issue.dart';
 
 class CycleService {
-  static Future<List<Cycle>> getCycles(String workspaceSlug, String projectId) async {
+  static Future<List<Cycle>> getCycles(
+      String workspaceSlug, String projectId) async {
     final dio = await ApiClient.getInstance();
-    final response = await dio.get('/workspaces/$workspaceSlug/projects/$projectId/cycles/');
+    final response =
+        await dio.get('/workspaces/$workspaceSlug/projects/$projectId/cycles/');
     final data = response.data;
     final list = data is Map ? (data['results'] ?? []) : data;
     return (list as List).map((e) => Cycle.fromJson(e)).toList();
+  }
+
+  /// Archived cycles only.
+  ///
+  /// `CycleArchiveUnarchiveEndpoint.get` already filters on
+  /// `archived_at__isnull=False`, so nothing live can come back through here
+  /// and the caller does not have to filter again. It answers with a bare
+  /// `.values()` list rather than a paginated envelope, and — unlike `cycles/`
+  /// — that list omits `created_at`.
+  static Future<List<Cycle>> getArchivedCycles(
+      String workspaceSlug, String projectId) async {
+    final dio = await ApiClient.getInstance();
+    final response = await dio
+        .get('/workspaces/$workspaceSlug/projects/$projectId/archived-cycles/');
+    final data = response.data;
+    final list = data is Map ? (data['results'] ?? []) : data;
+    return (list as List).map((e) => Cycle.fromJson(e)).toList();
+  }
+
+  /// Archives a cycle.
+  ///
+  /// Both directions live on `cycles/{id}/archive/` and are told apart by the
+  /// verb — POST archives, DELETE restores. The `archived-cycles/{id}/` route
+  /// shares the same view class but only serves GET: its handler signatures
+  /// take `cycle_id`, which that URL supplies as `pk`, so a write there fails
+  /// before it reaches any of Plane's own logic.
+  ///
+  /// Rejected with 400 unless the cycle's end date has already passed. See
+  /// [Cycle.canArchive] for why the app checks that itself first.
+  static Future<void> archiveCycle(
+    String workspaceSlug,
+    String projectId,
+    String cycleId,
+  ) async {
+    final dio = await ApiClient.getInstance();
+    await dio.post(
+      '/workspaces/$workspaceSlug/projects/$projectId/cycles/$cycleId/archive/',
+    );
+  }
+
+  static Future<void> unarchiveCycle(
+    String workspaceSlug,
+    String projectId,
+    String cycleId,
+  ) async {
+    final dio = await ApiClient.getInstance();
+    await dio.delete(
+      '/workspaces/$workspaceSlug/projects/$projectId/cycles/$cycleId/archive/',
+    );
   }
 
   static Future<Cycle> createCycle(

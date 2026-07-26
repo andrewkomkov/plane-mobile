@@ -283,6 +283,54 @@ class _CycleDetailScreenState extends ConsumerState<CycleDetailScreen> {
     );
   }
 
+  Future<void> _confirmArchive() async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Archive cycle'),
+        content: Text(
+            'Move "${widget.cycle.name}" out of the active cycles? It stays '
+            'readable under Archived and can be restored from there.'),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Cancel')),
+          TextButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              child: const Text('Archive')),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    try {
+      await CycleService.archiveCycle(
+          widget.workspaceSlug, widget.projectId, widget.cycle.id);
+      // The list screen invalidates and reloads on every return from here, so
+      // popping is what makes the row move into the archive.
+      if (mounted) Navigator.pop(context);
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to archive: $e')),
+        );
+      }
+    }
+  }
+
+  Future<void> _unarchive() async {
+    try {
+      await CycleService.unarchiveCycle(
+          widget.workspaceSlug, widget.projectId, widget.cycle.id);
+      if (mounted) Navigator.pop(context);
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to restore: $e')),
+        );
+      }
+    }
+  }
+
   void _confirmDelete() {
     showDialog(
       context: context,
@@ -325,7 +373,8 @@ class _CycleDetailScreenState extends ConsumerState<CycleDetailScreen> {
     final theme = Theme.of(context);
     final secondary = theme.colorScheme.onSurfaceVariant;
     final cycle = widget.cycle;
-    final statusColor = _statusColorFor(cycle.computedStatus);
+    final statusColor =
+        cycle.isArchived ? secondary : _statusColorFor(cycle.computedStatus);
 
     return Scaffold(
       appBar: M3EAppBar(
@@ -355,12 +404,19 @@ class _CycleDetailScreenState extends ConsumerState<CycleDetailScreen> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            // Status chip
+                            // Status chip. Archived replaces the status rather
+                            // than sitting next to it: an archived cycle is
+                            // always a completed one, so showing both says the
+                            // same thing twice.
                             PropertyChip(
-                              icon: Icons.loop,
+                              icon: cycle.isArchived
+                                  ? Icons.inventory_2_outlined
+                                  : Icons.loop,
                               iconColor: statusColor,
-                              label: cycle.computedStatus[0].toUpperCase() +
-                                  cycle.computedStatus.substring(1),
+                              label: cycle.isArchived
+                                  ? 'Archived'
+                                  : cycle.computedStatus[0].toUpperCase() +
+                                      cycle.computedStatus.substring(1),
                             ),
                             if (cycle.description != null &&
                                 cycle.description!.isNotEmpty) ...[
@@ -496,21 +552,57 @@ class _CycleDetailScreenState extends ConsumerState<CycleDetailScreen> {
   }
 
   void _showMoreMenu() {
+    final cycle = widget.cycle;
     showModalBottomSheet(
       context: context,
       builder: (ctx) => SafeArea(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            ListTile(
-              leading: const Icon(Icons.edit_outlined, size: 20),
-              title:
-                  Text('Edit cycle', style: Theme.of(ctx).textTheme.bodyMedium),
-              onTap: () {
-                Navigator.pop(ctx);
-                _showEditCycleDialog();
-              },
-            ),
+            // Plane rejects a PATCH on an archived cycle outright, so the edit
+            // entry is not offered on one rather than being offered and failing.
+            if (!cycle.isArchived)
+              ListTile(
+                leading: const Icon(Icons.edit_outlined, size: 20),
+                title: Text('Edit cycle',
+                    style: Theme.of(ctx).textTheme.bodyMedium),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  _showEditCycleDialog();
+                },
+              ),
+            if (cycle.isArchived)
+              ListTile(
+                leading: const Icon(Icons.unarchive_outlined, size: 20),
+                title: Text('Restore cycle',
+                    style: Theme.of(ctx).textTheme.bodyMedium),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  _unarchive();
+                },
+              )
+            else
+              ListTile(
+                leading: const Icon(Icons.inventory_2_outlined, size: 20),
+                title: Text('Archive cycle',
+                    style: Theme.of(ctx).textTheme.bodyMedium),
+                // The server only archives a cycle whose end date has passed,
+                // and blows up on one with no end date at all, so the entry is
+                // shown disabled with the reason rather than hidden — a cycle
+                // that cannot be archived yet is not the same as one that has
+                // no archive action.
+                subtitle: cycle.canArchive
+                    ? null
+                    : Text('Only a cycle whose end date has passed',
+                        style: Theme.of(ctx).textTheme.bodySmall),
+                enabled: cycle.canArchive,
+                onTap: cycle.canArchive
+                    ? () {
+                        Navigator.pop(ctx);
+                        _confirmArchive();
+                      }
+                    : null,
+              ),
             ListTile(
               leading: Icon(Icons.delete_outline,
                   color: Theme.of(ctx).colorScheme.error, size: 20),

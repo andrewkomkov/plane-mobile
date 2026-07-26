@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../config/theme.dart';
 import '../../widgets/m3e/icon_button.dart';
 import '../../widgets/m3e/text_field.dart';
+import '../../services/archived_issue_service.dart';
 import '../../services/issue_service.dart';
 import '../../services/view_service.dart';
 import '../../models/issue.dart';
@@ -10,6 +11,7 @@ import '../../models/label.dart';
 import '../../models/member.dart';
 import '../../models/state.dart';
 import '../../utils/issue_grouping.dart';
+import '../../widgets/archive_toggle.dart';
 import '../../widgets/issue_row.dart';
 import '../../widgets/section_header.dart';
 import '../../widgets/loading_state.dart';
@@ -50,6 +52,20 @@ class _IssueListScreenState extends ConsumerState<IssueListScreen>
   final DisplayState _display = DisplayState();
   FilterState _filterState = const FilterState();
 
+  /// Whether the list is showing the archive instead of the live work items.
+  bool _showArchived = false;
+
+  /// Fetched here rather than by the parent tab.
+  ///
+  /// `IssuesTabScreen` hands the same live list to all four view modes, and
+  /// three of them — board, table, calendar — have no archive. Loading the
+  /// archive up there would cost every project open a request that only one
+  /// view can ever use, so this screen asks for it the first time it is asked
+  /// to show one.
+  List<ArchivedIssue>? _archived;
+  bool _archivedLoading = false;
+  String? _archivedError;
+
   @override
   bool get wantKeepAlive => true;
 
@@ -57,6 +73,45 @@ class _IssueListScreenState extends ConsumerState<IssueListScreen>
   Map<String, IssueState> get _states => widget.states;
   List<Label> get _labels => widget.labels;
   List<Member> get _members => widget.members;
+
+  /// The archived work items, in the order the server returned them.
+  ///
+  /// Deliberately not run through [_filteredAndSorted]: the display sheet's
+  /// completed filter defaults to hiding completed and cancelled work, and
+  /// nearly everything in an archive is one of those — applying it here would
+  /// show an empty archive to a user looking straight at a full one.
+  List<ArchivedIssue> get _archivedIssues => _archived ?? const [];
+
+  Future<void> _loadArchived() async {
+    setState(() {
+      _archivedLoading = true;
+      _archivedError = null;
+    });
+    try {
+      final archived = await ArchivedIssueService.getArchivedIssues(
+          widget.workspaceSlug, widget.projectId);
+      if (mounted) {
+        setState(() {
+          _archived = archived;
+          _archivedLoading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _archivedError = e.toString();
+          _archivedLoading = false;
+        });
+      }
+    }
+  }
+
+  void _toggleArchived(bool value) {
+    setState(() => _showArchived = value);
+    // Refetched on every entry: a work item archived from its detail screen a
+    // moment ago has to be here.
+    if (value) _loadArchived();
+  }
 
   Future<void> _saveAsView() async {
     final name = await showDialog<String>(
@@ -164,115 +219,189 @@ class _IssueListScreenState extends ConsumerState<IssueListScreen>
     super.build(context);
     final theme = Theme.of(context);
 
-    final grouped = _grouped;
-
     final secondary = theme.colorScheme.onSurfaceVariant;
+    final count =
+        _showArchived ? _archivedIssues.length : _filteredAndSorted.length;
     return Scaffold(
       body: Column(
         children: [
-          // Minimal header: issue count + display options
+          // Minimal header: issue count + archive toggle + display options
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
             child: Row(
               children: [
-                Text('${_filteredAndSorted.length} issues',
+                Text('$count ${_showArchived ? 'archived' : 'issues'}',
                     style: theme.textTheme.bodySmall),
                 const Spacer(),
-                M3EIconButton(
-                  icon: Icons.tune,
-                  tooltip: 'Display options',
-                  size: M3EIconButtonSize.small,
-                  color: secondary,
-                  onPressed: () => showDisplayOptions(
-                      context, _display, () => setState(() {})),
+                ArchiveToggle(
+                  showArchived: _showArchived,
+                  entityPlural: 'work items',
+                  onChanged: _toggleArchived,
                 ),
+                const SizedBox(width: 4),
+                // The display sheet drives grouping and sorting, neither of
+                // which the archive uses, so it is not offered there.
+                if (!_showArchived)
+                  M3EIconButton(
+                    icon: Icons.tune,
+                    tooltip: 'Display options',
+                    size: M3EIconButtonSize.small,
+                    color: secondary,
+                    onPressed: () => showDisplayOptions(
+                        context, _display, () => setState(() {})),
+                  ),
               ],
             ),
           ),
           Expanded(
-            child: RefreshIndicator(
-              onRefresh: widget.onRefresh,
-              child: _filteredAndSorted.isEmpty
-                  ? ListView(children: [
-                      SizedBox(
-                          height: MediaQuery.of(context).size.height * 0.25),
-                      Center(
-                        child: EmptyStateWidget(
-                          message: _filterState.hasActiveFilters
-                              ? 'No issues match filters'
-                              : 'No issues',
-                          icon: Icons.check_circle_outline,
-                          subtitle: _filterState.hasActiveFilters
-                              ? 'Try adjusting your filters'
-                              : null,
-                        ),
-                      ),
-                    ])
-                  : ListView.builder(
-                      itemCount: grouped.entries
-                          .fold<int>(0, (sum, e) => sum + 1 + e.value.length),
-                      itemBuilder: (ctx, index) {
-                        int current = 0;
-                        for (final entry in grouped.entries) {
-                          if (index == current) {
-                            final label =
-                                groupByLabel(_display.groupByField, entry.key);
-                            return SectionHeader(
-                              label: label,
-                              count: entry.value.length,
-                              color: _groupColor(entry.key),
-                            );
-                          }
-                          current++;
-                          final issueIndex = index - current;
-                          if (issueIndex < entry.value.length) {
-                            final issue = entry.value[issueIndex];
-                            final state = _states[issue.state];
-                            return IssueRow(
-                              issue: issue,
-                              state: state,
-                              identifier: widget.projectIdentifier,
-                              showId: _display.rowProperties.contains('id'),
-                              showPriority:
-                                  _display.rowProperties.contains('priority'),
-                              showState:
-                                  _display.rowProperties.contains('status'),
-                              showLabels:
-                                  _display.rowProperties.contains('labels'),
-                              showSubIssues: true,
-                              showAssignee:
-                                  _display.rowProperties.contains('assignee'),
-                              showDueDate:
-                                  _display.rowProperties.contains('due_date'),
-                              maxTitleLines: _display.maxTitleLines,
-                              allLabels: _labels,
-                              allMembers: _members,
-                              onTap: () async {
-                                await Navigator.push(
-                                    context,
-                                    MaterialPageRoute(
-                                      builder: (_) => IssueDetailScreen(
-                                        workspaceSlug: widget.workspaceSlug,
-                                        projectId: widget.projectId,
-                                        issueId: issue.id,
-                                        projectIdentifier:
-                                            widget.projectIdentifier,
-                                        states: _states,
-                                      ),
-                                    ));
-                                widget.onRefresh();
-                              },
-                            );
-                          }
-                          current += entry.value.length;
-                        }
-                        return const SizedBox.shrink();
-                      },
-                    ),
-            ),
+            child: _showArchived
+                ? RefreshIndicator(
+                    onRefresh: _loadArchived,
+                    child: _archivedList(),
+                  )
+                : _liveList(),
           ),
         ],
       ),
+    );
+  }
+
+  Widget _archivedList() {
+    if (_archivedError != null) {
+      return ErrorStateWidget(
+        message: 'Failed to load archived work items',
+        onRetry: _loadArchived,
+      );
+    }
+    if (_archived == null && _archivedLoading) {
+      return const LoadingStateWidget();
+    }
+    final archived = _archivedIssues;
+    if (archived.isEmpty) {
+      return ListView(children: [
+        SizedBox(height: MediaQuery.of(context).size.height * 0.25),
+        const Center(
+          child: EmptyStateWidget(
+            message: 'No archived work items',
+            icon: Icons.inventory_2_outlined,
+            subtitle: 'Work items archived here or on the web appear here',
+          ),
+        ),
+      ]);
+    }
+    return ListView.builder(
+      itemCount: archived.length,
+      itemBuilder: (ctx, i) {
+        final entry = archived[i];
+        final issue = entry.issue;
+        // The same IssueRow every other list uses. Archived reads through the
+        // subtitle slot and through the label — the row is not a variant, it
+        // just has one more thing to say about itself.
+        return IssueRow(
+          issue: issue,
+          state: _states[issue.state],
+          identifier: widget.projectIdentifier,
+          subtitle: archivedOnLabel(entry.archivedAt),
+          showId: true,
+          showPriority: true,
+          showState: true,
+          semanticExtras: const ['archived'],
+          onTap: () async {
+            await Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => IssueDetailScreen(
+                  workspaceSlug: widget.workspaceSlug,
+                  projectId: widget.projectId,
+                  issueId: issue.id,
+                  projectIdentifier: widget.projectIdentifier,
+                  states: _states,
+                ),
+              ),
+            );
+            // Restoring happens on the detail screen, so what was open may no
+            // longer belong in this list.
+            _loadArchived();
+          },
+        );
+      },
+    );
+  }
+
+  Widget _liveList() {
+    final grouped = _grouped;
+    return RefreshIndicator(
+      onRefresh: widget.onRefresh,
+      child: _filteredAndSorted.isEmpty
+          ? ListView(children: [
+              SizedBox(height: MediaQuery.of(context).size.height * 0.25),
+              Center(
+                child: EmptyStateWidget(
+                  message: _filterState.hasActiveFilters
+                      ? 'No issues match filters'
+                      : 'No issues',
+                  icon: Icons.check_circle_outline,
+                  subtitle: _filterState.hasActiveFilters
+                      ? 'Try adjusting your filters'
+                      : null,
+                ),
+              ),
+            ])
+          : ListView.builder(
+              itemCount: grouped.entries
+                  .fold<int>(0, (sum, e) => sum + 1 + e.value.length),
+              itemBuilder: (ctx, index) {
+                int current = 0;
+                for (final entry in grouped.entries) {
+                  if (index == current) {
+                    final label =
+                        groupByLabel(_display.groupByField, entry.key);
+                    return SectionHeader(
+                      label: label,
+                      count: entry.value.length,
+                      color: _groupColor(entry.key),
+                    );
+                  }
+                  current++;
+                  final issueIndex = index - current;
+                  if (issueIndex < entry.value.length) {
+                    final issue = entry.value[issueIndex];
+                    final state = _states[issue.state];
+                    return IssueRow(
+                      issue: issue,
+                      state: state,
+                      identifier: widget.projectIdentifier,
+                      showId: _display.rowProperties.contains('id'),
+                      showPriority: _display.rowProperties.contains('priority'),
+                      showState: _display.rowProperties.contains('status'),
+                      showLabels: _display.rowProperties.contains('labels'),
+                      showSubIssues: true,
+                      showAssignee: _display.rowProperties.contains('assignee'),
+                      showDueDate: _display.rowProperties.contains('due_date'),
+                      maxTitleLines: _display.maxTitleLines,
+                      allLabels: _labels,
+                      allMembers: _members,
+                      onTap: () async {
+                        await Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => IssueDetailScreen(
+                                workspaceSlug: widget.workspaceSlug,
+                                projectId: widget.projectId,
+                                issueId: issue.id,
+                                projectIdentifier: widget.projectIdentifier,
+                                states: _states,
+                              ),
+                            ));
+                        widget.onRefresh();
+                      },
+                    );
+                  }
+                  current += entry.value.length;
+                }
+                return const SizedBox.shrink();
+              },
+            ),
     );
   }
 }

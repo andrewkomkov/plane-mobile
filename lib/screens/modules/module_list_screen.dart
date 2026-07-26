@@ -5,7 +5,9 @@ import '../../config/theme.dart';
 import '../../services/module_service.dart';
 import '../../providers/data_providers.dart';
 import '../../models/module.dart';
+import '../../widgets/archive_toggle.dart';
 import '../../widgets/loading_state.dart';
+import '../../widgets/m3e/icon_button.dart';
 import '../../widgets/plane_row.dart';
 import '../../widgets/skeleton_loader.dart';
 import '../../widgets/property_chip.dart';
@@ -27,6 +29,15 @@ class _ModuleListScreenState extends ConsumerState<ModuleListScreen>
   bool _initialLoading = true;
   String? _error;
 
+  /// Whether the list is showing the archive instead of the live modules.
+  bool _showArchived = false;
+
+  /// Held outside [DataCache] for the same reason as archived cycles: the
+  /// cache persists to SQLite for the offline path, and an archive is a view
+  /// a user opens occasionally and expects to be current.
+  List<Module>? _archived;
+  bool _archivedLoading = false;
+
   @override
   bool get wantKeepAlive => true;
 
@@ -43,6 +54,7 @@ class _ModuleListScreenState extends ConsumerState<ModuleListScreen>
 
   Future<void> _load() async {
     setState(() => _error = null);
+    if (_showArchived) return _loadArchived();
     try {
       await _cache.loadModules(widget.workspaceSlug, widget.projectId,
           force: true);
@@ -55,6 +67,84 @@ class _ModuleListScreenState extends ConsumerState<ModuleListScreen>
         });
       }
     }
+  }
+
+  Future<void> _loadArchived() async {
+    setState(() {
+      _archivedLoading = true;
+      _error = null;
+    });
+    try {
+      final archived = await ModuleService.getArchivedModules(
+          widget.workspaceSlug, widget.projectId);
+      if (mounted) {
+        setState(() {
+          _archived = archived;
+          _archivedLoading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _error = e.toString();
+          _archivedLoading = false;
+        });
+      }
+    }
+  }
+
+  void _toggleArchived(bool value) {
+    setState(() {
+      _showArchived = value;
+      _error = null;
+    });
+    // Either direction refetches: coming back out, the live cache was
+    // invalidated by any restore done while we were in, so the live list would
+    // otherwise render empty.
+    if (value) {
+      _loadArchived();
+    } else {
+      _load();
+    }
+  }
+
+  Future<void> _unarchive(Module module) async {
+    try {
+      await ModuleService.unarchiveModule(
+          widget.workspaceSlug, widget.projectId, module.id);
+      _cache.invalidateModules(widget.workspaceSlug, widget.projectId);
+      await _loadArchived();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('${module.name} restored')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to restore module: $e')),
+        );
+      }
+    }
+  }
+
+  Future<void> _confirmUnarchive(Module module) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Restore module'),
+        content: Text('Move "${module.name}" back into the active modules?'),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Cancel')),
+          TextButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              child: const Text('Restore')),
+        ],
+      ),
+    );
+    if (ok == true) await _unarchive(module);
   }
 
   Color _statusColor(String? status) {
@@ -173,57 +263,105 @@ class _ModuleListScreenState extends ConsumerState<ModuleListScreen>
   Widget build(BuildContext context) {
     super.build(context);
 
-    if (_initialLoading && _modules.isEmpty) {
+    if (!_showArchived && _initialLoading && _modules.isEmpty) {
       return const ProjectListSkeleton();
     }
+
+    return Scaffold(
+      body: Column(
+        children: [
+          _header(context),
+          Expanded(
+            child: RefreshIndicator(
+              onRefresh: _load,
+              child: _showArchived ? _archivedList() : _liveList(),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _header(BuildContext context) {
+    final theme = Theme.of(context);
+    final count = _showArchived ? (_archived?.length ?? 0) : _modules.length;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 8, 12, 4),
+      child: Row(
+        children: [
+          Text('$count ${count == 1 ? 'module' : 'modules'}',
+              style: theme.textTheme.bodySmall),
+          const Spacer(),
+          ArchiveToggle(
+            showArchived: _showArchived,
+            entityPlural: 'modules',
+            onChanged: _toggleArchived,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _liveList() {
     if (_error != null && _modules.isEmpty) {
       return ErrorStateWidget(
           message: 'Failed to load modules', onRetry: _load);
     }
     if (_modules.isEmpty) {
-      return const Center(
-        child: EmptyStateWidget(
-          message: 'No modules',
-          icon: Icons.view_module,
+      return ListView(children: [
+        SizedBox(height: MediaQuery.of(context).size.height * 0.25),
+        const Center(
+          child:
+              EmptyStateWidget(message: 'No modules', icon: Icons.view_module),
         ),
-      );
+      ]);
     }
+    return ListView.builder(
+      itemCount: _modules.length,
+      itemBuilder: (ctx, i) => _moduleRow(module: _modules[i]),
+    );
+  }
 
-    return Scaffold(
-      body: RefreshIndicator(
-        onRefresh: _load,
-        child: ListView.builder(
-          itemCount: _modules.length,
-          itemBuilder: (ctx, i) {
-            final m = _modules[i];
-            return _moduleRow(
-              module: m,
-              onTap: () async {
-                await Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => ModuleDetailScreen(
-                      workspaceSlug: widget.workspaceSlug,
-                      projectId: widget.projectId,
-                      module: m,
-                    ),
-                  ),
-                );
-                _cache.invalidateModules(
-                    widget.workspaceSlug, widget.projectId);
-                _load();
-              },
-            );
-          },
+  Widget _archivedList() {
+    if (_error != null) {
+      return ErrorStateWidget(
+          message: 'Failed to load archived modules', onRetry: _loadArchived);
+    }
+    final archived = _archived;
+    if (archived == null || (_archivedLoading && archived.isEmpty)) {
+      return const ProjectListSkeleton();
+    }
+    if (archived.isEmpty) {
+      return ListView(children: [
+        SizedBox(height: MediaQuery.of(context).size.height * 0.25),
+        const Center(
+          child: EmptyStateWidget(
+            message: 'No archived modules',
+            icon: Icons.inventory_2_outlined,
+            subtitle: 'Modules archived from here or from the web appear here',
+          ),
         ),
-      ),
+      ]);
+    }
+    return ListView.builder(
+      itemCount: archived.length,
+      itemBuilder: (ctx, i) => _moduleRow(module: archived[i]),
     );
   }
 
   /// Same row as a cycle, with the status carried by a chip because this list
   /// is flat where the cycle list groups by status.
-  Widget _moduleRow({required Module module, required VoidCallback onTap}) {
-    final statusColor = _statusColor(module.status);
+  ///
+  /// Archived swaps the leading glyph, replaces the date range with the
+  /// archive date, and puts a restore button in the trailing slot — the one
+  /// slot [PlaneRow] leaves outside its own semantics node, so the button
+  /// keeps a name of its own.
+  Widget _moduleRow({required Module module}) {
+    final theme = Theme.of(context);
+    final archived = module.isArchived;
+    final statusColor = archived
+        ? theme.colorScheme.onSurfaceVariant
+        : _statusColor(module.status);
     final statusLabel = _statusLabel(module.status);
     final dates = [module.startDate, module.targetDate]
         .where((d) => d != null)
@@ -231,10 +369,12 @@ class _ModuleListScreenState extends ConsumerState<ModuleListScreen>
     final count = '${module.completedIssues}/${module.totalIssues}';
 
     return PlaneRow(
-      icon: Icons.view_module,
+      icon: archived ? Icons.inventory_2_outlined : Icons.view_module,
       iconColor: statusColor,
       title: module.name,
-      subtitle: dates.isEmpty ? null : dates,
+      subtitle: archived
+          ? archivedOnLabel(module.archivedAt)
+          : (dates.isEmpty ? null : dates),
       subtitleTrailing: count,
       progress: module.progress,
       progressColor: statusColor,
@@ -247,11 +387,36 @@ class _ModuleListScreenState extends ConsumerState<ModuleListScreen>
       ],
       semanticLabel: [
         module.name,
+        if (archived) archivedOnLabel(module.archivedAt),
         statusLabel,
         '$count issues done',
         if (dates.isNotEmpty) dates,
       ].join(', '),
-      onTap: onTap,
+      trailing: archived
+          ? M3EIconButton(
+              icon: Icons.unarchive_outlined,
+              tooltip: 'Restore module ${module.name}',
+              size: M3EIconButtonSize.small,
+              onPressed: () => _confirmUnarchive(module),
+            )
+          : null,
+      onTap: () => _openModule(module),
     );
+  }
+
+  Future<void> _openModule(Module module) async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => ModuleDetailScreen(
+          workspaceSlug: widget.workspaceSlug,
+          projectId: widget.projectId,
+          module: module,
+        ),
+      ),
+    );
+    if (!mounted) return;
+    _cache.invalidateModules(widget.workspaceSlug, widget.projectId);
+    _load();
   }
 }

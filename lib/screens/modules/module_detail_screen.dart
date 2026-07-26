@@ -328,6 +328,53 @@ class _ModuleDetailScreenState extends ConsumerState<ModuleDetailScreen> {
     );
   }
 
+  Future<void> _confirmArchive() async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Archive module'),
+        content: Text(
+            'Move "${widget.module.name}" out of the active modules? It stays '
+            'readable under Archived and can be restored from there.'),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Cancel')),
+          TextButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              child: const Text('Archive')),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    try {
+      await ModuleService.archiveModule(
+          widget.workspaceSlug, widget.projectId, widget.module.id);
+      // The list screen invalidates and reloads on every return from here.
+      if (mounted) Navigator.pop(context);
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to archive: $e')),
+        );
+      }
+    }
+  }
+
+  Future<void> _unarchive() async {
+    try {
+      await ModuleService.unarchiveModule(
+          widget.workspaceSlug, widget.projectId, widget.module.id);
+      if (mounted) Navigator.pop(context);
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to restore: $e')),
+        );
+      }
+    }
+  }
+
   void _confirmDelete() {
     showDialog(
       context: context,
@@ -395,7 +442,8 @@ class _ModuleDetailScreenState extends ConsumerState<ModuleDetailScreen> {
     final theme = Theme.of(context);
     final secondary = theme.colorScheme.onSurfaceVariant;
     final mod = widget.module;
-    final statusColor = _statusColorFor(mod.status);
+    final statusColor =
+        mod.isArchived ? secondary : _statusColorFor(mod.status);
 
     return Scaffold(
       appBar: M3EAppBar(
@@ -425,11 +473,26 @@ class _ModuleDetailScreenState extends ConsumerState<ModuleDetailScreen> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            // Status chip
-                            PropertyChip(
-                              icon: Icons.circle,
-                              iconColor: statusColor,
-                              label: _statusLabel(mod.status),
+                            // Status chip. An archived module keeps its status
+                            // — completed and cancelled are not the same
+                            // thing — so Archived is a second chip beside it
+                            // rather than a replacement.
+                            Wrap(
+                              spacing: 6,
+                              runSpacing: 4,
+                              children: [
+                                PropertyChip(
+                                  icon: Icons.circle,
+                                  iconColor: statusColor,
+                                  label: _statusLabel(mod.status),
+                                ),
+                                if (mod.isArchived)
+                                  PropertyChip(
+                                    icon: Icons.inventory_2_outlined,
+                                    iconColor: secondary,
+                                    label: 'Archived',
+                                  ),
+                              ],
                             ),
                             if (mod.description != null &&
                                 mod.description!.isNotEmpty) ...[
@@ -564,21 +627,55 @@ class _ModuleDetailScreenState extends ConsumerState<ModuleDetailScreen> {
   }
 
   void _showMoreMenu() {
+    final mod = widget.module;
     showModalBottomSheet(
       context: context,
       builder: (ctx) => SafeArea(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            ListTile(
-              leading: const Icon(Icons.edit_outlined, size: 20),
-              title: Text('Edit module',
-                  style: Theme.of(ctx).textTheme.bodyMedium),
-              onTap: () {
-                Navigator.pop(ctx);
-                _showEditModuleDialog();
-              },
-            ),
+            // Plane answers 400 to a PATCH on an archived module, so the edit
+            // entry is withheld rather than offered and then failing.
+            if (!mod.isArchived)
+              ListTile(
+                leading: const Icon(Icons.edit_outlined, size: 20),
+                title: Text('Edit module',
+                    style: Theme.of(ctx).textTheme.bodyMedium),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  _showEditModuleDialog();
+                },
+              ),
+            if (mod.isArchived)
+              ListTile(
+                leading: const Icon(Icons.unarchive_outlined, size: 20),
+                title: Text('Restore module',
+                    style: Theme.of(ctx).textTheme.bodyMedium),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  _unarchive();
+                },
+              )
+            else
+              ListTile(
+                leading: const Icon(Icons.inventory_2_outlined, size: 20),
+                title: Text('Archive module',
+                    style: Theme.of(ctx).textTheme.bodyMedium),
+                // Plane only archives a completed or cancelled module. Shown
+                // disabled with the reason: "no archive action here" and "not
+                // archivable yet" are different things to a reader.
+                subtitle: mod.canArchive
+                    ? null
+                    : Text('Only a completed or cancelled module',
+                        style: Theme.of(ctx).textTheme.bodySmall),
+                enabled: mod.canArchive,
+                onTap: mod.canArchive
+                    ? () {
+                        Navigator.pop(ctx);
+                        _confirmArchive();
+                      }
+                    : null,
+              ),
             ListTile(
               leading: Icon(Icons.delete_outline,
                   color: Theme.of(ctx).colorScheme.error, size: 20),

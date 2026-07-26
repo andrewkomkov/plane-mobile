@@ -3,12 +3,60 @@ import '../models/module.dart';
 import '../models/issue.dart';
 
 class ModuleService {
-  static Future<List<Module>> getModules(String workspaceSlug, String projectId) async {
+  static Future<List<Module>> getModules(
+      String workspaceSlug, String projectId) async {
     final dio = await ApiClient.getInstance();
-    final response = await dio.get('/workspaces/$workspaceSlug/projects/$projectId/modules/');
+    final response = await dio
+        .get('/workspaces/$workspaceSlug/projects/$projectId/modules/');
     final data = response.data;
     final list = data is Map ? (data['results'] ?? []) : data;
     return (list as List).map((e) => Module.fromJson(e)).toList();
+  }
+
+  /// Archived modules only.
+  ///
+  /// `ModuleArchiveUnarchiveEndpoint.get` filters on
+  /// `archived_at__isnull=False` itself, and answers with a bare `.values()`
+  /// list rather than a paginated envelope.
+  static Future<List<Module>> getArchivedModules(
+      String workspaceSlug, String projectId) async {
+    final dio = await ApiClient.getInstance();
+    final response = await dio.get(
+        '/workspaces/$workspaceSlug/projects/$projectId/archived-modules/');
+    final data = response.data;
+    final list = data is Map ? (data['results'] ?? []) : data;
+    return (list as List).map((e) => Module.fromJson(e)).toList();
+  }
+
+  /// Archives a module.
+  ///
+  /// Same shape as cycles: POST and DELETE on `modules/{id}/archive/` are the
+  /// two directions, and `archived-modules/{id}/` is read-only regardless of
+  /// what its name suggests — its handler expects `module_id` where the URL
+  /// gives `pk`.
+  ///
+  /// Rejected with 400 unless the module's status is completed or cancelled.
+  /// See [Module.canArchive].
+  static Future<void> archiveModule(
+    String workspaceSlug,
+    String projectId,
+    String moduleId,
+  ) async {
+    final dio = await ApiClient.getInstance();
+    await dio.post(
+      '/workspaces/$workspaceSlug/projects/$projectId/modules/$moduleId/archive/',
+    );
+  }
+
+  static Future<void> unarchiveModule(
+    String workspaceSlug,
+    String projectId,
+    String moduleId,
+  ) async {
+    final dio = await ApiClient.getInstance();
+    await dio.delete(
+      '/workspaces/$workspaceSlug/projects/$projectId/modules/$moduleId/archive/',
+    );
   }
 
   static Future<Module> createModule(
