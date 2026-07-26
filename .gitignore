@@ -13,3 +13,6 @@ ios/Pods/
 *.apk
 *.aab
 android/.kotlin/
+
+# Agent worktrees
+.claude/worktrees/

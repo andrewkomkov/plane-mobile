@@ -3,6 +3,23 @@
 What the mobile app does and does not implement, measured against the Plane
 server this deployment actually runs.
 
+> **Correction — read this before the tables below.** This document was first
+> written against the server's *internal* API (`apps/api/plane/app/urls/`).
+> That is the wrong reference. Both login paths end in
+> `setup_screen.dart:_handleAuthSuccess`, which stores an API token and sets
+> `authMethod = 'api_key'`; `api_client.dart` then points the base URL at
+> `{base}/api/v1`. The session branch is dead code, so the app in fact talks to
+> Plane's *external* v1 API (`apps/api/plane/api/urls/`), which is a much
+> smaller surface. 17 endpoints the app calls do not exist there at all.
+>
+> Consequences confirmed on a device, not inferred: opening any work item shows
+> "Failed to load issue", and the Views screen shows "Failed to load views".
+> Saved views have no v1 equivalent under any name. So some rows below marked
+> covered describe code that is wired but dead. Tracked as task #17, which has
+> to be decided before most of the remaining work is worth doing.
+>
+> Rows corrected since that finding are marked **(v1-checked)**.
+
 **Reference:** `~/PycharmProjects/Plane.so`, Plane **v1.2.0** — a fork, not
 stock (it carries local commits adding workspace-level Pages and a v1 pages
 API). The feature list below is derived from that server's own route table
