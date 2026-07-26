@@ -10,14 +10,13 @@ import '../../models/label.dart';
 import '../../models/member.dart';
 import '../../models/state.dart';
 import '../../utils/issue_grouping.dart';
-import '../../widgets/issue_tile.dart';
+import '../../widgets/issue_row.dart';
 import '../../widgets/section_header.dart';
 import '../../widgets/loading_state.dart';
 import '../../widgets/filter_bar.dart';
 import '../../widgets/display_options.dart';
 import '../../widgets/bottom_sheet_picker.dart';
 import 'issue_detail_screen.dart';
-
 
 class IssueListScreen extends ConsumerStatefulWidget {
   final String workspaceSlug;
@@ -43,8 +42,7 @@ class IssueListScreen extends ConsumerStatefulWidget {
   });
 
   @override
-  ConsumerState<IssueListScreen> createState() =>
-      _IssueListScreenState();
+  ConsumerState<IssueListScreen> createState() => _IssueListScreenState();
 }
 
 class _IssueListScreenState extends ConsumerState<IssueListScreen>
@@ -77,8 +75,7 @@ class _IssueListScreenState extends ConsumerState<IssueListScreen>
                 onPressed: () => Navigator.pop(ctx),
                 child: const Text('Cancel')),
             TextButton(
-                onPressed: () =>
-                    Navigator.pop(ctx, controller.text.trim()),
+                onPressed: () => Navigator.pop(ctx, controller.text.trim()),
                 child: const Text('Save')),
           ],
         );
@@ -90,12 +87,10 @@ class _IssueListScreenState extends ConsumerState<IssueListScreen>
         queryData['state'] = _filterState.selectedStates.toList();
       }
       if (_filterState.selectedPriorities.isNotEmpty) {
-        queryData['priority'] =
-            _filterState.selectedPriorities.toList();
+        queryData['priority'] = _filterState.selectedPriorities.toList();
       }
       if (_filterState.selectedAssignees.isNotEmpty) {
-        queryData['assignees'] =
-            _filterState.selectedAssignees.toList();
+        queryData['assignees'] = _filterState.selectedAssignees.toList();
       }
       if (_filterState.selectedLabels.isNotEmpty) {
         queryData['label'] = _filterState.selectedLabels.toList();
@@ -107,8 +102,8 @@ class _IssueListScreenState extends ConsumerState<IssueListScreen>
           {'name': name, 'query_data': queryData},
         );
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('View saved')));
+          ScaffoldMessenger.of(context)
+              .showSnackBar(const SnackBar(content: Text('View saved')));
         }
       } catch (e) {
         if (mounted) {
@@ -188,8 +183,8 @@ class _IssueListScreenState extends ConsumerState<IssueListScreen>
                   tooltip: 'Display options',
                   size: M3EIconButtonSize.small,
                   color: secondary,
-                  onPressed: () =>
-                      showDisplayOptions(context, _display, () => setState(() {})),
+                  onPressed: () => showDisplayOptions(
+                      context, _display, () => setState(() {})),
                 ),
               ],
             ),
@@ -200,8 +195,7 @@ class _IssueListScreenState extends ConsumerState<IssueListScreen>
               child: _filteredAndSorted.isEmpty
                   ? ListView(children: [
                       SizedBox(
-                          height: MediaQuery.of(context).size.height *
-                              0.25),
+                          height: MediaQuery.of(context).size.height * 0.25),
                       Center(
                         child: EmptyStateWidget(
                           message: _filterState.hasActiveFilters
@@ -215,14 +209,14 @@ class _IssueListScreenState extends ConsumerState<IssueListScreen>
                       ),
                     ])
                   : ListView.builder(
-                      itemCount: grouped.entries.fold<int>(
-                          0, (sum, e) => sum + 1 + e.value.length),
+                      itemCount: grouped.entries
+                          .fold<int>(0, (sum, e) => sum + 1 + e.value.length),
                       itemBuilder: (ctx, index) {
                         int current = 0;
                         for (final entry in grouped.entries) {
                           if (index == current) {
-                            final label = groupByLabel(
-                                _display.groupByField, entry.key);
+                            final label =
+                                groupByLabel(_display.groupByField, entry.key);
                             return SectionHeader(
                               label: label,
                               count: entry.value.length,
@@ -234,18 +228,22 @@ class _IssueListScreenState extends ConsumerState<IssueListScreen>
                           if (issueIndex < entry.value.length) {
                             final issue = entry.value[issueIndex];
                             final state = _states[issue.state];
-                            return IssueTile(
+                            return IssueRow(
                               issue: issue,
                               state: state,
-                              projectIdentifier:
-                                  widget.projectIdentifier,
+                              identifier: widget.projectIdentifier,
                               showId: _display.rowProperties.contains('id'),
-                              showPriority: _display.rowProperties.contains('priority'),
-                              showState: _display.rowProperties.contains('status'),
-                              showLabels: _display.rowProperties.contains('labels'),
+                              showPriority:
+                                  _display.rowProperties.contains('priority'),
+                              showState:
+                                  _display.rowProperties.contains('status'),
+                              showLabels:
+                                  _display.rowProperties.contains('labels'),
                               showSubIssues: true,
-                              showAssignee: _display.rowProperties.contains('assignee'),
-                              showDueDate: _display.rowProperties.contains('due_date'),
+                              showAssignee:
+                                  _display.rowProperties.contains('assignee'),
+                              showDueDate:
+                                  _display.rowProperties.contains('due_date'),
                               maxTitleLines: _display.maxTitleLines,
                               allLabels: _labels,
                               allMembers: _members,
@@ -253,12 +251,9 @@ class _IssueListScreenState extends ConsumerState<IssueListScreen>
                                 await Navigator.push(
                                     context,
                                     MaterialPageRoute(
-                                      builder: (_) =>
-                                          IssueDetailScreen(
-                                        workspaceSlug:
-                                            widget.workspaceSlug,
-                                        projectId:
-                                            widget.projectId,
+                                      builder: (_) => IssueDetailScreen(
+                                        workspaceSlug: widget.workspaceSlug,
+                                        projectId: widget.projectId,
                                         issueId: issue.id,
                                         projectIdentifier:
                                             widget.projectIdentifier,
@@ -281,4 +276,3 @@ class _IssueListScreenState extends ConsumerState<IssueListScreen>
     );
   }
 }
-

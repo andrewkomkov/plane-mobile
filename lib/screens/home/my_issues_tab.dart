@@ -18,7 +18,7 @@ import '../../widgets/m3e/chip.dart';
 import '../../widgets/m3e/fab_menu.dart';
 import '../../widgets/m3e/icon_button.dart';
 import '../../widgets/section_header.dart';
-import '../../widgets/issue_tile.dart';
+import '../../widgets/issue_row.dart';
 import '../issues/issue_detail_screen.dart';
 import '../issues/issue_create_screen.dart';
 import '../../models/project.dart';
@@ -26,7 +26,8 @@ import '../../models/project.dart';
 class MyIssuesTab extends ConsumerStatefulWidget {
   final String workspaceSlug;
   final String? currentUserId;
-  const MyIssuesTab({super.key, required this.workspaceSlug, this.currentUserId});
+  const MyIssuesTab(
+      {super.key, required this.workspaceSlug, this.currentUserId});
 
   @override
   ConsumerState<MyIssuesTab> createState() => _MyIssuesTabState();
@@ -132,9 +133,12 @@ class _MyIssuesTabState extends ConsumerState<MyIssuesTab>
   List<Issue> get _filteredAndSorted {
     var result = _issues.toList();
     if (_filterMode == 'assigned' && widget.currentUserId != null) {
-      result = result.where((i) => i.assignees.contains(widget.currentUserId)).toList();
+      result = result
+          .where((i) => i.assignees.contains(widget.currentUserId))
+          .toList();
     } else if (_filterMode == 'created' && widget.currentUserId != null) {
-      result = result.where((i) => i.createdBy == widget.currentUserId).toList();
+      result =
+          result.where((i) => i.createdBy == widget.currentUserId).toList();
     }
     // 'all' mode: no user filtering — show all issues from all projects
     result = applyFilters(result, _filterState);
@@ -154,8 +158,8 @@ class _MyIssuesTabState extends ConsumerState<MyIssuesTab>
     if (!_showSubIssues) {
       result = result.where((i) => i.parent == null).toList();
     }
-    result = applySorting(result, _filterState.sortField,
-        _filterState.sortAscending);
+    result = applySorting(
+        result, _filterState.sortField, _filterState.sortAscending);
     return result;
   }
 
@@ -173,10 +177,12 @@ class _MyIssuesTabState extends ConsumerState<MyIssuesTab>
     for (final p in projects) {
       try {
         await cache.loadProjectExtras(widget.workspaceSlug, p.id);
-        for (final l in cache.getLabels(widget.workspaceSlug, p.id) ?? <Label>[]) {
+        for (final l
+            in cache.getLabels(widget.workspaceSlug, p.id) ?? <Label>[]) {
           if (seenLabelIds.add(l.id)) allLabels.add(l);
         }
-        for (final m in cache.getMembers(widget.workspaceSlug, p.id) ?? <Member>[]) {
+        for (final m
+            in cache.getMembers(widget.workspaceSlug, p.id) ?? <Member>[]) {
           if (seenMemberIds.add(m.id)) allMembers.add(m);
         }
       } catch (_) {}
@@ -323,7 +329,8 @@ class _MyIssuesTabState extends ConsumerState<MyIssuesTab>
             return InkWell(
               onTap: onTap,
               child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
                 child: Row(
                   children: [
                     Text(label, style: theme.textTheme.bodyLarge),
@@ -332,14 +339,16 @@ class _MyIssuesTabState extends ConsumerState<MyIssuesTab>
                         style: theme.textTheme.bodyLarge
                             ?.copyWith(color: secondary)),
                     const SizedBox(width: 4),
-                    Icon(Icons.unfold_more, size: PlaneTheme.iconMedium, color: secondary),
+                    Icon(Icons.unfold_more,
+                        size: PlaneTheme.iconMedium, color: secondary),
                   ],
                 ),
               ),
             );
           }
 
-          void cycleOption(String field, List<(String, String)> options, String current, Function(String) onChanged) {
+          void cycleOption(String field, List<(String, String)> options,
+              String current, Function(String) onChanged) {
             final idx = options.indexWhere((o) => o.$1 == current);
             final next = options[(idx + 1) % options.length];
             onChanged(next.$1);
@@ -352,39 +361,69 @@ class _MyIssuesTabState extends ConsumerState<MyIssuesTab>
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   const SizedBox(height: 12),
-                  Center(child: Container(width: 36, height: 4,
-                      decoration: BoxDecoration(color: secondary.withValues(alpha: 0.3),
-                          borderRadius: BorderRadius.circular(M3EShape.full)))),
+                  Center(
+                      child: Container(
+                          width: 36,
+                          height: 4,
+                          decoration: BoxDecoration(
+                              color: secondary.withValues(alpha: 0.3),
+                              borderRadius:
+                                  BorderRadius.circular(M3EShape.full)))),
                   const SizedBox(height: 16),
-
-                  optionRow('Grouping', _grouping[0].toUpperCase() + _grouping.substring(1), () {
+                  optionRow('Grouping',
+                      _grouping[0].toUpperCase() + _grouping.substring(1), () {
                     setSheetState(() {
-                      cycleOption('grouping', [('state','Status'),('priority','Priority'),('assignee','Assignee'),('label','Label')],
-                          _grouping, (v) => _grouping = v);
+                      cycleOption(
+                          'grouping',
+                          [
+                            ('state', 'Status'),
+                            ('priority', 'Priority'),
+                            ('assignee', 'Assignee'),
+                            ('label', 'Label')
+                          ],
+                          _grouping,
+                          (v) => _grouping = v);
                     });
                     setState(() {
-                      _filterState = FilterState(groupBy: {
-                        'state': GroupByField.state, 'priority': GroupByField.priority,
-                        'assignee': GroupByField.assignee, 'label': GroupByField.label,
-                      }[_grouping] ?? GroupByField.state);
+                      _filterState = FilterState(
+                          groupBy: {
+                                'state': GroupByField.state,
+                                'priority': GroupByField.priority,
+                                'assignee': GroupByField.assignee,
+                                'label': GroupByField.label,
+                              }[_grouping] ??
+                              GroupByField.state);
                     });
                   }),
-
-                  optionRow('Ordering', _ordering[0].toUpperCase() + _ordering.substring(1), () {
+                  optionRow('Ordering',
+                      _ordering[0].toUpperCase() + _ordering.substring(1), () {
                     setSheetState(() {
-                      cycleOption('ordering', [('created','Created'),('updated','Updated'),('priority','Priority')],
-                          _ordering, (v) { _ordering = v; });
+                      cycleOption(
+                          'ordering',
+                          [
+                            ('created', 'Created'),
+                            ('updated', 'Updated'),
+                            ('priority', 'Priority')
+                          ],
+                          _ordering, (v) {
+                        _ordering = v;
+                      });
                     });
                     setState(() {
                       _filterState = FilterState(
                         groupBy: _filterState.groupBy,
-                        sortField: _ordering == 'updated' ? SortField.updatedAt : _ordering == 'priority' ? SortField.priority : SortField.createdAt,
+                        sortField: _ordering == 'updated'
+                            ? SortField.updatedAt
+                            : _ordering == 'priority'
+                                ? SortField.priority
+                                : SortField.createdAt,
                         sortAscending: !_sortNewest,
                       );
                     });
                   }),
-
-                  optionRow('Sort', _sortNewest ? 'Newest first' : 'Oldest first', () {
+                  optionRow(
+                      'Sort', _sortNewest ? 'Newest first' : 'Oldest first',
+                      () {
                     setSheetState(() => _sortNewest = !_sortNewest);
                     setState(() {
                       _filterState = FilterState(
@@ -394,22 +433,34 @@ class _MyIssuesTabState extends ConsumerState<MyIssuesTab>
                       );
                     });
                   }),
-
                   const SizedBox(height: 8),
-
-                  optionRow('Completed issues', _completedFilter == 'none' ? 'None' : _completedFilter == 'week' ? 'Past week' : 'All', () {
+                  optionRow(
+                      'Completed issues',
+                      _completedFilter == 'none'
+                          ? 'None'
+                          : _completedFilter == 'week'
+                              ? 'Past week'
+                              : 'All', () {
                     setSheetState(() {
-                      cycleOption('completed', [('none','None'),('week','Past week'),('all','All')],
-                          _completedFilter, (v) => _completedFilter = v);
+                      cycleOption(
+                          'completed',
+                          [
+                            ('none', 'None'),
+                            ('week', 'Past week'),
+                            ('all', 'All')
+                          ],
+                          _completedFilter,
+                          (v) => _completedFilter = v);
                     });
                     setState(() {});
                   }),
-
                   Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 6),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 20, vertical: 6),
                     child: Row(
                       children: [
-                        Text('Show sub-issues', style: theme.textTheme.bodyLarge),
+                        Text('Show sub-issues',
+                            style: theme.textTheme.bodyLarge),
                         const Spacer(),
                         // The switch sits in a Row next to its caption, so it
                         // would otherwise be an unnamed node for automation.
@@ -426,14 +477,14 @@ class _MyIssuesTabState extends ConsumerState<MyIssuesTab>
                       ],
                     ),
                   ),
-
-                  optionRow('Maximum title length', '$_maxTitleLines line${_maxTitleLines > 1 ? 's' : ''}', () {
-                    setSheetState(() => _maxTitleLines = _maxTitleLines == 1 ? 2 : 1);
+                  optionRow('Maximum title length',
+                      '$_maxTitleLines line${_maxTitleLines > 1 ? 's' : ''}',
+                      () {
+                    setSheetState(
+                        () => _maxTitleLines = _maxTitleLines == 1 ? 2 : 1);
                     setState(() {});
                   }),
-
                   const SizedBox(height: 12),
-
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 20),
                     child: Row(
@@ -446,14 +497,15 @@ class _MyIssuesTabState extends ConsumerState<MyIssuesTab>
                         // carries the 48dp minimum without extra layout.
                         TextButton(
                           onPressed: () {
-                            setSheetState(() => _rowProperties = {'status', 'priority', 'id'});
+                            setSheetState(() =>
+                                _rowProperties = {'status', 'priority', 'id'});
                             setState(() {});
                           },
                           style: TextButton.styleFrom(
                             foregroundColor: secondary,
                             minimumSize: const Size(48, 48),
-                            textStyle: M3EType.emphasized(
-                                theme.textTheme.titleSmall!),
+                            textStyle:
+                                M3EType.emphasized(theme.textTheme.titleSmall!),
                           ),
                           child: const Text('Reset'),
                         ),
@@ -467,17 +519,30 @@ class _MyIssuesTabState extends ConsumerState<MyIssuesTab>
                       spacing: 8,
                       runSpacing: 8,
                       children: [
-                        for (final prop in ['Status', 'Priority', 'Assignee', 'ID', 'Labels', 'Project', 'Due date', 'Cycle', 'Estimate'])
+                        for (final prop in [
+                          'Status',
+                          'Priority',
+                          'Assignee',
+                          'ID',
+                          'Labels',
+                          'Project',
+                          'Due date',
+                          'Cycle',
+                          'Estimate'
+                        ])
                           // The chip's Text names it; only the on/off state
                           // needs exposing, as it is carried by colour alone.
                           Semantics(
                             button: true,
-                            selected: _rowProperties.contains(prop.toLowerCase().replaceAll(' ', '_')),
+                            selected: _rowProperties.contains(
+                                prop.toLowerCase().replaceAll(' ', '_')),
                             child: M3EChip(
                               label: prop,
-                              selected: _rowProperties.contains(prop.toLowerCase().replaceAll(' ', '_')),
+                              selected: _rowProperties.contains(
+                                  prop.toLowerCase().replaceAll(' ', '_')),
                               onTap: () {
-                                final key = prop.toLowerCase().replaceAll(' ', '_');
+                                final key =
+                                    prop.toLowerCase().replaceAll(' ', '_');
                                 setSheetState(() {
                                   if (_rowProperties.contains(key)) {
                                     _rowProperties.remove(key);
@@ -534,7 +599,8 @@ class _MyIssuesTabState extends ConsumerState<MyIssuesTab>
             child: _loading
                 ? const IssueListSkeleton()
                 : _error != null
-                    ? ErrorStateWidget(message: 'Failed to load', onRetry: _load)
+                    ? ErrorStateWidget(
+                        message: 'Failed to load', onRetry: _load)
                     : RefreshIndicator(
                         onRefresh: _load,
                         child: _buildLinearList(),
@@ -588,10 +654,10 @@ class _MyIssuesTabState extends ConsumerState<MyIssuesTab>
       ));
       for (final issue in entry.value) {
         final state = _allStates[issue.state];
-        items.add(IssueTile(
+        items.add(IssueRow(
           issue: issue,
           state: state,
-          projectIdentifier: _projectIdentifiers[issue.project],
+          identifier: _projectIdentifiers[issue.project],
           showPriority: _rowProperties.contains('priority'),
           showState: _rowProperties.contains('status'),
           showId: true,

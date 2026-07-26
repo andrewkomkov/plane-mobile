@@ -1,6 +1,4 @@
 import 'package:flutter/material.dart';
-import '../../config/m3e/motion.dart';
-import '../../config/m3e/shapes.dart';
 import '../../config/m3e/typography.dart';
 import '../../widgets/m3e/text_field.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -9,6 +7,7 @@ import '../../services/cycle_service.dart';
 import '../../providers/data_providers.dart';
 import '../../models/cycle.dart';
 import '../../widgets/loading_state.dart';
+import '../../widgets/plane_row.dart';
 import '../../widgets/skeleton_loader.dart';
 import '../../widgets/section_header.dart';
 import 'cycle_detail_screen.dart';
@@ -18,13 +17,10 @@ class CycleListScreen extends ConsumerStatefulWidget {
   final String projectId;
 
   const CycleListScreen(
-      {super.key,
-      required this.workspaceSlug,
-      required this.projectId});
+      {super.key, required this.workspaceSlug, required this.projectId});
 
   @override
-  ConsumerState<CycleListScreen> createState() =>
-      _CycleListScreenState();
+  ConsumerState<CycleListScreen> createState() => _CycleListScreenState();
 }
 
 class _CycleListScreenState extends ConsumerState<CycleListScreen>
@@ -46,7 +42,8 @@ class _CycleListScreenState extends ConsumerState<CycleListScreen>
   Future<void> _load() async {
     setState(() => _error = null);
     try {
-      await _cache.loadCycles(widget.workspaceSlug, widget.projectId, force: true);
+      await _cache.loadCycles(widget.workspaceSlug, widget.projectId,
+          force: true);
       if (mounted) setState(() => _initialLoading = false);
     } catch (e) {
       if (mounted) {
@@ -173,9 +170,7 @@ class _CycleListScreenState extends ConsumerState<CycleListScreen>
                           }
                         },
                         child: Text(
-                          endDate != null
-                              ? _formatDate(endDate!)
-                              : 'End date',
+                          endDate != null ? _formatDate(endDate!) : 'End date',
                           style: M3EType.emphasized(
                               Theme.of(ctx).textTheme.labelMedium!),
                         ),
@@ -206,11 +201,11 @@ class _CycleListScreenState extends ConsumerState<CycleListScreen>
                         'description': descController.text.trim(),
                       if (startDate != null)
                         'start_date': _formatDate(startDate!),
-                      if (endDate != null)
-                        'end_date': _formatDate(endDate!),
+                      if (endDate != null) 'end_date': _formatDate(endDate!),
                     },
                   );
-                  _cache.invalidateCycles(widget.workspaceSlug, widget.projectId);
+                  _cache.invalidateCycles(
+                      widget.workspaceSlug, widget.projectId);
                   _load();
                 } catch (e) {
                   if (mounted) {
@@ -240,8 +235,7 @@ class _CycleListScreenState extends ConsumerState<CycleListScreen>
       return const ProjectListSkeleton();
     }
     if (_error != null && _cycles.isEmpty) {
-      return ErrorStateWidget(
-          message: 'Failed to load cycles', onRetry: _load);
+      return ErrorStateWidget(message: 'Failed to load cycles', onRetry: _load);
     }
     if (_cycles.isEmpty) {
       return const Center(
@@ -274,9 +268,8 @@ class _CycleListScreenState extends ConsumerState<CycleListScreen>
               final cycleIndex = index - current;
               if (cycleIndex < entry.value.length) {
                 final cycle = entry.value[cycleIndex];
-                return _CycleCard(
+                return _cycleRow(
                   cycle: cycle,
-                  statusColor: _statusColor(cycle.computedStatus),
                   onTap: () async {
                     await Navigator.push(
                       context,
@@ -288,7 +281,8 @@ class _CycleListScreenState extends ConsumerState<CycleListScreen>
                         ),
                       ),
                     );
-                    _cache.invalidateCycles(widget.workspaceSlug, widget.projectId);
+                    _cache.invalidateCycles(
+                        widget.workspaceSlug, widget.projectId);
                     _load();
                   },
                 );
@@ -301,70 +295,30 @@ class _CycleListScreenState extends ConsumerState<CycleListScreen>
       ),
     );
   }
-}
 
-class _CycleCard extends StatelessWidget {
-  final Cycle cycle;
-  final Color statusColor;
-  final VoidCallback onTap;
+  /// A cycle is a row like any other: the progress bar and the completed count
+  /// are slots, not a reason for this screen to draw its own card.
+  Widget _cycleRow({required Cycle cycle, required VoidCallback onTap}) {
+    final statusColor = _statusColor(cycle.computedStatus);
+    final dates =
+        [cycle.startDate, cycle.endDate].where((d) => d != null).join(' - ');
+    final count = '${cycle.completedIssues}/${cycle.totalIssues}';
 
-  const _CycleCard({
-    required this.cycle,
-    required this.statusColor,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
-    return M3EPressable(
+    return PlaneRow(
+      icon: Icons.loop,
+      iconColor: statusColor,
+      title: cycle.name,
+      subtitle: dates.isEmpty ? null : dates,
+      subtitleTrailing: count,
+      progress: cycle.progress,
+      progressColor: statusColor,
+      semanticLabel: [
+        cycle.name,
+        _statusLabel(cycle.computedStatus),
+        '$count issues done',
+        if (dates.isNotEmpty) dates,
+      ].join(', '),
       onTap: onTap,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Icon(Icons.loop, size: PlaneTheme.iconMedium, color: statusColor),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Text(
-                    cycle.name,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: theme.textTheme.titleMedium,
-                  ),
-                ),
-                Text(
-                  '${cycle.completedIssues}/${cycle.totalIssues}',
-                  style: theme.textTheme.bodySmall,
-                ),
-              ],
-            ),
-            const SizedBox(height: 6),
-            ClipRRect(
-              borderRadius: BorderRadius.circular(M3EShape.full),
-              child: LinearProgressIndicator(
-                value: cycle.progress,
-                minHeight: 4,
-                backgroundColor: theme.colorScheme.outlineVariant,
-                valueColor: AlwaysStoppedAnimation<Color>(statusColor),
-              ),
-            ),
-            if (cycle.startDate != null || cycle.endDate != null) ...[
-              const SizedBox(height: 4),
-              Text(
-                [cycle.startDate, cycle.endDate]
-                    .where((d) => d != null)
-                    .join(' - '),
-                style: theme.textTheme.bodySmall,
-              ),
-            ],
-          ],
-        ),
-      ),
     );
   }
 }

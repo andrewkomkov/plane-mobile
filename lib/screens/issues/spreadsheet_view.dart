@@ -4,6 +4,8 @@ import '../../models/issue.dart';
 import '../../models/state.dart';
 import '../../models/member.dart';
 import '../../services/issue_service.dart';
+import '../../widgets/plane_row.dart';
+import '../../widgets/property_chip.dart';
 import 'issue_detail_screen.dart';
 
 class SpreadsheetView extends StatelessWidget {
@@ -68,19 +70,19 @@ class SpreadsheetView extends StatelessWidget {
 
               return Container(
                 decoration: BoxDecoration(
-                  border: Border(
-                      bottom: BorderSide(color: border, width: 0.5)),
+                  border: Border(bottom: BorderSide(color: border, width: 0.5)),
                 ),
                 child: SingleChildScrollView(
                   scrollDirection: Axis.horizontal,
                   child: Row(
                     children: [
-                      // ID
+                      // ID. Same treatment as the identifier a list row draws,
+                      // because it is the same string in the same product.
                       _DataCell(
                         width: 80,
                         child: Text(
                           '$projectIdentifier-${issue.sequenceId}',
-                          style: theme.textTheme.bodySmall,
+                          style: PlaneRow.identifierStyle(theme),
                         ),
                       ),
                       // Title
@@ -105,43 +107,31 @@ class SpreadsheetView extends StatelessWidget {
                             issue.name,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
-                            style: theme.textTheme.titleSmall,
+                            style: theme.textTheme.titleMedium,
                           ),
                         ),
                       ),
-                      // State
+                      // State. A property with an icon in its own colour and a
+                      // neutral label is a PropertyChip, which is what the
+                      // module list and the issue detail already use — the
+                      // table used to hand-roll the same pairing a size and a
+                      // colour off.
                       _DataCell(
                         width: 120,
-                        // The cell text is just the state name, which repeats
+                        // The chip text is just the state name, which repeats
                         // in every row; the label pins it to one issue.
                         child: Semantics(
                           label: 'Change state of '
                               '$projectIdentifier-${issue.sequenceId}',
                           button: true,
                           container: true,
-                          child: InkWell(
+                          child: PropertyChip(
+                            icon:
+                                PlaneTheme.stateIcon(state?.group ?? 'backlog'),
+                            iconColor: PlaneTheme.stateGroupColor(
+                                context, state?.group ?? 'backlog'),
+                            label: state?.name ?? 'Unknown',
                             onTap: () => _showStatePicker(context, issue),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(
-                                  PlaneTheme.stateIcon(
-                                      state?.group ?? 'backlog'),
-                                  size: 14,
-                                  color: PlaneTheme.stateGroupColor(context, state?.group ?? 'backlog'),
-                                ),
-                                const SizedBox(width: 4),
-                                Flexible(
-                                  child: Text(
-                                    state?.name ?? 'Unknown',
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: theme.textTheme.bodySmall?.copyWith(
-                                        color: theme.colorScheme.onSurface),
-                                  ),
-                                ),
-                              ],
-                            ),
                           ),
                         ),
                       ),
@@ -153,26 +143,13 @@ class SpreadsheetView extends StatelessWidget {
                               '$projectIdentifier-${issue.sequenceId}',
                           button: true,
                           container: true,
-                          child: InkWell(
-                            onTap: () =>
-                                _showPriorityPicker(context, issue),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(
-                                  PlaneTheme.priorityIcon(issue.priority),
-                                  size: 14,
-                                  color: PlaneTheme.priorityColor(context, issue.priority),
-                                ),
-                                const SizedBox(width: 4),
-                                Text(
-                                  issue.priority[0].toUpperCase() +
-                                      issue.priority.substring(1),
-                                  style: theme.textTheme.bodySmall?.copyWith(
-                                      color: theme.colorScheme.onSurface),
-                                ),
-                              ],
-                            ),
+                          child: PropertyChip(
+                            icon: PlaneTheme.priorityIcon(issue.priority),
+                            iconColor: PlaneTheme.priorityColor(
+                                context, issue.priority),
+                            label: issue.priority[0].toUpperCase() +
+                                issue.priority.substring(1),
+                            onTap: () => _showPriorityPicker(context, issue),
                           ),
                         ),
                       ),
@@ -180,9 +157,7 @@ class SpreadsheetView extends StatelessWidget {
                       _DataCell(
                         width: 120,
                         child: Text(
-                          assigneeNames.isEmpty
-                              ? 'Unassigned'
-                              : assigneeNames,
+                          assigneeNames.isEmpty ? 'Unassigned' : assigneeNames,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: theme.textTheme.bodySmall?.copyWith(
@@ -198,9 +173,8 @@ class SpreadsheetView extends StatelessWidget {
                         child: Text(
                           issue.targetDate ?? '-',
                           style: theme.textTheme.bodySmall?.copyWith(
-                            color: issue.isOverdue
-                                ? PlaneTheme.urgent
-                                : secondary,
+                            color:
+                                issue.isOverdue ? PlaneTheme.urgent : secondary,
                           ),
                         ),
                       ),
@@ -226,13 +200,12 @@ class SpreadsheetView extends StatelessWidget {
                     leading: Icon(PlaneTheme.stateIcon(s.group),
                         color: PlaneTheme.stateGroupColor(context, s.group),
                         size: 18),
-                    title: Text(s.name,
-                        style: Theme.of(ctx).textTheme.bodyMedium),
+                    title:
+                        Text(s.name, style: Theme.of(ctx).textTheme.bodyMedium),
                     onTap: () async {
                       Navigator.pop(ctx);
                       await IssueService.updateIssue(
-                          workspaceSlug, projectId, issue.id,
-                          {'state': s.id});
+                          workspaceSlug, projectId, issue.id, {'state': s.id});
                       onRefresh();
                     },
                   ))
@@ -257,8 +230,7 @@ class SpreadsheetView extends StatelessWidget {
                     onTap: () async {
                       Navigator.pop(ctx);
                       await IssueService.updateIssue(
-                          workspaceSlug, projectId, issue.id,
-                          {'priority': p});
+                          workspaceSlug, projectId, issue.id, {'priority': p});
                       onRefresh();
                     },
                   ))

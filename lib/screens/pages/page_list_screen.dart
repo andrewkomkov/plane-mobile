@@ -4,7 +4,7 @@ import '../../providers/data_providers.dart';
 import '../../models/page.dart';
 import '../../widgets/loading_state.dart';
 import '../../widgets/skeleton_loader.dart';
-import '../../widgets/item_tile.dart';
+import '../../widgets/plane_row.dart';
 import 'page_detail_screen.dart';
 
 class PageListScreen extends ConsumerStatefulWidget {
@@ -43,7 +43,8 @@ class _PageListScreenState extends ConsumerState<PageListScreen>
   Future<void> _load() async {
     setState(() => _error = null);
     try {
-      await _cache.loadPages(widget.workspaceSlug, widget.projectId, force: true);
+      await _cache.loadPages(widget.workspaceSlug, widget.projectId,
+          force: true);
       if (mounted) setState(() => _initialLoading = false);
     } catch (e) {
       if (mounted) {
@@ -88,8 +89,7 @@ class _PageListScreenState extends ConsumerState<PageListScreen>
         onRefresh: _load,
         child: _pages.isEmpty
             ? ListView(children: [
-                SizedBox(
-                    height: MediaQuery.of(context).size.height * 0.3),
+                SizedBox(height: MediaQuery.of(context).size.height * 0.3),
                 const Center(
                   child: EmptyStateWidget(
                     message: 'No pages',
@@ -102,12 +102,19 @@ class _PageListScreenState extends ConsumerState<PageListScreen>
                 itemCount: _pages.length,
                 itemBuilder: (ctx, i) {
                   final page = _pages[i];
-                  return ItemTile(
-                    icon: page.isLocked
-                        ? Icons.lock
-                        : Icons.description_outlined,
-                    title: page.name.isEmpty ? 'Untitled' : page.name,
+                  final name = page.name.isEmpty ? 'Untitled' : page.name;
+                  return PlaneRow(
+                    icon:
+                        page.isLocked ? Icons.lock : Icons.description_outlined,
+                    title: name,
                     subtitle: _formatDate(page.updatedAt),
+                    // The lock is drawn, so it has to be said: the row's label
+                    // replaces everything under it.
+                    semanticLabel: [
+                      name,
+                      if (page.isLocked) 'locked',
+                      'updated ${_formatDate(page.updatedAt)}',
+                    ].join(', '),
                     onTap: () async {
                       await Navigator.push(
                         context,
@@ -120,7 +127,8 @@ class _PageListScreenState extends ConsumerState<PageListScreen>
                           ),
                         ),
                       );
-                      _cache.invalidatePages(widget.workspaceSlug, widget.projectId);
+                      _cache.invalidatePages(
+                          widget.workspaceSlug, widget.projectId);
                       _load();
                     },
                   );

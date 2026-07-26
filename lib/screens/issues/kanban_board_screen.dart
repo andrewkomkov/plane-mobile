@@ -4,6 +4,8 @@ import '../../config/theme.dart';
 import '../../models/issue.dart';
 import '../../models/state.dart';
 import '../../services/issue_service.dart';
+import '../../widgets/issue_row.dart';
+import '../../widgets/plane_row.dart';
 import 'issue_detail_screen.dart';
 
 class KanbanBoardScreen extends StatefulWidget {
@@ -42,8 +44,7 @@ class _KanbanBoardScreenState extends State<KanbanBoardScreen> {
       cols.putIfAbsent(stateId, () => []);
       cols[stateId]!.add(issue);
     }
-    cols.removeWhere(
-        (key, v) => v.isEmpty && !widget.states.containsKey(key));
+    cols.removeWhere((key, v) => v.isEmpty && !widget.states.containsKey(key));
     return cols;
   }
 
@@ -102,8 +103,7 @@ class _KanbanBoardScreenState extends State<KanbanBoardScreen> {
               child: AnimatedContainer(
                 duration: const Duration(milliseconds: 200),
                 width: 280,
-                margin:
-                    const EdgeInsets.only(right: 8, top: 8, bottom: 8),
+                margin: const EdgeInsets.only(right: 8, top: 8, bottom: 8),
                 decoration: isTarget
                     ? BoxDecoration(
                         borderRadius: BorderRadius.circular(M3EShape.large),
@@ -113,8 +113,8 @@ class _KanbanBoardScreenState extends State<KanbanBoardScreen> {
                           color: theme.colorScheme.primary,
                           width: 0.8,
                         ),
-                        color: theme.colorScheme.primary
-                            .withValues(alpha: 0.05),
+                        color:
+                            theme.colorScheme.primary.withValues(alpha: 0.05),
                       )
                     : null,
                 child: Column(
@@ -127,10 +127,10 @@ class _KanbanBoardScreenState extends State<KanbanBoardScreen> {
                       child: Row(
                         children: [
                           Icon(
-                            PlaneTheme.stateIcon(
-                                state?.group ?? 'backlog'),
+                            PlaneTheme.stateIcon(state?.group ?? 'backlog'),
                             size: PlaneTheme.iconSmall,
-                            color: PlaneTheme.stateGroupColor(context, state?.group ?? 'backlog'),
+                            color: PlaneTheme.stateGroupColor(
+                                context, state?.group ?? 'backlog'),
                           ),
                           const SizedBox(width: 6),
                           Text(
@@ -143,8 +143,7 @@ class _KanbanBoardScreenState extends State<KanbanBoardScreen> {
                           Text(
                             '${columnIssues.length}',
                             style: theme.textTheme.labelSmall?.copyWith(
-                              color: theme
-                                  .colorScheme.onSurfaceVariant
+                              color: theme.colorScheme.onSurfaceVariant
                                   .withValues(alpha: 0.6),
                             ),
                           ),
@@ -165,10 +164,8 @@ class _KanbanBoardScreenState extends State<KanbanBoardScreen> {
                               await Navigator.push(
                                   context,
                                   MaterialPageRoute(
-                                    builder: (_) =>
-                                        IssueDetailScreen(
-                                      workspaceSlug:
-                                          widget.workspaceSlug,
+                                    builder: (_) => IssueDetailScreen(
+                                      workspaceSlug: widget.workspaceSlug,
                                       projectId: widget.projectId,
                                       issueId: issue.id,
                                       projectIdentifier:
@@ -214,6 +211,27 @@ class _DraggableKanbanCard extends StatelessWidget {
     required this.onTap,
   });
 
+  /// The board card is the same row as everywhere else, stacked instead of
+  /// laid out across, because a 280dp column has no width for a side cluster.
+  Widget _card({VoidCallback? onTap, bool dragging = false}) => IssueRow(
+        issue: issue,
+        identifier: identifier,
+        density: PlaneRowDensity.card,
+        // The column header already names the state, and a card is only ever
+        // read inside its column.
+        showState: false,
+        maxTitleLines: 3,
+        highlighted: dragging,
+        // Neither clause is drawn on the card: the column it sits in is
+        // structure, and the drag affordance has no visible affordance at all.
+        // `M3EPressable` takes a label rather than a hint, so both ride in it.
+        semanticExtras: [
+          'in $stateName',
+          'long press and drag to move to another column',
+        ],
+        onTap: onTap,
+      );
+
   @override
   Widget build(BuildContext context) {
     return LongPressDraggable<_DragData>(
@@ -224,101 +242,19 @@ class _DraggableKanbanCard extends StatelessWidget {
         elevation: 0,
         color: Colors.transparent,
         borderRadius: BorderRadius.circular(M3EShape.large),
+        // The copy under the finger is a picture of the card, not a second
+        // control — two nodes with the same label would confuse a screen
+        // reader and `adb_drive.py tap` alike.
         child: SizedBox(
           width: 260,
-          child: _KanbanCardContent(
-            issue: issue,
-            identifier: identifier,
-            isDragging: true,
-          ),
+          child: ExcludeSemantics(child: _card(dragging: true)),
         ),
       ),
       childWhenDragging: Opacity(
         opacity: 0.3,
-        child: _KanbanCardContent(
-          issue: issue,
-          identifier: identifier,
-        ),
+        child: ExcludeSemantics(child: _card()),
       ),
-      child: Semantics(
-        label: 'Issue $identifier-${issue.sequenceId} in $stateName',
-        hint: 'Long press and drag to move to another column',
-        button: true,
-        container: true,
-        child: GestureDetector(
-          onTap: onTap,
-          child: _KanbanCardContent(
-            issue: issue,
-            identifier: identifier,
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _KanbanCardContent extends StatelessWidget {
-  final Issue issue;
-  final String identifier;
-  final bool isDragging;
-
-  const _KanbanCardContent({
-    required this.issue,
-    required this.identifier,
-    this.isDragging = false,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 4, vertical: 3),
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        // A card being dragged is lifted, and M3 says so with a tonal step
-        // rather than a shadow. It used to say it twice with a shadow: the
-        // Material wrapping this already carries elevation, and this added a
-        // second black one under it — in an app whose theme sets elevation 0
-        // on every other surface it defines.
-        color: isDragging
-            ? theme.colorScheme.surfaceContainerHighest
-            : theme.cardTheme.color ?? theme.colorScheme.surface,
-        borderRadius: BorderRadius.circular(M3EShape.large),
-        border: Border.all(
-          color: isDragging
-              ? theme.colorScheme.primary
-              : theme.colorScheme.outlineVariant,
-          width: 0.8,
-        ),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            '$identifier-${issue.sequenceId}',
-            style: theme.textTheme.labelSmall?.copyWith(
-              color: theme.colorScheme.onSurfaceVariant,
-            ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            issue.name,
-            maxLines: 3,
-            overflow: TextOverflow.ellipsis,
-            style: theme.textTheme.titleSmall,
-          ),
-          const SizedBox(height: 8),
-          Row(
-            children: [
-              Icon(
-                PlaneTheme.priorityIcon(issue.priority),
-                size: PlaneTheme.iconSmall,
-                color: PlaneTheme.priorityColor(context, issue.priority),
-              ),
-            ],
-          ),
-        ],
-      ),
+      child: _card(onTap: onTap),
     );
   }
 }

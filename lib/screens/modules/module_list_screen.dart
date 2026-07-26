@@ -1,6 +1,4 @@
 import 'package:flutter/material.dart';
-import '../../config/m3e/motion.dart';
-import '../../config/m3e/shapes.dart';
 import '../../widgets/m3e/text_field.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../config/theme.dart';
@@ -8,6 +6,7 @@ import '../../services/module_service.dart';
 import '../../providers/data_providers.dart';
 import '../../models/module.dart';
 import '../../widgets/loading_state.dart';
+import '../../widgets/plane_row.dart';
 import '../../widgets/skeleton_loader.dart';
 import '../../widgets/property_chip.dart';
 import 'module_detail_screen.dart';
@@ -17,13 +16,10 @@ class ModuleListScreen extends ConsumerStatefulWidget {
   final String projectId;
 
   const ModuleListScreen(
-      {super.key,
-      required this.workspaceSlug,
-      required this.projectId});
+      {super.key, required this.workspaceSlug, required this.projectId});
 
   @override
-  ConsumerState<ModuleListScreen> createState() =>
-      _ModuleListScreenState();
+  ConsumerState<ModuleListScreen> createState() => _ModuleListScreenState();
 }
 
 class _ModuleListScreenState extends ConsumerState<ModuleListScreen>
@@ -48,7 +44,8 @@ class _ModuleListScreenState extends ConsumerState<ModuleListScreen>
   Future<void> _load() async {
     setState(() => _error = null);
     try {
-      await _cache.loadModules(widget.workspaceSlug, widget.projectId, force: true);
+      await _cache.loadModules(widget.workspaceSlug, widget.projectId,
+          force: true);
       if (mounted) setState(() => _initialLoading = false);
     } catch (e) {
       if (mounted) {
@@ -122,8 +119,8 @@ class _ModuleListScreenState extends ConsumerState<ModuleListScreen>
                     'completed',
                     'cancelled',
                   ]
-                      .map((s) =>
-                          DropdownMenuItem(value: s, child: Text(_statusLabel(s))))
+                      .map((s) => DropdownMenuItem(
+                          value: s, child: Text(_statusLabel(s))))
                       .toList(),
                   onChanged: (v) =>
                       setDialogState(() => selectedStatus = v ?? 'planned'),
@@ -153,7 +150,8 @@ class _ModuleListScreenState extends ConsumerState<ModuleListScreen>
                       'status': selectedStatus,
                     },
                   );
-                  _cache.invalidateModules(widget.workspaceSlug, widget.projectId);
+                  _cache.invalidateModules(
+                      widget.workspaceSlug, widget.projectId);
                   _load();
                 } catch (e) {
                   if (mounted) {
@@ -198,10 +196,8 @@ class _ModuleListScreenState extends ConsumerState<ModuleListScreen>
           itemCount: _modules.length,
           itemBuilder: (ctx, i) {
             final m = _modules[i];
-            return _ModuleCard(
+            return _moduleRow(
               module: m,
-              statusColor: _statusColor(m.status),
-              statusLabel: _statusLabel(m.status),
               onTap: () async {
                 await Navigator.push(
                   context,
@@ -213,7 +209,8 @@ class _ModuleListScreenState extends ConsumerState<ModuleListScreen>
                     ),
                   ),
                 );
-                _cache.invalidateModules(widget.workspaceSlug, widget.projectId);
+                _cache.invalidateModules(
+                    widget.workspaceSlug, widget.projectId);
                 _load();
               },
             );
@@ -222,82 +219,39 @@ class _ModuleListScreenState extends ConsumerState<ModuleListScreen>
       ),
     );
   }
-}
 
-class _ModuleCard extends StatelessWidget {
-  final Module module;
-  final Color statusColor;
-  final String statusLabel;
-  final VoidCallback onTap;
+  /// Same row as a cycle, with the status carried by a chip because this list
+  /// is flat where the cycle list groups by status.
+  Widget _moduleRow({required Module module, required VoidCallback onTap}) {
+    final statusColor = _statusColor(module.status);
+    final statusLabel = _statusLabel(module.status);
+    final dates = [module.startDate, module.targetDate]
+        .where((d) => d != null)
+        .join(' - ');
+    final count = '${module.completedIssues}/${module.totalIssues}';
 
-  const _ModuleCard({
-    required this.module,
-    required this.statusColor,
-    required this.statusLabel,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
-    return M3EPressable(
-      onTap: onTap,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Icon(Icons.view_module, size: PlaneTheme.iconMedium, color: statusColor),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Text(
-                    module.name,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: theme.textTheme.titleMedium,
-                  ),
-                ),
-                const SizedBox(width: 8),
-                PropertyChip(
-                  icon: Icons.circle,
-                  iconColor: statusColor,
-                  label: statusLabel,
-                ),
-              ],
-            ),
-            const SizedBox(height: 6),
-            ClipRRect(
-              borderRadius: BorderRadius.circular(M3EShape.full),
-              child: LinearProgressIndicator(
-                value: module.progress,
-                minHeight: 4,
-                backgroundColor: theme.colorScheme.outlineVariant,
-                valueColor: AlwaysStoppedAnimation<Color>(statusColor),
-              ),
-            ),
-            const SizedBox(height: 4),
-            Row(
-              children: [
-                if (module.startDate != null || module.targetDate != null)
-                  Text(
-                    [module.startDate, module.targetDate]
-                        .where((d) => d != null)
-                        .join(' - '),
-                    style: theme.textTheme.bodySmall,
-                  ),
-                const Spacer(),
-                Text(
-                  '${module.completedIssues}/${module.totalIssues}',
-                  style: theme.textTheme.bodySmall,
-                ),
-              ],
-            ),
-          ],
+    return PlaneRow(
+      icon: Icons.view_module,
+      iconColor: statusColor,
+      title: module.name,
+      subtitle: dates.isEmpty ? null : dates,
+      subtitleTrailing: count,
+      progress: module.progress,
+      progressColor: statusColor,
+      metadata: [
+        PropertyChip(
+          icon: Icons.circle,
+          iconColor: statusColor,
+          label: statusLabel,
         ),
-      ),
+      ],
+      semanticLabel: [
+        module.name,
+        statusLabel,
+        '$count issues done',
+        if (dates.isNotEmpty) dates,
+      ].join(', '),
+      onTap: onTap,
     );
   }
 }

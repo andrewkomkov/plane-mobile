@@ -5,6 +5,7 @@ import '../../widgets/m3e/text_field.dart';
 import '../../services/view_service.dart';
 import '../../models/view.dart';
 import '../../widgets/loading_state.dart';
+import '../../widgets/plane_row.dart';
 import '../../utils/time_ago.dart';
 import 'view_detail_screen.dart';
 
@@ -43,8 +44,8 @@ class _ViewListScreenState extends ConsumerState<ViewListScreen>
       _error = null;
     });
     try {
-      final views = await ViewService.getViews(
-          widget.workspaceSlug, widget.projectId);
+      final views =
+          await ViewService.getViews(widget.workspaceSlug, widget.projectId);
       setState(() {
         _views = views;
         _loading = false;
@@ -74,8 +75,7 @@ class _ViewListScreenState extends ConsumerState<ViewListScreen>
                 onPressed: () => Navigator.pop(ctx),
                 child: const Text('Cancel')),
             TextButton(
-                onPressed: () =>
-                    Navigator.pop(ctx, controller.text.trim()),
+                onPressed: () => Navigator.pop(ctx, controller.text.trim()),
                 child: const Text('Create')),
           ],
         );
@@ -134,8 +134,7 @@ class _ViewListScreenState extends ConsumerState<ViewListScreen>
     super.build(context);
     if (_loading) return const LoadingStateWidget();
     if (_error != null) {
-      return ErrorStateWidget(
-          message: 'Failed to load views', onRetry: _load);
+      return ErrorStateWidget(message: 'Failed to load views', onRetry: _load);
     }
 
     return Scaffold(
@@ -143,8 +142,7 @@ class _ViewListScreenState extends ConsumerState<ViewListScreen>
         onRefresh: _load,
         child: _views.isEmpty
             ? ListView(children: [
-                SizedBox(
-                    height: MediaQuery.of(context).size.height * 0.3),
+                SizedBox(height: MediaQuery.of(context).size.height * 0.3),
                 const Center(
                   child: EmptyStateWidget(
                     message: 'No saved views',
@@ -157,20 +155,17 @@ class _ViewListScreenState extends ConsumerState<ViewListScreen>
                 itemCount: _views.length,
                 itemBuilder: (ctx, i) {
                   final view = _views[i];
-                  final secondary =
-                      Theme.of(ctx).colorScheme.onSurfaceVariant;
-                  return ListTile(
-                    leading:
-                        Icon(Icons.view_list_outlined, color: secondary),
-                    title: Text(view.name),
-                    subtitle: Text(
-                      view.description ?? timeAgoShort(view.updatedAt),
-                      style: Theme.of(ctx).textTheme.bodySmall,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
+                  final subtitle =
+                      view.description ?? timeAgoShort(view.updatedAt);
+                  return PlaneRow(
+                    icon: Icons.view_list_outlined,
+                    title: view.name,
+                    subtitle: subtitle,
+                    semanticLabel: '${view.name}, view, $subtitle',
                     // Named per view so repeated rows stay distinguishable to
-                    // external automation.
+                    // external automation. It sits in `trailing` rather than
+                    // inside the row so that it keeps that name — the row's
+                    // own label replaces the semantics of everything it wraps.
                     trailing: M3EIconButton(
                       icon: Icons.delete_outline,
                       tooltip: 'Delete view ${view.name}',

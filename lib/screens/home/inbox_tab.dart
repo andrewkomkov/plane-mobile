@@ -10,7 +10,7 @@ import '../issues/issue_detail_screen.dart';
 import '../../widgets/loading_state.dart';
 import '../../widgets/skeleton_loader.dart';
 import '../../widgets/m3e/flexible_app_bar.dart';
-import '../../widgets/issue_tile.dart';
+import '../../widgets/issue_row.dart';
 
 class InboxTab extends ConsumerStatefulWidget {
   final String workspaceSlug;
@@ -49,8 +49,7 @@ class _InboxTabState extends ConsumerState<InboxTab>
 
     // Read from SQLite first (instant)
     try {
-      final cached =
-          await SyncService.readInboxItems(widget.workspaceSlug);
+      final cached = await SyncService.readInboxItems(widget.workspaceSlug);
       if (cached != null && cached.isNotEmpty && mounted) {
         setState(() {
           _notifications = cached;
@@ -108,7 +107,8 @@ class _InboxTabState extends ConsumerState<InboxTab>
       // Update local state
       if (mounted) {
         setState(() {
-          final idx = _notifications.indexWhere((n) => n['id'] == notificationId);
+          final idx =
+              _notifications.indexWhere((n) => n['id'] == notificationId);
           if (idx >= 0) _notifications[idx]['read_at'] = 'stored';
         });
       }
@@ -126,7 +126,8 @@ class _InboxTabState extends ConsumerState<InboxTab>
       await dio.delete('/auth/mobile/notifications/$notificationId/read/');
       if (mounted) {
         setState(() {
-          final idx = _notifications.indexWhere((n) => n['id'] == notificationId);
+          final idx =
+              _notifications.indexWhere((n) => n['id'] == notificationId);
           if (idx >= 0) _notifications[idx]['read_at'] = null;
         });
       }
@@ -135,7 +136,8 @@ class _InboxTabState extends ConsumerState<InboxTab>
 
   Future<void> _dismiss(String notificationId) async {
     // Optimistically remove from list
-    final removed = _notifications.firstWhere((n) => n['id'] == notificationId, orElse: () => {});
+    final removed = _notifications.firstWhere((n) => n['id'] == notificationId,
+        orElse: () => {});
     setState(() {
       _notifications.removeWhere((n) => n['id'] == notificationId);
     });
@@ -165,7 +167,11 @@ class _InboxTabState extends ConsumerState<InboxTab>
           mainAxisSize: MainAxisSize.min,
           children: [
             ListTile(
-              leading: Icon(isRead ? Icons.mark_email_unread_outlined : Icons.mark_email_read_outlined, size: 20),
+              leading: Icon(
+                  isRead
+                      ? Icons.mark_email_unread_outlined
+                      : Icons.mark_email_read_outlined,
+                  size: 20),
               title: Text(isRead ? 'Mark as unread' : 'Mark as read',
                   style: Theme.of(ctx).textTheme.bodyMedium),
               onTap: () {
@@ -224,7 +230,8 @@ class _InboxTabState extends ConsumerState<InboxTab>
               },
               child: _notifications.isEmpty
                   ? ListView(children: [
-                      SizedBox(height: MediaQuery.of(context).size.height * 0.3),
+                      SizedBox(
+                          height: MediaQuery.of(context).size.height * 0.3),
                       const Center(
                         child: EmptyStateWidget(
                           message: 'No notifications',
@@ -233,31 +240,37 @@ class _InboxTabState extends ConsumerState<InboxTab>
                         ),
                       ),
                     ])
-                  : ListView.separated(
+                  // Rows are separated by the gap between their cards now, the
+                  // same as every other list; a divider on top of that drew a
+                  // line through the middle of the gap.
+                  : ListView.builder(
                       padding: const EdgeInsets.only(bottom: 100),
                       itemCount: _notifications.length,
-                      separatorBuilder: (_, __) => const Divider(
-                          indent: 60, endIndent: 20, height: 0.5, thickness: 0.5),
                       itemBuilder: (ctx, i) {
                         final n = _notifications[i];
                         final isRead = n['read_at'] != null;
                         final notificationId = (n['id'] ?? '') as String;
-                        final stateGroup = (n['state_group'] ?? 'backlog') as String;
-                        final projectId = (n['project'] ?? n['project_id'] ?? '') as String;
+                        final stateGroup =
+                            (n['state_group'] ?? 'backlog') as String;
+                        final projectId =
+                            (n['project'] ?? n['project_id'] ?? '') as String;
                         final issueId = (n['issue_id'] ?? '') as String;
                         final identifier = n['project_identifier'] ?? '';
                         final title = (n['title'] ?? '') as String;
                         final activityText = _buildActivityText(n);
-                        final createdAt = DateTime.tryParse(n['created_at'] ?? '');
+                        final createdAt =
+                            DateTime.tryParse(n['created_at'] ?? '');
                         final priority = (n['priority'] ?? 'none') as String;
                         final seqId = n['sequence_id'] ?? 0;
 
-                        // Build a lightweight Issue for IssueTile
+                        // Build a lightweight Issue for IssueRow
                         final issue = Issue(
                           id: issueId,
                           name: title,
                           priority: priority,
-                          sequenceId: seqId is int ? seqId : int.tryParse(seqId.toString()) ?? 0,
+                          sequenceId: seqId is int
+                              ? seqId
+                              : int.tryParse(seqId.toString()) ?? 0,
                           assignees: const [],
                           labels: const [],
                           createdAt: createdAt ?? DateTime.now(),
@@ -291,17 +304,22 @@ class _InboxTabState extends ConsumerState<InboxTab>
                           onDismissed: (_) => _dismiss(notificationId),
                           child: GestureDetector(
                             onLongPress: () => _showNotificationOptions(n),
-                            child: IssueTile(
+                            child: IssueRow(
                               issue: issue,
                               state: fakeState,
-                              projectIdentifier: identifier.isNotEmpty ? identifier : null,
+                              identifier:
+                                  identifier.isNotEmpty ? identifier : null,
                               subtitle: activityText,
                               showId: identifier.isNotEmpty,
                               showPriority: true,
-                              isUnread: !isRead,
-                              timeAgo: createdAt != null ? timeAgoShort(createdAt) : null,
+                              unread: !isRead,
+                              timeAgo: createdAt != null
+                                  ? timeAgoShort(createdAt)
+                                  : null,
                               onTap: () {
-                                if (projectId.isEmpty || issueId.isEmpty) return;
+                                if (projectId.isEmpty || issueId.isEmpty) {
+                                  return;
+                                }
                                 // Mark as read on tap
                                 if (!isRead && notificationId.isNotEmpty) {
                                   _markRead(notificationId);

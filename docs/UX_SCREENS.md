@@ -86,7 +86,7 @@ same sizes, so older screens render identically.
 |---|---|---|
 | `iconSmall` | 14 | Priority/state icons inside chips, inline indicators |
 | `iconMedium` | 16 | Priority/state icons in issue rows, nav hint icons |
-| `iconLarge` | 20 | Leading icons in ItemTile, action icons |
+| `iconLarge` | 20 | Leading icons in PlaneRow, action icons |
 | Nav bar icons | 22 | Bottom navigation bar items |
 
 ### Color Palette
@@ -281,24 +281,21 @@ Full behaviour reference in [M3_EXPRESSIVE.md](M3_EXPRESSIVE.md).
 **Layout:** Padding `(22, 22, 20, 8)`. Label uses `M3EType.overline` (11/w600, uppercase). When `color` is set, a 3x12 fully-rounded colour bar carries the state-group hue so the label itself stays legible. Count sits in a stadium badge on `surfaceContainerHigh`.
 **Used by:** MyIssuesTab, ProjectsTab, IssueListScreen, CycleListScreen, NotificationScreen, SearchScreen.
 
-### IssueTile
-**Path:** `lib/widgets/issue_tile.dart`
-**Props:** `issue`, `state`, `projectIdentifier`, `subtitle`, `showId/showProject/showAssignee/showDueDate/showPriority/showState/showLabels/showSubIssues`, `isUnread`, `timeAgo`, `maxTitleLines`, `onTap`, `allLabels`, `allMembers`
-**Two layouts:**
-1. **Standard row** (no subtitle): rounded card (`M3EShape.large`) on `surfaceContainerLow`. Horizontal row with optional priority icon, state icon, ID text, title (expanded), stadium label pills, sub-issue count, overdue/due-date icon, assignee avatars. Outer padding `(16, 2)`, inner `(16, 14)`.
-2. **Inbox layout** (subtitle present): two-line layout. Left: state icon (20px). Right column: top line = ID + title, bottom line = priority icon + subtitle text + timeAgo. Unread items sit on `surfaceContainerLow`.
-**Press feedback:** both layouts are wrapped in `M3EPressable` -- the row squeezes to 0.975 (0.985 for inbox) on touch-down and springs back with overshoot on release.
-**Reference:** Linear's issue rows, with M3E press physics.
+### PlaneRow
+**Path:** `lib/widgets/plane_row.dart`
+**Replaces** the former `IssueTile`, `ItemTile` and the `IssueRow` wrapper (all deleted), plus the inline rows CycleListScreen, ModuleListScreen and ViewListScreen each built for themselves.
+**Props:** `icon`/`iconColor`/`leading`, `identifier`, `badges`, `title`/`titleMaxLines`/`emphasizeTitle`, `subtitle`/`subtitleTrailing`, `chips`, `progress`/`progressColor`, `metadata`, `avatars`, `trailing`, `density`, `highlighted`, `selected`, `semanticLabel` (required), `onTap`, `onLongPress`
+**Layout:** identifier line (identifier + badges), title, subtitle line (subtitle + a bulleted `subtitleTrailing`), chips wrap, progress bar. `metadata` and `avatars` form a right-hand cluster; `trailing` sits beyond it.
+**Densities:** `standard` — rounded card (`M3EShape.large`) on `surfaceContainerLow`, outer `(16, 2)`, inner `(16, 14)`. `compact` — no fill, inner `(16, 10)`, text in the same place as standard, used by the calendar's day pane. `card` — the same slots stacked, outlined, for the 280dp board column.
+**Press feedback:** the whole surface squeezes on touch-down and springs back with overshoot. The gesture and the semantics node cover the content region only, so an interactive `trailing` keeps its own accessibility label; the scale is lifted onto the surface so the card still moves as one piece.
+**Semantics:** `semanticLabel` is required — `M3EPressable` replaces the subtree's semantics with it, and the app is driven from outside through those labels (`tool/adb_drive.py`).
+**Used by:** every list in the app, through `IssueRow` for issues and directly for everything else.
 
-### IssueRow (wrapper)
+### IssueRow
 **Path:** `lib/widgets/issue_row.dart`
-Backward-compatible wrapper around IssueTile. Enables all row properties. Used by CalendarView and ViewDetailScreen.
-
-### ItemTile
-**Path:** `lib/widgets/item_tile.dart`
-**Props:** `icon`, `iconColor`, `title`, `subtitle`, `leading` (custom widget), `trailing`, `onTap`
-**Layout:** Rounded card (`M3EShape.large`) on `surfaceContainerLow`. Outer padding `(16, 2)`, inner `(16, 14)`. Icon 20px. Title 15/w500. Subtitle 12, secondary. Wrapped in `M3EPressable` (0.98).
-**Used by:** MenuTab, PageListScreen, SearchScreen.
+**Props:** `issue`, `state`, `identifier`, `subtitle`, `timeAgo`, `showId/showProject/showAssignee/showDueDate/showPriority/showState/showLabels/showSubIssues`, `unread`, `highlighted`, `maxTitleLines`, `density`, `semanticExtras`, `onTap`, `allLabels`, `allMembers`
+The mapping from an `Issue` to a `PlaneRow`, and the only place that mapping is written down: state icon → leading, `PLM-123` → identifier, priority → badge, labels → chips, sub-issue count / due date / project → metadata, assignees → avatars. The `show*` flags follow the display-options sheet and drop a hidden property from the accessibility label too.
+**Used by:** IssueListScreen, MyIssuesTab, InboxTab, ViewDetailScreen, CalendarView, KanbanBoardScreen, CycleDetailScreen, ModuleDetailScreen.
 
 ### PropertyChip
 **Path:** `lib/widgets/property_chip.dart`
@@ -337,12 +334,12 @@ Shows a Linear-style bottom sheet with grouping/ordering/sort/completed-filter/s
 
 **Layout:**
 - Header: `M3EFlexibleHeaderScaffold(title: 'Inbox', overline: 'PENDING NOTIFICATIONS')` -- collapses into the toolbar on scroll.
-- Body: `ListView.separated` of `IssueTile` in inbox mode (with subtitle).
+- Body: `ListView.builder` of `IssueRow` with a subtitle (the activity text) and a `timeAgo`.
 - Empty state: icon `Icons.inbox_outlined`, "No notifications", subtitle "Activity on your issues will appear here".
 - Loading: `LoadingStateWidget`.
 - Bottom padding: 100.
 
-**Components used:** M3EFlexibleHeaderScaffold, IssueTile (inbox layout), LoadingStateWidget, EmptyStateWidget.
+**Components used:** M3EFlexibleHeaderScaffold, IssueRow, LoadingStateWidget, EmptyStateWidget.
 
 **Data shown:** Notification title (issue name), activity text (actor + action), priority icon, state icon, issue ID, read/unread status, time ago.
 
@@ -374,12 +371,12 @@ Shows a Linear-style bottom sheet with grouping/ordering/sort/completed-filter/s
 - Header: `M3EFlexibleHeaderScaffold` with title "My issues", a `more_horiz` action, and an `M3EButtonGroup` (Assigned / Created / All) pinned below the title. Pressing a scope widens it while its neighbour compresses.
 - Create is an `M3EFabMenu` at `right: 20, bottom: 96` -- expands to "New issue" and "Display options" over a blurred scrim.
 - Pill filters: rounded containers (radius 8), padding `(14, 6)`, `fontSection` (13), filled when selected.
-- Body: grouped list with `SectionHeader` (grouped by state group: Backlog, Unstarted, etc.) + `IssueTile` standard rows.
+- Body: grouped list with `SectionHeader` (grouped by state group: Backlog, Unstarted, etc.) + `IssueRow`.
 - Empty state: "No issues", "All caught up".
 - Loading: `LoadingStateWidget`.
 - Error: `ErrorStateWidget` with retry.
 
-**Components used:** M3EFlexibleHeaderScaffold, M3EButtonGroup, M3EFabMenu, M3EChip (display options), SectionHeader, IssueTile (standard), LoadingStateWidget, EmptyStateWidget, ErrorStateWidget.
+**Components used:** M3EFlexibleHeaderScaffold, M3EButtonGroup, M3EFabMenu, M3EChip (display options), SectionHeader, IssueRow, LoadingStateWidget, EmptyStateWidget, ErrorStateWidget.
 
 **Data shown:** Issue name, priority icon, state icon, issue ID with project identifier. Configurable via row properties (status, priority, id, labels, project, due date, assignee).
 
@@ -410,7 +407,7 @@ Shows a Linear-style bottom sheet with grouping/ordering/sort/completed-filter/s
 
 **Layout:**
 - Header: `M3EFlexibleHeaderScaffold(title: 'Projects')` with a stadium search field pinned below the title (it filters the whole list, so it does not scroll away).
-- Body: `ListView.builder` of `ItemTile` widgets. Each project has a leading 36x36 rounded square (radius 8) with the project identifier text (10px, w600) centered inside, tinted `primary.withAlpha(0.15)`. Trailing: chevron_right icon (20px).
+- Body: `ListView.builder` of rows this screen still builds inline (**not** `PlaneRow` — see Design Inconsistencies). Each project has a leading 40x40 rounded square with the project identifier text centered inside, tinted from the badge palette. Trailing: chevron_right icon.
 - Bottom padding: 100.
 
 **Components used:** M3EFlexibleHeaderScaffold, SectionHeader, LoadingStateWidget.
@@ -443,11 +440,11 @@ Shows a Linear-style bottom sheet with grouping/ordering/sort/completed-filter/s
 - Top section: Workspace name + logo (tappable for workspace switcher), with `unfold_more` icon. Padding `(20, 16, 20, 0)`.
 - User card: CircleAvatar (radius 22) + display name (15/w500) + email (12, secondary). Padding `(20, 16)`.
 - Divider.
-- Menu items via `ItemTile`: Notifications, Analytics, Workspace Members, Switch Workspace, Profile & Appearance, About.
+- Menu items, built inline rather than as `PlaneRow`: Notifications, Analytics, Workspace Members, Switch Workspace, Profile & Appearance, About.
 - Divider.
 - Disconnect (red icon, with confirmation dialog).
 
-**Components used:** ItemTile, LoadingStateWidget, EmptyStateWidget, ErrorStateWidget (on workspace members sub-screen).
+**Components used:** LoadingStateWidget, EmptyStateWidget, ErrorStateWidget (on workspace members sub-screen).
 
 **Data shown:** Workspace name/logo, user name/email/avatar, menu items.
 
@@ -461,7 +458,7 @@ Shows a Linear-style bottom sheet with grouping/ordering/sort/completed-filter/s
 **Current issues:**
 - No workspace logo fallback is elegant enough -- just a letter in a circle.
 - The workspace switcher bottom sheet doesn't show a loading indicator if slow.
-- Menu items use `ItemTile` but the icon style isn't consistent (some outlined, some not).
+- Menu items are drawn by this screen instead of `PlaneRow`, and the icon style isn't consistent (some outlined, some not).
 - About dialog uses Flutter's default `showAboutDialog` -- looks generic.
 
 **Reference:** Similar to Linear's "Settings" sidebar section.
@@ -475,11 +472,11 @@ Shows a Linear-style bottom sheet with grouping/ordering/sort/completed-filter/s
 
 **Layout:**
 - AppBar with embedded `TextField` (hint: "Search across workspace...", prefix search icon). Clear button when text present.
-- When no query: shows "Recent searches" section with `ItemTile` (history icon), or empty state ("Search issues, projects, pages and more").
-- When querying: shows grouped results with `SectionHeader` per entity type + `_SearchResultTile` (uses ItemTile internally).
+- When no query: shows "Recent searches" section with `PlaneRow` (history icon), or empty state ("Search issues, projects, pages and more").
+- When querying: shows grouped results with `SectionHeader` per entity type + `_SearchResultTile` (a `PlaneRow` whose label spells out the kind of hit, since only the icon shows it).
 - Loading: `LoadingStateWidget`.
 
-**Components used:** SectionHeader, ItemTile, LoadingStateWidget, EmptyStateWidget.
+**Components used:** SectionHeader, PlaneRow, LoadingStateWidget, EmptyStateWidget.
 
 **Data shown:** Search result name, identifier (for issues), type-specific icon.
 
@@ -600,11 +597,11 @@ Shows a Linear-style bottom sheet with grouping/ordering/sort/completed-filter/s
 
 **Layout:**
 - Top bar: issue count text (12, secondary) + display options tune icon. Padding `(20, 8)`.
-- Body: grouped `ListView.builder` with `SectionHeader` (with count) + `IssueTile` (standard rows).
+- Body: grouped `ListView.builder` with `SectionHeader` (with count) + `IssueRow`.
 - Empty state: "No issues" or "No issues match filters".
 - Pull-to-refresh.
 
-**Components used:** SectionHeader, IssueTile, DisplayOptions (shared), EmptyStateWidget.
+**Components used:** SectionHeader, IssueRow, DisplayOptions (shared), EmptyStateWidget.
 
 **Data shown:** Issue name, priority, state, ID, labels (as dots), sub-issue count, assignee avatars, due date indicator. All configurable via display options row properties.
 
@@ -641,7 +638,7 @@ Shows a Linear-style bottom sheet with grouping/ordering/sort/completed-filter/s
   - Module & Cycle row (if present): icon + name, secondary text.
   - Assignees section: label "Assignees" (12/w500) + wrapped avatar chips.
   - Description: rendered via `MarkdownBody` (flutter_markdown). Styles: p=14/1.6, h1=20/w600, h2=18/w600, h3=16/w500, code=13/primary, blockquote with 3px left border.
-  - Sub-issues section: header with count + add button, list of IssueTile rows.
+  - Sub-issues section: header with count + add button, list of rows this screen builds inline (**not** `IssueRow` — see Design Inconsistencies).
   - Relations section (if any).
   - Attachments section.
   - Links section.
@@ -649,7 +646,7 @@ Shows a Linear-style bottom sheet with grouping/ordering/sort/completed-filter/s
 - Bottom: comment input bar (fixed, not scrollable with content).
   - TextField with hint "Add a comment...", send button.
 
-**Components used:** PropertyChip, IssueTile (for sub-issues), MarkdownBody, LoadingStateWidget, ErrorStateWidget.
+**Components used:** PropertyChip, MarkdownBody, LoadingStateWidget, ErrorStateWidget.
 
 **Data shown:** Everything about an issue: name, ID, state, priority, labels, assignees, start/target dates, description, sub-issues, relations, attachments, links, activity feed, comments.
 
@@ -780,7 +777,7 @@ Shows a Linear-style bottom sheet with grouping/ordering/sort/completed-filter/s
   - If no day selected: shows "No date" issues list.
   - Header text: "YYYY-MM-DD (N issues)" or "No date (N issues)", 13/w500, secondary.
 
-**Components used:** IssueRow (IssueTile wrapper with all properties enabled).
+**Components used:** IssueRow, with every row property enabled.
 
 **Data shown:** Calendar grid, issue dots on dates, issue list for selected day or unscheduled issues.
 
@@ -851,13 +848,13 @@ Shows a Linear-style bottom sheet with grouping/ordering/sort/completed-filter/s
 **Purpose:** Lists all cycles in a project, grouped by status (Active, Upcoming, Completed, Draft).
 
 **Layout:**
-- Body: grouped `ListView.builder` with `SectionHeader` (status label + count + color) and `_CycleCard` widgets.
-- CycleCard: `InkWell`, padding `(20, 12)`. Row: loop icon (16) + name (15/w400) + "completed/total" (12, secondary). Below: 4px progress bar. Below: date range (11, secondary).
+- Body: grouped `ListView.builder` with `SectionHeader` (status label + count + color) and `PlaneRow`.
+- Row: loop icon in the status colour, cycle name, date range as the subtitle with "completed/total" at the end of it, and the 4px progress bar below.
 - Empty: `EmptyStateWidget` with loop icon, "No cycles".
 - Error: `ErrorStateWidget`.
 - Pull-to-refresh.
 
-**Components used:** SectionHeader, LoadingStateWidget, EmptyStateWidget, ErrorStateWidget.
+**Components used:** SectionHeader, PlaneRow, LoadingStateWidget, EmptyStateWidget, ErrorStateWidget.
 
 **Data shown:** Cycle name, completed/total issues, progress bar, date range, status group.
 
@@ -889,11 +886,11 @@ Shows a Linear-style bottom sheet with grouping/ordering/sort/completed-filter/s
   - Info section (padding 20): status PropertyChip, description (15, secondary), date range row, progress bar (6px height) + "N/N" text.
   - Divider.
   - Issues header: "Issues" (13/w500) + count (12) + add icon (20).
-  - Issue list: `Dismissible` wrappers around `IssueTile` (swipe to remove from cycle).
+  - Issue list: `Dismissible` wrappers around `IssueRow` (swipe to remove from cycle).
   - Bottom padding: 80.
 - Loading/Error states.
 
-**Components used:** PropertyChip, IssueTile, LoadingStateWidget, ErrorStateWidget.
+**Components used:** PropertyChip, IssueRow, LoadingStateWidget, ErrorStateWidget.
 
 **Data shown:** Cycle status, description, date range, progress, issues list.
 
@@ -919,12 +916,12 @@ Shows a Linear-style bottom sheet with grouping/ordering/sort/completed-filter/s
 **Purpose:** Lists all modules in a project as cards with status chips and progress bars.
 
 **Layout:**
-- Body: `ListView.builder` of `_ModuleCard` widgets.
-- ModuleCard: `InkWell`, padding `(20, 12)`. Row: module icon (16) + name (15/w400) + PropertyChip (status). Below: 4px progress bar. Below: date range (11, secondary) + "completed/total" (12, secondary).
+- Body: `ListView.builder` of `PlaneRow`.
+- Row: module icon in the status colour, module name, the status `PropertyChip` on the right, date range as the subtitle with "completed/total" at the end of it, and the 4px progress bar below — the same shape as a cycle row.
 - Empty: `EmptyStateWidget` with view_module icon, "No modules".
 - Pull-to-refresh.
 
-**Components used:** PropertyChip, LoadingStateWidget, EmptyStateWidget, ErrorStateWidget.
+**Components used:** PlaneRow, PropertyChip, LoadingStateWidget, EmptyStateWidget, ErrorStateWidget.
 
 **Data shown:** Module name, status (chip), progress bar, date range, issue count.
 
@@ -960,11 +957,11 @@ Shows a Linear-style bottom sheet with grouping/ordering/sort/completed-filter/s
 **Purpose:** Lists all pages in a project.
 
 **Layout:**
-- Body: `ListView.builder` of `ItemTile` widgets. Icon: `description_outlined` (or `lock` if locked). Title: page name or "Untitled". Subtitle: last updated date (dd.MM.yyyy format).
+- Body: `ListView.builder` of `PlaneRow`. Icon: `description_outlined` (or `lock` if locked). Title: page name or "Untitled". Subtitle: last updated date (dd.MM.yyyy format).
 - Empty: "No pages", subtitle "Create a page to get started".
 - Pull-to-refresh.
 
-**Components used:** ItemTile, LoadingStateWidget, EmptyStateWidget, ErrorStateWidget.
+**Components used:** PlaneRow, LoadingStateWidget, EmptyStateWidget, ErrorStateWidget.
 
 **Data shown:** Page name, lock status, last updated date.
 
@@ -1046,15 +1043,15 @@ Shows a Linear-style bottom sheet with grouping/ordering/sort/completed-filter/s
 **Purpose:** Lists saved views (filter presets) for a project.
 
 **Layout:**
-- Body: `ListView.builder` of `ListTile` (not ItemTile -- inconsistent).
-  - Leading: `view_list_outlined` icon, grey color.
+- Body: `ListView.builder` of `PlaneRow`.
+  - Leading: `view_list_outlined` icon.
   - Title: view name.
-  - Subtitle: description or time ago (12, grey).
-  - Trailing: delete icon (20, grey).
+  - Subtitle: description or time ago.
+  - Trailing: delete icon button, named per view.
 - Empty: "No saved views", "Create a view to save filter presets".
 - Pull-to-refresh.
 
-**Components used:** LoadingStateWidget, EmptyStateWidget, ErrorStateWidget.
+**Components used:** PlaneRow, LoadingStateWidget, EmptyStateWidget, ErrorStateWidget.
 
 **Data shown:** View name, description or last updated time.
 
@@ -1067,8 +1064,6 @@ Shows a Linear-style bottom sheet with grouping/ordering/sort/completed-filter/s
 **Navigation:** Tab 4 in ProjectScreen. Pushes ViewDetailScreen.
 
 **Current issues:**
-- Uses raw `ListTile` instead of `ItemTile` -- inconsistent padding and styling.
-- Grey colors hardcoded (`Colors.grey[600]`, `Colors.grey[500]`) instead of theme tokens.
 - No create button visible in UI.
 - Delete is always visible (no confirmation on accident).
 
@@ -1135,7 +1130,7 @@ Shows a Linear-style bottom sheet with grouping/ordering/sort/completed-filter/s
 - No snooze functionality.
 - No filter tabs (all/mentions/assigned).
 - Archive is permanent (no unarchive).
-- Tile padding is `(20, 9)` -- tighter than standard ItemTile.
+- Tile padding is `(20, 9)` -- tighter than a standard `PlaneRow`.
 
 **Reference:** Similar to Linear's notification panel.
 
@@ -1293,10 +1288,10 @@ Shows a Linear-style bottom sheet with grouping/ordering/sort/completed-filter/s
 ### Design Inconsistencies
 5. **Two notification-like screens:** InboxTab (home) and NotificationScreen (menu) serve overlapping purposes.
 6. **AppBar vs flexible header:** ~~resolved~~ -- home tabs use `M3EFlexibleHeaderScaffold`, sub-screens use `M3EAppBar`. Both draw from the M3E type scale and share the hairline divider; no Material `AppBar` remains in the app.
-7. **ListTile vs ItemTile:** ViewListScreen uses raw `ListTile` with hardcoded grey colors, while every other screen uses `ItemTile` with theme colors.
+7. **Three widgets for one row:** ~~mostly resolved~~ -- `IssueTile`, `ItemTile` and the `IssueRow` wrapper are gone, as are the inline rows the cycle, module and view lists each built for themselves. Every issue and entity list now renders `PlaneRow`, issues through `IssueRow`. Still outside it: ProjectsTab's project cards, MenuTab's menu items, NotificationScreen's rows and IssueDetailScreen's sub-issue rows, which each still draw their own.
 8. **Display options duplication:** MyIssuesTab has its own display options implementation; IssueListScreen uses the shared `showDisplayOptions`. Should consolidate.
 9. **Date formats vary:** Calendar uses ISO (YYYY-MM-DD), Pages use European (dd.MM.yyyy), Analytics uses "d/M", notifications use `timeAgo`. No consistent formatting.
-10. **Hardcoded colors:** ViewListScreen uses `Colors.grey[500]` and `Colors.grey[600]` instead of theme tokens.
+10. **Hardcoded colors:** ~~resolved~~ -- ViewListScreen went through `PlaneRow`, which takes every colour from the scheme.
 
 ### Polish Needed
 11. **Empty states are text-only:** No illustrations, just icon + text. Could be more engaging.

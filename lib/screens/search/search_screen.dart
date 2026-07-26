@@ -10,12 +10,13 @@ import '../../widgets/m3e/icon_button.dart';
 import '../../widgets/m3e/text_field.dart';
 import '../../utils/search_result_route.dart';
 import '../../widgets/section_header.dart';
-import '../../widgets/item_tile.dart';
+import '../../widgets/plane_row.dart';
 
 class SearchScreen extends ConsumerStatefulWidget {
   final String workspaceSlug;
   final bool autoFocus;
-  const SearchScreen({super.key, required this.workspaceSlug, this.autoFocus = false});
+  const SearchScreen(
+      {super.key, required this.workspaceSlug, this.autoFocus = false});
 
   @override
   ConsumerState<SearchScreen> createState() => _SearchScreenState();
@@ -61,8 +62,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
       _recentSearches = _recentSearches.sublist(0, 10);
     }
     try {
-      await _storage.write(
-          key: _recentKey, value: jsonEncode(_recentSearches));
+      await _storage.write(key: _recentKey, value: jsonEncode(_recentSearches));
     } catch (_) {}
   }
 
@@ -199,8 +199,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                 child: TextButton(
                   onPressed: () {
                     setState(() => _recentSearches.clear());
-                    _storage.write(
-                        key: _recentKey, value: jsonEncode([]));
+                    _storage.write(key: _recentKey, value: jsonEncode([]));
                   },
                   style: TextButton.styleFrom(
                     foregroundColor: theme.colorScheme.primary,
@@ -213,9 +212,12 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
             ],
           ),
         ),
-        ..._recentSearches.map((q) => ItemTile(
+        ..._recentSearches.map((q) => PlaneRow(
               icon: Icons.history,
               title: q,
+              // The query on its own would be indistinguishable from a result
+              // row carrying the same words.
+              semanticLabel: '$q, recent search',
               onTap: () {
                 _controller.text = q;
                 _search(q);
@@ -228,8 +230,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
   Widget _buildResults(ThemeData theme) {
     final entries = _grouped.entries.toList();
     return ListView.builder(
-      itemCount:
-          entries.fold<int>(0, (sum, e) => sum + 1 + e.value.length),
+      itemCount: entries.fold<int>(0, (sum, e) => sum + 1 + e.value.length),
       itemBuilder: (ctx, index) {
         int current = 0;
         for (final entry in entries) {
@@ -290,6 +291,24 @@ class _SearchResultTile extends StatelessWidget {
     }
   }
 
+  /// Singular name of what a hit is, for the row's accessibility label.
+  String _kindFor(String type) {
+    switch (type) {
+      case 'issues':
+        return 'issue';
+      case 'projects':
+        return 'project';
+      case 'pages':
+        return 'page';
+      case 'cycles':
+        return 'cycle';
+      case 'modules':
+        return 'module';
+      default:
+        return type;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final name = item['name'] ?? item['title'] ?? '';
@@ -302,10 +321,17 @@ class _SearchResultTile extends StatelessWidget {
         ? '$identifier-$sequenceId'
         : (item['description'] ?? '').toString();
 
-    return ItemTile(
+    return PlaneRow(
       icon: _iconFor(type),
       title: name.toString(),
       subtitle: subtitle.isNotEmpty ? subtitle : null,
+      // The kind of thing a hit is only shows in its icon, which the row's
+      // label replaces, so it is spelled out.
+      semanticLabel: [
+        name.toString(),
+        if (subtitle.isNotEmpty) subtitle.toString(),
+        _kindFor(type),
+      ].join(', '),
       onTap: onTap,
     );
   }

@@ -149,9 +149,10 @@ remain anywhere in `lib/`.
   notifications, analytics, profile, project + settings, search, login) —
   `M3EAppBar`
 - `lib/widgets/filter_bar.dart` — all filter/action chips are `M3EChip`
-- `lib/widgets/{issue_tile,item_tile,property_chip,section_header}.dart` —
-  press physics and the expressive corner scale
-- Cycle, module and notification list rows — `M3EPressable`
+- `lib/widgets/{plane_row,issue_row,property_chip,section_header}.dart` —
+  press physics and the expressive corner scale. `plane_row.dart` is the one
+  row every list is built from; `issue_row.dart` maps an issue onto it
+- Notification list rows — `M3EPressable`
 
 ### Two title changes worth flagging
 

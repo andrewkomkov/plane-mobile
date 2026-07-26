@@ -26,8 +26,7 @@ class ViewDetailScreen extends ConsumerStatefulWidget {
   });
 
   @override
-  ConsumerState<ViewDetailScreen> createState() =>
-      _ViewDetailScreenState();
+  ConsumerState<ViewDetailScreen> createState() => _ViewDetailScreenState();
 }
 
 class _ViewDetailScreenState extends ConsumerState<ViewDetailScreen> {
@@ -83,14 +82,12 @@ class _ViewDetailScreenState extends ConsumerState<ViewDetailScreen> {
             (qd['assignees'] as List).map((e) => e.toString()).toSet();
         if (assigneeIds.isNotEmpty) {
           issues = issues
-              .where(
-                  (i) => i.assignees.any((a) => assigneeIds.contains(a)))
+              .where((i) => i.assignees.any((a) => assigneeIds.contains(a)))
               .toList();
         }
       }
       if (qd.containsKey('label') && qd['label'] is List) {
-        final labelIds =
-            (qd['label'] as List).map((e) => e.toString()).toSet();
+        final labelIds = (qd['label'] as List).map((e) => e.toString()).toSet();
         if (labelIds.isNotEmpty) {
           issues = issues
               .where((i) => i.labels.any((l) => labelIds.contains(l)))
@@ -127,9 +124,7 @@ class _ViewDetailScreenState extends ConsumerState<ViewDetailScreen> {
                   child: _issues.isEmpty
                       ? ListView(children: [
                           SizedBox(
-                              height:
-                                  MediaQuery.of(context).size.height *
-                                      0.3),
+                              height: MediaQuery.of(context).size.height * 0.3),
                           const Center(
                             child: EmptyStateWidget(
                               message: 'No issues match this view',
@@ -137,32 +132,30 @@ class _ViewDetailScreenState extends ConsumerState<ViewDetailScreen> {
                             ),
                           ),
                         ])
-                      : ListView.separated(
+                      // No separators: the rows are cards with a gap between
+                      // them, and a divider inside that gap read as a second,
+                      // competing grouping.
+                      : ListView.builder(
                           padding: const EdgeInsets.only(bottom: 20),
                           itemCount: _issues.length,
-                          separatorBuilder: (ctx, __) => Divider(
-                              indent: 16,
-                              endIndent: 16,
-                              height: 0.5,
-                              thickness: 0.5,
-                              color:
-                                  Theme.of(ctx).colorScheme.outlineVariant),
                           itemBuilder: (ctx, i) {
                             final issue = _issues[i];
                             final state = _states[issue.state];
                             return IssueRow(
                               issue: issue,
                               state: state,
+                              showLabels: true,
+                              showSubIssues: true,
+                              showAssignee: true,
+                              showDueDate: true,
                               allLabels: _labels,
                               allMembers: _members,
                               onTap: () async {
                                 await Navigator.push(
                                     context,
                                     MaterialPageRoute(
-                                      builder: (_) =>
-                                          IssueDetailScreen(
-                                        workspaceSlug:
-                                            widget.workspaceSlug,
+                                      builder: (_) => IssueDetailScreen(
+                                        workspaceSlug: widget.workspaceSlug,
                                         projectId: widget.projectId,
                                         issueId: issue.id,
                                         states: _states,

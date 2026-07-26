@@ -5,6 +5,7 @@ import '../../widgets/m3e/icon_button.dart';
 import '../../models/issue.dart';
 import '../../models/state.dart';
 import '../../widgets/issue_row.dart';
+import '../../widgets/plane_row.dart';
 import '../../models/label.dart';
 import '../../models/member.dart';
 import 'issue_detail_screen.dart';
@@ -91,8 +92,8 @@ class _CalendarViewState extends State<CalendarView> {
                 tooltip: 'Previous month',
                 onPressed: () {
                   setState(() {
-                    _currentMonth = DateTime(
-                        _currentMonth.year, _currentMonth.month - 1);
+                    _currentMonth =
+                        DateTime(_currentMonth.year, _currentMonth.month - 1);
                     _selectedDay = null;
                   });
                 },
@@ -106,8 +107,8 @@ class _CalendarViewState extends State<CalendarView> {
                 tooltip: 'Next month',
                 onPressed: () {
                   setState(() {
-                    _currentMonth = DateTime(
-                        _currentMonth.year, _currentMonth.month + 1);
+                    _currentMonth =
+                        DateTime(_currentMonth.year, _currentMonth.month + 1);
                     _selectedDay = null;
                   });
                 },
@@ -166,8 +167,8 @@ class _CalendarViewState extends State<CalendarView> {
                 return const Expanded(child: SizedBox(height: 48));
               }
 
-              final date = DateTime(
-                  _currentMonth.year, _currentMonth.month, dayNum);
+              final date =
+                  DateTime(_currentMonth.year, _currentMonth.month, dayNum);
               final dateKey = _formatDate(date);
               final issueCount = issuesByDate[dateKey]?.length ?? 0;
               final isToday = date.year == today.year &&
@@ -282,6 +283,14 @@ class _CalendarViewState extends State<CalendarView> {
                         issue: issue,
                         state: widget.states[issue.state],
                         identifier: widget.projectIdentifier,
+                        // The month grid already owns most of the screen, so
+                        // the day list drops the card fill and tightens up. It
+                        // is the same row, one density down.
+                        density: PlaneRowDensity.compact,
+                        showLabels: true,
+                        showSubIssues: true,
+                        showAssignee: true,
+                        showDueDate: true,
                         allLabels: widget.allLabels,
                         allMembers: widget.allMembers,
                         onTap: () async {
@@ -332,6 +341,11 @@ class _CalendarViewState extends State<CalendarView> {
                       issue: issue,
                       state: widget.states[issue.state],
                       identifier: widget.projectIdentifier,
+                      density: PlaneRowDensity.compact,
+                      showLabels: true,
+                      showSubIssues: true,
+                      showAssignee: true,
+                      showDueDate: true,
                       allLabels: widget.allLabels,
                       allMembers: widget.allMembers,
                       onTap: () async {
@@ -358,8 +372,19 @@ class _CalendarViewState extends State<CalendarView> {
 
   String _monthName(int month) {
     const names = [
-      '', 'January', 'February', 'March', 'April', 'May', 'June',
-      'July', 'August', 'September', 'October', 'November', 'December'
+      '',
+      'January',
+      'February',
+      'March',
+      'April',
+      'May',
+      'June',
+      'July',
+      'August',
+      'September',
+      'October',
+      'November',
+      'December'
     ];
     return names[month];
   }

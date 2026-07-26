@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../config/m3e/motion.dart';
 import '../config/m3e/shapes.dart';
+import '../config/theme.dart';
 
 /// Read-only property display (state, priority, assignee, due date).
 ///
@@ -37,11 +38,18 @@ class PropertyChip extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 14, color: iconColor),
+          Icon(icon, size: PlaneTheme.iconSmall, color: iconColor),
           const SizedBox(width: 6),
-          Text(
-            label,
-            style: theme.textTheme.labelMedium,
+          // Flexible because a chip is now also used inside a fixed-width
+          // table cell, where a long state name would otherwise overflow
+          // rather than truncate.
+          Flexible(
+            child: Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: theme.textTheme.labelMedium,
+            ),
           ),
         ],
       ),

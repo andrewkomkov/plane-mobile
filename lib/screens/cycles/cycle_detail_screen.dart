@@ -13,7 +13,7 @@ import '../../models/cycle.dart';
 import '../../models/issue.dart';
 import '../../models/state.dart';
 import '../../widgets/loading_state.dart';
-import '../../widgets/issue_tile.dart';
+import '../../widgets/issue_row.dart';
 import '../../widgets/property_chip.dart';
 import '../issues/issue_detail_screen.dart';
 
@@ -30,8 +30,7 @@ class CycleDetailScreen extends ConsumerStatefulWidget {
   });
 
   @override
-  ConsumerState<CycleDetailScreen> createState() =>
-      _CycleDetailScreenState();
+  ConsumerState<CycleDetailScreen> createState() => _CycleDetailScreenState();
 }
 
 class _CycleDetailScreenState extends ConsumerState<CycleDetailScreen> {
@@ -62,7 +61,8 @@ class _CycleDetailScreenState extends ConsumerState<CycleDetailScreen> {
             widget.workspaceSlug, widget.projectId, widget.cycle.id),
         cache.loadStates(widget.workspaceSlug, widget.projectId),
       ]);
-      final states = cache.getStates(widget.workspaceSlug, widget.projectId) ?? {};
+      final states =
+          cache.getStates(widget.workspaceSlug, widget.projectId) ?? {};
       setState(() {
         _issues = results[0] as List<Issue>;
         _states = states;
@@ -81,7 +81,8 @@ class _CycleDetailScreenState extends ConsumerState<CycleDetailScreen> {
     if (_allProjectIssues.isEmpty) {
       try {
         await _cache.loadIssues(widget.workspaceSlug, widget.projectId);
-        _allProjectIssues = _cache.getIssues(widget.workspaceSlug, widget.projectId) ?? [];
+        _allProjectIssues =
+            _cache.getIssues(widget.workspaceSlug, widget.projectId) ?? [];
         if (_allProjectIssues.isEmpty) {
           // Force fetch if cache is empty
           final result = await IssueService.getIssues(
@@ -117,8 +118,8 @@ class _CycleDetailScreenState extends ConsumerState<CycleDetailScreen> {
             child: Column(
               children: [
                 Padding(
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 16, vertical: 12),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                   child: Row(
                     children: [
                       Text('Add issues',
@@ -139,11 +140,10 @@ class _CycleDetailScreenState extends ConsumerState<CycleDetailScreen> {
                                   _load();
                                 } catch (e) {
                                   if (mounted) {
-                                    ScaffoldMessenger.of(context)
-                                        .showSnackBar(
+                                    ScaffoldMessenger.of(context).showSnackBar(
                                       SnackBar(
-                                          content: Text(
-                                              'Failed to add issues: $e')),
+                                          content:
+                                              Text('Failed to add issues: $e')),
                                     );
                                   }
                                 }
@@ -182,7 +182,8 @@ class _CycleDetailScreenState extends ConsumerState<CycleDetailScreen> {
                         secondary: Icon(
                           PlaneTheme.priorityIcon(issue.priority),
                           size: 16,
-                          color: PlaneTheme.priorityColor(context, issue.priority),
+                          color:
+                              PlaneTheme.priorityColor(context, issue.priority),
                         ),
                         controlAffinity: ListTileControlAffinity.trailing,
                         dense: true,
@@ -375,7 +376,8 @@ class _CycleDetailScreenState extends ConsumerState<CycleDetailScreen> {
                               Row(
                                 children: [
                                   Icon(Icons.calendar_today_outlined,
-                                      size: PlaneTheme.iconSmall, color: secondary),
+                                      size: PlaneTheme.iconSmall,
+                                      color: secondary),
                                   const SizedBox(width: 6),
                                   Text(
                                     [cycle.startDate, cycle.endDate]
@@ -398,9 +400,8 @@ class _CycleDetailScreenState extends ConsumerState<CycleDetailScreen> {
                                       minHeight: 6,
                                       backgroundColor:
                                           theme.colorScheme.outlineVariant,
-                                      valueColor:
-                                          AlwaysStoppedAnimation<Color>(
-                                              statusColor),
+                                      valueColor: AlwaysStoppedAnimation<Color>(
+                                          statusColor),
                                     ),
                                   ),
                                 ),
@@ -455,17 +456,18 @@ class _CycleDetailScreenState extends ConsumerState<CycleDetailScreen> {
                             direction: DismissDirection.endToStart,
                             background: Container(
                               alignment: Alignment.centerRight,
-                              padding:
-                                  const EdgeInsets.only(right: 20),
-                              color: theme.colorScheme.error.withValues(alpha: 0.1),
+                              padding: const EdgeInsets.only(right: 20),
+                              color: theme.colorScheme.error
+                                  .withValues(alpha: 0.1),
                               child: Icon(Icons.remove_circle_outline,
-                                  color: theme.colorScheme.error, size: PlaneTheme.iconLarge),
+                                  color: theme.colorScheme.error,
+                                  size: PlaneTheme.iconLarge),
                             ),
                             confirmDismiss: (_) async {
                               await _removeIssue(issue);
                               return false;
                             },
-                            child: IssueTile(
+                            child: IssueRow(
                               issue: issue,
                               state: _states[issue.state],
                               showPriority: true,
@@ -475,8 +477,7 @@ class _CycleDetailScreenState extends ConsumerState<CycleDetailScreen> {
                                   context,
                                   MaterialPageRoute(
                                     builder: (_) => IssueDetailScreen(
-                                      workspaceSlug:
-                                          widget.workspaceSlug,
+                                      workspaceSlug: widget.workspaceSlug,
                                       projectId: widget.projectId,
                                       issueId: issue.id,
                                       states: _states,
@@ -503,8 +504,8 @@ class _CycleDetailScreenState extends ConsumerState<CycleDetailScreen> {
           children: [
             ListTile(
               leading: const Icon(Icons.edit_outlined, size: 20),
-              title: Text('Edit cycle',
-                  style: Theme.of(ctx).textTheme.bodyMedium),
+              title:
+                  Text('Edit cycle', style: Theme.of(ctx).textTheme.bodyMedium),
               onTap: () {
                 Navigator.pop(ctx);
                 _showEditCycleDialog();

@@ -13,7 +13,7 @@ import '../../models/module.dart';
 import '../../models/issue.dart';
 import '../../models/state.dart';
 import '../../widgets/loading_state.dart';
-import '../../widgets/issue_tile.dart';
+import '../../widgets/issue_row.dart';
 import '../../widgets/property_chip.dart';
 import '../issues/issue_detail_screen.dart';
 
@@ -53,8 +53,7 @@ class ModuleDetailScreen extends ConsumerStatefulWidget {
   });
 
   @override
-  ConsumerState<ModuleDetailScreen> createState() =>
-      _ModuleDetailScreenState();
+  ConsumerState<ModuleDetailScreen> createState() => _ModuleDetailScreenState();
 }
 
 class _ModuleDetailScreenState extends ConsumerState<ModuleDetailScreen> {
@@ -85,7 +84,8 @@ class _ModuleDetailScreenState extends ConsumerState<ModuleDetailScreen> {
             widget.workspaceSlug, widget.projectId, widget.module.id),
         cache.loadStates(widget.workspaceSlug, widget.projectId),
       ]);
-      final states = cache.getStates(widget.workspaceSlug, widget.projectId) ?? {};
+      final states =
+          cache.getStates(widget.workspaceSlug, widget.projectId) ?? {};
       setState(() {
         _issues = results[0] as List<Issue>;
         _states = states;
@@ -104,7 +104,8 @@ class _ModuleDetailScreenState extends ConsumerState<ModuleDetailScreen> {
     if (_allProjectIssues.isEmpty) {
       try {
         await _cache.loadIssues(widget.workspaceSlug, widget.projectId);
-        _allProjectIssues = _cache.getIssues(widget.workspaceSlug, widget.projectId) ?? [];
+        _allProjectIssues =
+            _cache.getIssues(widget.workspaceSlug, widget.projectId) ?? [];
         if (_allProjectIssues.isEmpty) {
           final result = await IssueService.getIssues(
               widget.workspaceSlug, widget.projectId);
@@ -139,8 +140,8 @@ class _ModuleDetailScreenState extends ConsumerState<ModuleDetailScreen> {
             child: Column(
               children: [
                 Padding(
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 16, vertical: 12),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                   child: Row(
                     children: [
                       Text('Add issues',
@@ -161,11 +162,10 @@ class _ModuleDetailScreenState extends ConsumerState<ModuleDetailScreen> {
                                   _load();
                                 } catch (e) {
                                   if (mounted) {
-                                    ScaffoldMessenger.of(context)
-                                        .showSnackBar(
+                                    ScaffoldMessenger.of(context).showSnackBar(
                                       SnackBar(
-                                          content: Text(
-                                              'Failed to add issues: $e')),
+                                          content:
+                                              Text('Failed to add issues: $e')),
                                     );
                                   }
                                 }
@@ -204,7 +204,8 @@ class _ModuleDetailScreenState extends ConsumerState<ModuleDetailScreen> {
                         secondary: Icon(
                           PlaneTheme.priorityIcon(issue.priority),
                           size: 16,
-                          color: PlaneTheme.priorityColor(context, issue.priority),
+                          color:
+                              PlaneTheme.priorityColor(context, issue.priority),
                         ),
                         controlAffinity: ListTileControlAffinity.trailing,
                         dense: true,
@@ -278,8 +279,8 @@ class _ModuleDetailScreenState extends ConsumerState<ModuleDetailScreen> {
                       .map((s) => DropdownMenuItem(
                           value: s, child: Text(_statusLabel(s))))
                       .toList(),
-                  onChanged: (v) => setDialogState(
-                      () => selectedStatus = v ?? 'backlog'),
+                  onChanged: (v) =>
+                      setDialogState(() => selectedStatus = v ?? 'backlog'),
                   isExpanded: true,
                 ),
               ],
@@ -439,12 +440,12 @@ class _ModuleDetailScreenState extends ConsumerState<ModuleDetailScreen> {
                             ],
                             const SizedBox(height: 12),
                             // Date range
-                            if (mod.startDate != null ||
-                                mod.targetDate != null)
+                            if (mod.startDate != null || mod.targetDate != null)
                               Row(
                                 children: [
                                   Icon(Icons.calendar_today_outlined,
-                                      size: PlaneTheme.iconSmall, color: secondary),
+                                      size: PlaneTheme.iconSmall,
+                                      color: secondary),
                                   const SizedBox(width: 6),
                                   Text(
                                     [mod.startDate, mod.targetDate]
@@ -467,9 +468,8 @@ class _ModuleDetailScreenState extends ConsumerState<ModuleDetailScreen> {
                                       minHeight: 6,
                                       backgroundColor:
                                           theme.colorScheme.outlineVariant,
-                                      valueColor:
-                                          AlwaysStoppedAnimation<Color>(
-                                              statusColor),
+                                      valueColor: AlwaysStoppedAnimation<Color>(
+                                          statusColor),
                                     ),
                                   ),
                                 ),
@@ -524,17 +524,18 @@ class _ModuleDetailScreenState extends ConsumerState<ModuleDetailScreen> {
                             direction: DismissDirection.endToStart,
                             background: Container(
                               alignment: Alignment.centerRight,
-                              padding:
-                                  const EdgeInsets.only(right: 20),
-                              color: theme.colorScheme.error.withValues(alpha: 0.1),
+                              padding: const EdgeInsets.only(right: 20),
+                              color: theme.colorScheme.error
+                                  .withValues(alpha: 0.1),
                               child: Icon(Icons.remove_circle_outline,
-                                  color: theme.colorScheme.error, size: PlaneTheme.iconLarge),
+                                  color: theme.colorScheme.error,
+                                  size: PlaneTheme.iconLarge),
                             ),
                             confirmDismiss: (_) async {
                               await _removeIssue(issue);
                               return false;
                             },
-                            child: IssueTile(
+                            child: IssueRow(
                               issue: issue,
                               state: _states[issue.state],
                               showPriority: true,
@@ -544,8 +545,7 @@ class _ModuleDetailScreenState extends ConsumerState<ModuleDetailScreen> {
                                   context,
                                   MaterialPageRoute(
                                     builder: (_) => IssueDetailScreen(
-                                      workspaceSlug:
-                                          widget.workspaceSlug,
+                                      workspaceSlug: widget.workspaceSlug,
                                       projectId: widget.projectId,
                                       issueId: issue.id,
                                       states: _states,
