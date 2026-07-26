@@ -1,10 +1,4 @@
 import 'package:plane_mobile/models/issue.dart';
-import 'package:plane_mobile/models/project.dart';
-import 'package:plane_mobile/models/page.dart';
-import 'package:plane_mobile/models/cycle.dart';
-import 'package:plane_mobile/models/module.dart';
-import 'package:plane_mobile/models/activity.dart';
-import 'package:plane_mobile/models/comment.dart';
 import 'package:plane_mobile/models/state.dart';
 import 'package:plane_mobile/models/label.dart';
 import 'package:plane_mobile/models/member.dart';

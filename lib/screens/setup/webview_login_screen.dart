@@ -71,7 +71,9 @@ class _WebViewLoginScreenState extends State<WebViewLoginScreen> {
     if (path.contains('sign-in') ||
         path.contains('sign-up') ||
         path.contains('accounts.google') ||
-        path.contains('/auth/')) return false;
+        path.contains('/auth/')) {
+      return false;
+    }
     return true;
   }
 

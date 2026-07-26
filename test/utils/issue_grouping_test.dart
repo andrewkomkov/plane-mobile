@@ -1,9 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:plane_mobile/utils/issue_grouping.dart';
-import 'package:plane_mobile/models/issue.dart';
-import 'package:plane_mobile/models/state.dart';
-import 'package:plane_mobile/models/label.dart';
-import 'package:plane_mobile/models/member.dart';
 import 'package:plane_mobile/widgets/filter_bar.dart';
 import '../test_helpers.dart';
 
@@ -40,8 +36,7 @@ void main() {
         makeIssue(id: 'i1', state: 's1'),
         makeIssue(id: 'i2', state: 's3'),
       ];
-      final groups =
-          groupIssuesByStateGroup(issues, states, excludeDone: true);
+      final groups = groupIssuesByStateGroup(issues, states, excludeDone: true);
 
       expect(groups.containsKey('completed'), isFalse);
       expect(groups['started']!.length, 1);
@@ -99,7 +94,9 @@ void main() {
     });
 
     test('issue with multiple assignees appears in each group', () {
-      final issues = [makeIssue(id: 'i1', assignees: ['m1', 'm2'])];
+      final issues = [
+        makeIssue(id: 'i1', assignees: ['m1', 'm2'])
+      ];
       final groups = groupIssuesByAssignee(issues, members);
 
       expect(groups['Alice']!.length, 1);
@@ -107,7 +104,9 @@ void main() {
     });
 
     test('unknown assignee maps to Unknown', () {
-      final issues = [makeIssue(id: 'i1', assignees: ['unknown-id'])];
+      final issues = [
+        makeIssue(id: 'i1', assignees: ['unknown-id'])
+      ];
       final groups = groupIssuesByAssignee(issues, members);
 
       expect(groups['Unknown']!.length, 1);

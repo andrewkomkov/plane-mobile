@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import '../config/m3e/shapes.dart';
 import '../config/theme.dart';
-import '../utils/issue_grouping.dart';
 import 'filter_bar.dart';
 import 'm3e/chip.dart';
 
@@ -25,7 +24,8 @@ class DisplayState {
     Set<String>? rowProperties,
   }) : rowProperties = rowProperties ?? {'status', 'priority', 'id'};
 
-  GroupByField get groupByField => {
+  GroupByField get groupByField =>
+      {
         'state': GroupByField.state,
         'priority': GroupByField.priority,
         'assignee': GroupByField.assignee,
@@ -33,7 +33,8 @@ class DisplayState {
       }[grouping] ??
       GroupByField.state;
 
-  SortField get sortField => {
+  SortField get sortField =>
+      {
         'updated': SortField.updatedAt,
         'priority': SortField.priority,
       }[ordering] ??
@@ -42,7 +43,8 @@ class DisplayState {
 
 /// Shows the Linear-style Display Options bottom sheet.
 /// Returns when sheet closes — caller should setState.
-Future<void> showDisplayOptions(BuildContext context, DisplayState ds, VoidCallback onChanged) {
+Future<void> showDisplayOptions(
+    BuildContext context, DisplayState ds, VoidCallback onChanged) {
   return showModalBottomSheet<void>(
     context: context,
     isScrollControlled: true,
@@ -65,7 +67,8 @@ Future<void> showDisplayOptions(BuildContext context, DisplayState ds, VoidCallb
                   const Spacer(),
                   Text(value, style: theme.textTheme.bodySmall),
                   const SizedBox(width: 4),
-                  Icon(Icons.unfold_more, size: PlaneTheme.iconMedium, color: secondary),
+                  Icon(Icons.unfold_more,
+                      size: PlaneTheme.iconMedium, color: secondary),
                 ],
               ),
             ),
@@ -89,27 +92,29 @@ Future<void> showDisplayOptions(BuildContext context, DisplayState ds, VoidCallb
                                 BorderRadius.circular(M3EShape.full)))),
                 const SizedBox(height: 16),
 
-                optionRow(
-                    'Grouping',
+                optionRow('Grouping',
                     ds.grouping[0].toUpperCase() + ds.grouping.substring(1),
                     () {
                   const options = ['state', 'priority', 'assignee', 'label'];
                   final idx = options.indexOf(ds.grouping);
-                  setSheetState(() => ds.grouping = options[(idx + 1) % options.length]);
+                  setSheetState(
+                      () => ds.grouping = options[(idx + 1) % options.length]);
                   onChanged();
                 }),
 
-                optionRow(
-                    'Ordering',
+                optionRow('Ordering',
                     ds.ordering[0].toUpperCase() + ds.ordering.substring(1),
                     () {
                   const options = ['created', 'updated', 'priority'];
                   final idx = options.indexOf(ds.ordering);
-                  setSheetState(() => ds.ordering = options[(idx + 1) % options.length]);
+                  setSheetState(
+                      () => ds.ordering = options[(idx + 1) % options.length]);
                   onChanged();
                 }),
 
-                optionRow('Sort', ds.sortNewest ? 'Newest first' : 'Oldest first', () {
+                optionRow(
+                    'Sort', ds.sortNewest ? 'Newest first' : 'Oldest first',
+                    () {
                   setSheetState(() => ds.sortNewest = !ds.sortNewest);
                   onChanged();
                 }),
@@ -125,17 +130,17 @@ Future<void> showDisplayOptions(BuildContext context, DisplayState ds, VoidCallb
                             : 'All', () {
                   const options = ['none', 'week', 'all'];
                   final idx = options.indexOf(ds.completedFilter);
-                  setSheetState(
-                      () => ds.completedFilter = options[(idx + 1) % options.length]);
+                  setSheetState(() =>
+                      ds.completedFilter = options[(idx + 1) % options.length]);
                   onChanged();
                 }),
 
                 Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 6),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 20, vertical: 6),
                   child: Row(
                     children: [
-                      Text('Show sub-issues',
-                          style: theme.textTheme.bodyLarge),
+                      Text('Show sub-issues', style: theme.textTheme.bodyLarge),
                       const Spacer(),
                       // The switch sits in a Row next to its caption, so it
                       // would otherwise be an unnamed node for automation.
@@ -153,11 +158,11 @@ Future<void> showDisplayOptions(BuildContext context, DisplayState ds, VoidCallb
                   ),
                 ),
 
-                optionRow(
-                    'Maximum title length',
+                optionRow('Maximum title length',
                     '${ds.maxTitleLines} line${ds.maxTitleLines > 1 ? 's' : ''}',
                     () {
-                  setSheetState(() => ds.maxTitleLines = ds.maxTitleLines == 1 ? 2 : 1);
+                  setSheetState(
+                      () => ds.maxTitleLines = ds.maxTitleLines == 1 ? 2 : 1);
                   onChanged();
                 }),
 
@@ -177,8 +182,8 @@ Future<void> showDisplayOptions(BuildContext context, DisplayState ds, VoidCallb
                       // GestureDetector here did not.
                       TextButton(
                         onPressed: () {
-                          setSheetState(
-                              () => ds.rowProperties = {'status', 'priority', 'id'});
+                          setSheetState(() =>
+                              ds.rowProperties = {'status', 'priority', 'id'});
                           onChanged();
                         },
                         child: Text('Reset',
@@ -208,8 +213,8 @@ Future<void> showDisplayOptions(BuildContext context, DisplayState ds, VoidCallb
                       ])
                         M3EChip(
                           label: prop,
-                          selected: ds.rowProperties
-                              .contains(prop.toLowerCase().replaceAll(' ', '_')),
+                          selected: ds.rowProperties.contains(
+                              prop.toLowerCase().replaceAll(' ', '_')),
                           onTap: () {
                             final key = prop.toLowerCase().replaceAll(' ', '_');
                             setSheetState(() {
@@ -234,4 +239,3 @@ Future<void> showDisplayOptions(BuildContext context, DisplayState ds, VoidCallb
     ),
   );
 }
-

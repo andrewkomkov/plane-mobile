@@ -9,19 +9,16 @@ import '../../config/m3e/shapes.dart';
 import '../../widgets/m3e/app_bar.dart';
 import '../../widgets/m3e/icon_button.dart';
 import '../../widgets/m3e/text_field.dart';
-import 'package:flutter/services.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../config/secure_storage.dart';
 import '../../config/theme.dart';
-import '../../services/project_service.dart';
 import '../../services/module_service.dart';
 import '../../services/issue_service.dart';
 import '../../services/attachment_service.dart';
 import '../../services/comment_service.dart';
 import '../../services/label_service.dart';
-import '../../services/member_service.dart';
 import '../../services/auth_service.dart';
 import '../../models/user.dart';
 import '../../providers/data_providers.dart';
@@ -612,8 +609,9 @@ class _IssueDetailScreenState extends ConsumerState<IssueDetailScreen> {
         sub.id,
         {'parent': null},
       );
-      if (mounted)
+      if (mounted) {
         setState(() => _subIssues.removeWhere((s) => s.id == sub.id));
+      }
     } catch (e) {
       _complain('Could not remove the sub-issue', e);
     }
