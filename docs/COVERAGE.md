@@ -61,7 +61,7 @@ forbids it — which was not true of this document's first two versions.
 |---|---|---|---|
 | Analytics | every figure is now server-computed — `advance-analytics/`, `advance-analytics-charts/`, `advance-analytics-stats/`, and `default-analytics/` for the overdue count. Five requests where the sweep took up to 45. A panel the server does not answer for is named as missing rather than drawn as a zero | the date-range and per-dimension filters Plane's own analytics page offers (assignee, label, cycle, estimate); `export-analytics/` | P3 |
 | Intake | `intake_service.dart` is correct and current | **no UI reaches it.** The "Inbox" tab is the notification feed, not this queue | P2 |
-| Search | works through the shim's own SQL endpoint | not on Plane's `search/` routes, so it bypasses Plane's permission checks | P2 |
+| Search | on Plane's own `workspaces/{slug}/search/` through the proxy, so `GlobalSearchEndpoint` filters every entity on project membership — *verified* | `entity-search/` and the per-project `search-issues/` are not used | P3 |
 | Estimates | a work item's estimate point can be set | estimate *scales* cannot be created or managed | P3 |
 | Projects | list, detail, settings, members | **create** (deliberate), archive, join, leave | P3 |
 
@@ -103,16 +103,23 @@ workaround is commented where it lives.
 
 ## Architectural risk
 
-Three capabilities still route through `plane-mobile-api`'s own SQL handlers
-rather than the proxy: **search**, the **Inbox notification feed**, and
-`issue-info`, plus auth and device registration.
+Two capabilities still route through `plane-mobile-api`'s own SQL handlers
+rather than the proxy: the **Inbox notification feed** and `issue-info`, plus
+auth and device registration.
 
-Those handlers authenticate but do not authorise. This was demonstrated, not
+Those handlers authenticated but did not authorise. This was demonstrated, not
 suspected: the page handlers filtered by `project_id` with no membership check,
 and `get_page` filtered on page id alone, so any valid token in the instance
-could read or rewrite any page in any workspace. Pages were moved onto Plane's
-API and those handlers deleted. **Search and notifications still have that
-shape** and should follow.
+could read or rewrite any page in any workspace. The notification feed selected
+activity rows by workspace slug alone, with the same result.
+
+Pages and search were moved onto Plane's own API and their handlers deleted.
+The notification feed could not follow — Plane's own notifications table is
+empty on this instance while the derived feed has entries, so pointing the
+Inbox at it would empty a feed in use. It is authorised properly instead: the
+caller must be a workspace member, and the query joins `project_members` so it
+only returns activity from projects that caller belongs to. Worth revisiting
+once it is known why Plane is not populating its own table.
 
 The proxy is the pattern to prefer for anything new: it cannot have this class
 of bug, because the authorisation is not ours to get wrong.
