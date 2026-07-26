@@ -151,15 +151,16 @@ class _WebViewLoginScreenState extends State<WebViewLoginScreen> {
         return;
       }
 
-      // Step 4: Fall back to session cookie
-      final cookies = await _runJS('document.cookie');
-      final sessionMatch = RegExp(r'sessionid=([^;]+)').firstMatch(cookies);
-      if (sessionMatch != null && mounted) {
-        Navigator.pop(context, 'session:${sessionMatch.group(1)}');
-        return;
-      }
-
-      // Step 5: If nothing works, tell the user
+      // Step 4: If nothing works, tell the user.
+      //
+      // There used to be a session-cookie fallback here that scraped
+      // `document.cookie` and popped `session:<id>`. It could not have
+      // produced anything: Plane's session cookie is named "session-id", not
+      // "sessionid", and it is HttpOnly, so `document.cookie` never contains
+      // it. Nothing parsed the `session:` prefix either — the only credential
+      // this screen can usefully return is an `apitoken:`. Falling through to
+      // the message below is the honest outcome; popping a value no caller
+      // reads just closed the screen with no token and no explanation.
       _extracting = false;
       if (mounted) {
         setState(() => _loading = false);

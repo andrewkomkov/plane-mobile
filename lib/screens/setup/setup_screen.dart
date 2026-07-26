@@ -166,7 +166,6 @@ class _SetupScreenState extends State<SetupScreen> {
       await SecureStorage.saveBaseUrl(url);
       await SecureStorage.saveApiKey(apiKey);
       await SecureStorage.saveWorkspaceSlug(workspace);
-      await SecureStorage.saveAuthMethod('api_key');
       ApiClient.reset();
       widget.onConfigured();
     } catch (e) {
@@ -181,7 +180,6 @@ class _SetupScreenState extends State<SetupScreen> {
 
     await SecureStorage.saveBaseUrl(url);
     await SecureStorage.saveApiKey(apiToken);
-    await SecureStorage.saveAuthMethod('api_key');
     ApiClient.reset();
 
     if (workspaces.isEmpty) {

@@ -146,7 +146,6 @@ void main() {
     if (!await SecureStorage.isConfigured()) {
       await SecureStorage.saveBaseUrl(_baseUrl);
       await SecureStorage.saveApiKey(_apiKey);
-      await SecureStorage.saveAuthMethod('api_key');
       // The Dio instance is a static cached against the old credentials, and it
       // outlives the widget tree that each test rebuilds.
       ApiClient.reset();

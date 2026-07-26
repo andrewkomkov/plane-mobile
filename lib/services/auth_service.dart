@@ -14,6 +14,11 @@ class AuthService {
     return User.fromJson(response.data);
   }
 
+  /// Check that a base URL and token the user just typed in actually work.
+  ///
+  /// Runs before anything is stored, so it goes at the external `/api/v1`
+  /// surface via [ApiClient.createTemporary] rather than the proxy — see the
+  /// note there for why that is the one legitimate v1 call left in the app.
   static Future<bool> testConnection(String baseUrl, String apiKey) async {
     try {
       final dio = await ApiClient.createTemporary(baseUrl, apiKey);
@@ -21,58 +26,6 @@ class AuthService {
       return response.statusCode == 200;
     } catch (e) {
       return false;
-    }
-  }
-
-  /// Test connection using a session cookie against the internal API.
-  static Future<bool> testSessionConnection(
-      String baseUrl, String sessionId) async {
-    try {
-      final dio = ApiClient.createWithSession(baseUrl, sessionId);
-      final response = await dio.get('/users/me/');
-      return response.statusCode == 200;
-    } catch (e) {
-      return false;
-    }
-  }
-
-  /// Create an API token using a session cookie.
-  /// Returns the token string on success, null on failure.
-  static Future<String?> createApiToken(
-      String baseUrl, String sessionId) async {
-    try {
-      final dio = ApiClient.createWithSession(baseUrl, sessionId);
-      final response = await dio.post('/users/api-tokens/', data: {
-        'label': 'Plane Mobile App',
-        'description': 'Auto-created by Plane mobile app',
-      });
-      if (response.statusCode == 201 || response.statusCode == 200) {
-        return response.data['token'] as String?;
-      }
-      return null;
-    } catch (e) {
-      return null;
-    }
-  }
-
-  /// Fetch workspaces using a session cookie.
-  static Future<List<Map<String, dynamic>>> fetchWorkspaces(
-      String baseUrl, String sessionId) async {
-    try {
-      final dio = ApiClient.createWithSession(baseUrl, sessionId);
-      final response = await dio.get('/users/me/workspaces/');
-      if (response.statusCode == 200) {
-        final data = response.data;
-        if (data is List) {
-          return data.cast<Map<String, dynamic>>();
-        }
-        if (data is Map && data.containsKey('results')) {
-          return (data['results'] as List).cast<Map<String, dynamic>>();
-        }
-      }
-      return [];
-    } catch (e) {
-      return [];
     }
   }
 }

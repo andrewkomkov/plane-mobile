@@ -19,6 +19,10 @@ import 'secure_storage.dart';
 /// proxies through to the internal API, so Plane's own permission classes run
 /// on every request. Route names in the services are the internal ones, which
 /// is what they were written against in the first place.
+///
+/// That session lives entirely on the proxy. The app never sees it, never
+/// stores it and never sends a session cookie of its own — a token in
+/// `X-Api-Key` is the whole client-side credential.
 const String kPlaneProxyBase = '/auth/mobile/_plane/api';
 
 class ApiClient {
@@ -32,28 +36,20 @@ class ApiClient {
   static Future<Dio> _create() async {
     final baseUrl = await SecureStorage.getBaseUrl() ?? '';
     final apiKey = await SecureStorage.getApiKey() ?? '';
-    final sessionId = await SecureStorage.getSessionId() ?? '';
 
-    final headers = <String, dynamic>{
-      'Content-Type': 'application/json',
-    };
-
-    // Prefer API key if available, fall back to session cookie.
-    //
-    // The cookie branch is kept for a caller that supplies its own session,
-    // but nothing produces one: both sign-in paths end in
-    // setup_screen._handleAuthSuccess, which stores an api_token. Note the
-    // name below is wrong for this server anyway — Plane sets
-    // SESSION_COOKIE_NAME to "session-id", not Django's default.
-    if (apiKey.isNotEmpty) {
-      headers['X-Api-Key'] = apiKey;
-    } else if (sessionId.isNotEmpty) {
-      headers['Cookie'] = 'sessionid=$sessionId';
-    }
-
+    // The token is the only credential the app has. There used to be a second
+    // branch here that sent a `Cookie: sessionid=...` when no token was
+    // stored; it was removed because it could never have worked. Plane sets
+    // SESSION_COOKIE_NAME to "session-id", so the server never read the
+    // cookie, and nothing in the app ever wrote a session id in the first
+    // place — both sign-in paths end in setup_screen._handleAuthSuccess,
+    // which stores an api_token.
     _dio = Dio(BaseOptions(
-      baseUrl: apiKey.isNotEmpty ? '$baseUrl$kPlaneProxyBase' : '$baseUrl/api',
-      headers: headers,
+      baseUrl: '$baseUrl$kPlaneProxyBase',
+      headers: {
+        'X-Api-Key': apiKey,
+        'Content-Type': 'application/json',
+      },
       connectTimeout: const Duration(seconds: 10),
       receiveTimeout: const Duration(seconds: 30),
     ));
@@ -108,25 +104,23 @@ class ApiClient {
     _dioInternal = null;
   }
 
+  /// A throwaway client for validating a token the user has just typed in.
+  ///
+  /// This is the one place `/api/v1` is still the right target, and it is
+  /// deliberate. The proxy the rest of the app talks to only answers once the
+  /// app is configured — it needs a stored base URL and token to exchange for
+  /// a session. At setup there is nothing stored yet and nothing to exchange,
+  /// so the check has to go somewhere that authenticates a bare token on its
+  /// own. That is the external API. `/users/me/` exists on both surfaces and
+  /// is enough to tell a good token from a bad one.
+  ///
+  /// Nothing else should use this: v1 omits most of what the app reads.
   static Future<Dio> createTemporary(String baseUrl, String apiKey) async {
     return Dio(BaseOptions(
       baseUrl: '$baseUrl/api/v1',
       headers: {
         'X-Api-Key': apiKey,
         'Content-Type': 'application/json',
-      },
-      connectTimeout: const Duration(seconds: 10),
-      receiveTimeout: const Duration(seconds: 10),
-    ));
-  }
-
-  /// Create a Dio instance using a session cookie for internal API calls.
-  static Dio createWithSession(String baseUrl, String sessionId) {
-    return Dio(BaseOptions(
-      baseUrl: '$baseUrl/api',
-      headers: {
-        'Content-Type': 'application/json',
-        'Cookie': 'sessionid=$sessionId',
       },
       connectTimeout: const Duration(seconds: 10),
       receiveTimeout: const Duration(seconds: 10),
