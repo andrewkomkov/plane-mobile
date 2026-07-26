@@ -25,8 +25,8 @@ compiles but no one has watched it work.
 | | Areas |
 |---|---|
 | Covered | 19 |
-| Partial | 5 |
-| Missing | 8 |
+| Partial | 6 |
+| Missing | 6 |
 
 Everything that was structurally unreachable is now reachable. What remains
 missing is missing because nobody has built it, not because the transport
@@ -65,14 +65,24 @@ forbids it — which was not true of this document's first two versions.
 | Search | on Plane's own `workspaces/{slug}/search/` through the proxy, so `GlobalSearchEndpoint` filters every entity on project membership — *verified* | `entity-search/` and the per-project `search-issues/` are not used | P3 |
 | Estimates | a work item's estimate point can be set | estimate *scales* cannot be created or managed | P3 |
 | Projects | list, detail, settings, members | **create** (deliberate), archive, join, leave | P3 |
+| Draft work items | list, edit, promote to a work item, discard, and "Save draft" on the create screen. Reached from the work-item list's listing switcher | the draft editor carries the same fields the create screen does — title, description, state, priority — so assignees, labels, dates, cycle and module can be read off a web-made draft but not changed. Description is plain text, and the editor says so before it flattens a rich one. Workspace-level drafts with no project are not listed: the listing is project-scoped, and Plane refuses to promote a project-less draft anyway | P2 |
+
+Two things about drafts that the route names do not tell you. They are
+**workspace-scoped and single-user**: `workspaces/{slug}/draft-issues/` has no
+project segment, a draft's project is a nullable column, and the list filters
+on `created_by=request.user` with no parameter that widens it — nobody can see
+anyone else's drafts. And **`Issue.is_draft` is dead**. It is still in the
+internal serialiser's field list and `IssueManager` still excludes it, but
+migration 0077 moved every `is_draft=True` row into the separate `DraftIssue`
+table and nothing writes the flag any more. A draft is a different model, not a
+work item with a bit set, which is why it has no `sequence_id` and can never
+render as `PLM-123`.
 
 ## Missing
 
 | Area | What it is | Pri |
 |---|---|---|
 | **Favorites** | `user-favorites/` and the per-entity favorite routes | P2 |
-| **Draft work items** | `draft-issues/`, `draft-to-issue/{}/`. Drafts made on web are invisible here | P2 |
-| **Trash / restore** | `deleted-issues/`, asset restore. Deleting on mobile is unrecoverable there | P2 |
 | **Description history** | `issues/{}/versions/`, `work-items/{}/description-versions/`. The activity feed is covered; description history is not | P3 |
 | **Exports** | `export-issues/`, `export-analytics/`, `user-activity/{}/export/` | P3 |
 | **Home widgets** | stickies, quick links, the workspace home dashboard | P3 |
@@ -83,6 +93,40 @@ Also absent, reasonably: **Gantt** (the fifth view type), **AI assistant**,
 **Unsplash** covers, and GitHub integration beyond a read-only repo list —
 `github-repositories/` is the one path the app calls that no internal route
 serves, so it fails today.
+
+## Not missing — not offered: trash and restore
+
+Deleting a work item on mobile is unrecoverable, and it cannot be made
+recoverable against this server. This was previously listed as a P2 gap. It is
+not a gap; there is nothing to build.
+
+`DELETE issues/{id}/` is a soft delete — `Issue` extends `SoftDeleteModel`, so
+the row survives with `deleted_at` set and a background task soft-deletes its
+children. The data is therefore still there. What is not there is any way back:
+
+- **No restore route exists for work items.** The only `restore` handlers in
+  the whole API are for file assets (`assets/v2/workspaces/{}/restore/{}/`).
+  Nothing clears `deleted_at` on an issue, and no serialiser accepts it as a
+  writable field, so there is no PATCH that would do it either.
+- **`projects/{id}/deleted-issues/` is not a trash listing.** Despite the name
+  it returns a bare JSON array of UUIDs — `values_list("id", flat=True)` over
+  everything archived *or* deleted — with no names, states or timestamps. It
+  exists so a client with a local database can prune rows it has cached. Plane's
+  own web client has a `getDeletedIssues` method for it and calls it from
+  nowhere.
+- A listing built on it could show a column of UUIDs and offer no action on
+  any of them. That is the "listing that can only look at things" this was
+  explicitly not to become.
+
+**The recoverable path is archiving, which the app already has.** Archive and
+unarchive both round-trip, and archived work items are one of the three
+listings on the work-item list. If the complaint is "delete is final on
+mobile", the answer available today is to archive instead — the delete
+confirmation on the work-item detail screen is where that would be said, and
+that screen is not this change's to edit.
+
+Restoring would need a server change: an endpoint that clears `deleted_at`, and
+a listing endpoint that returns the deleted rows rather than their ids.
 
 ## Server defects found while building this
 
@@ -103,9 +147,11 @@ workaround is commented where it lives.
 | `workspaces/{}/cycles/` and `.../modules/` never check project membership | they select on `workspace__slug` alone behind `WorkspaceViewerPermission`, so any workspace member reads the cycles and modules — names, dates, issue counts — of every project in the workspace, including ones they are not in. The sibling `workspaces/{}/issues/` does filter. The rollup screens drop any row whose project is not in the caller's own project list |
 | `workspaces/{}/workspace-views/` is not a view list | `WorkspaceMemberUserViewsEndpoint` is POST-only and writes `view_props` onto the caller's workspace membership. A GET is a 405. The workspace saved views are at `workspaces/{}/views/` |
 | `WorkspaceViewViewSet.retrieve` has no permission decorator and no 404 | every other action on it carries `@allow_permission`; this one does not, and it serialises whatever `.first()` returned. For a view that does not exist, or is private to someone else, `IssueViewSerializer(None).data` is DRF's initial-value dict, so the caller gets a 200 and an empty view rather than a 404 |
-| `lib/models/view.dart` reads `query_data` | not a field on `IssueView` — the model holds `filters` and the compiled `query`. So `PlaneView.queryData` is empty for every view the server has ever sent, `view_detail_screen` filters on nothing and shows the whole project, and `view_list_screen` posts a key the serializer discards. The workspace views screen reads `filters` instead; the project one has not been changed |
+| `IssueView` has no `query_data` field | the model holds `filters` and the compiled `query`. `PlaneView` read `query_data`, so its filter set was empty for every view the server ever sent and a saved view listed the whole project. Fixed — it reads `filters` now. `view_list_screen` still posts the old key on create, which the serializer discards |
 | `WorkspaceCyclesEndpoint`/`WorkspaceModulesEndpoint` read `order_by` from `self.kwargs` | that is the URL kwargs, which never contain it, so the `order_by` query parameter is silently ignored and the order is always `-created_at` |
 | `CycleSerializer` omits `created_at` and `archived_at` | so a cycle from any endpoint using it — including the workspace rollup — has a fabricated `createdAt` and always reads as not archived. Harmless only because nothing sorts cycles by creation |
+| Draft retrieve and update guard the wrong model | both are decorated `creator=True, model=Issue` while the pk is a `DraftIssue` id, so the "you made it" fallback can never match — `Issue.objects.filter(id=<draft id>)` is always empty. `retrieve` allows only `ROLE.ADMIN` besides, so a workspace member cannot fetch their own draft at all. The app never calls `retrieve`: the list serialiser already includes `description_html`, so the listing carries everything the detail would |
+| `draft-to-issue/{id}/` does not copy the draft | it builds the work item out of `request.data` alone, takes only the project from the draft row, then deletes the row. Post an empty body and you get an empty work item and a destroyed draft. The app re-sends the whole draft, merged with any unsaved edits |
 
 ## Architectural risk
 

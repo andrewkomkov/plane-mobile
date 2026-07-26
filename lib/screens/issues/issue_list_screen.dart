@@ -4,20 +4,24 @@ import '../../config/theme.dart';
 import '../../widgets/m3e/icon_button.dart';
 import '../../widgets/m3e/text_field.dart';
 import '../../services/archived_issue_service.dart';
+import '../../services/draft_issue_service.dart';
 import '../../services/issue_service.dart';
 import '../../services/view_service.dart';
+import '../../models/draft_issue.dart';
 import '../../models/issue.dart';
 import '../../models/label.dart';
 import '../../models/member.dart';
 import '../../models/state.dart';
 import '../../utils/issue_grouping.dart';
 import '../../widgets/archive_toggle.dart';
+import '../../widgets/issue_listing_switcher.dart';
 import '../../widgets/issue_row.dart';
 import '../../widgets/section_header.dart';
 import '../../widgets/loading_state.dart';
 import '../../widgets/filter_bar.dart';
 import '../../widgets/display_options.dart';
 import '../../widgets/bottom_sheet_picker.dart';
+import 'issue_create_screen.dart';
 import 'issue_detail_screen.dart';
 
 class IssueListScreen extends ConsumerStatefulWidget {
@@ -52,19 +56,23 @@ class _IssueListScreenState extends ConsumerState<IssueListScreen>
   final DisplayState _display = DisplayState();
   FilterState _filterState = const FilterState();
 
-  /// Whether the list is showing the archive instead of the live work items.
-  bool _showArchived = false;
+  /// Which of the three listings is on screen.
+  IssueListing _listing = IssueListing.live;
 
   /// Fetched here rather than by the parent tab.
   ///
   /// `IssuesTabScreen` hands the same live list to all four view modes, and
-  /// three of them — board, table, calendar — have no archive. Loading the
-  /// archive up there would cost every project open a request that only one
-  /// view can ever use, so this screen asks for it the first time it is asked
-  /// to show one.
+  /// three of them — board, table, calendar — have neither an archive nor
+  /// drafts. Loading either up there would cost every project open a request
+  /// that only one view can ever use, so this screen asks for them the first
+  /// time it is asked to show one.
   List<ArchivedIssue>? _archived;
   bool _archivedLoading = false;
   String? _archivedError;
+
+  List<DraftIssue>? _drafts;
+  bool _draftsLoading = false;
+  String? _draftsError;
 
   @override
   bool get wantKeepAlive => true;
@@ -106,11 +114,75 @@ class _IssueListScreenState extends ConsumerState<IssueListScreen>
     }
   }
 
-  void _toggleArchived(bool value) {
-    setState(() => _showArchived = value);
-    // Refetched on every entry: a work item archived from its detail screen a
-    // moment ago has to be here.
-    if (value) _loadArchived();
+  /// The caller's drafts for this project, in the order the server returned
+  /// them — newest first, which the view fixes and no parameter changes.
+  ///
+  /// Not run through [_filteredAndSorted] for the same reason the archive is
+  /// not: those controls belong to the live list, and the display sheet is not
+  /// offered while a draft or the archive is showing.
+  List<DraftIssue> get _draftIssues => _drafts ?? const [];
+
+  Future<void> _loadDrafts() async {
+    setState(() {
+      _draftsLoading = true;
+      _draftsError = null;
+    });
+    try {
+      final drafts = await DraftIssueService.getDrafts(
+        widget.workspaceSlug,
+        projectId: widget.projectId,
+      );
+      if (mounted) {
+        setState(() {
+          _drafts = drafts;
+          _draftsLoading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _draftsError = e.toString();
+          _draftsLoading = false;
+        });
+      }
+    }
+  }
+
+  void _selectListing(IssueListing value) {
+    setState(() => _listing = value);
+    // Refetched on every entry rather than cached: a work item archived from
+    // its detail screen, or a draft saved from the create screen, a moment ago
+    // has to be here.
+    switch (value) {
+      case IssueListing.live:
+        break;
+      case IssueListing.drafts:
+        _loadDrafts();
+      case IssueListing.archived:
+        _loadArchived();
+    }
+  }
+
+  /// Opens a draft in the editor, which can save it, promote it or discard it.
+  Future<void> _openDraft(DraftIssue draft) async {
+    final outcome = await Navigator.push<IssueCreateOutcome>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => IssueCreateScreen(
+          workspaceSlug: widget.workspaceSlug,
+          projectId: widget.projectId,
+          states: _states,
+          draft: draft,
+        ),
+      ),
+    );
+    if (outcome == null || !mounted) return;
+    await _loadDrafts();
+    // Promotion creates a work item and destroys the draft, so the live list
+    // the parent tab holds is stale too.
+    if (outcome == IssueCreateOutcome.issueCreated) {
+      await widget.onRefresh();
+    }
   }
 
   Future<void> _saveAsView() async {
@@ -220,49 +292,121 @@ class _IssueListScreenState extends ConsumerState<IssueListScreen>
     final theme = Theme.of(context);
 
     final secondary = theme.colorScheme.onSurfaceVariant;
-    final count =
-        _showArchived ? _archivedIssues.length : _filteredAndSorted.length;
     return Scaffold(
       body: Column(
         children: [
-          // Minimal header: issue count + archive toggle + display options
+          // Minimal header: which listing, and the display sheet for the one
+          // listing that has anything to display-option.
+          //
+          // The per-listing count used to live here as a leading label. It now
+          // sits on the section header of whichever list is showing, where the
+          // live list's group counts already were — so nothing was lost and the
+          // switcher gets the width it needs at large font scales.
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
             child: Row(
               children: [
-                Text('$count ${_showArchived ? 'archived' : 'issues'}',
-                    style: theme.textTheme.bodySmall),
-                const Spacer(),
-                ArchiveToggle(
-                  showArchived: _showArchived,
-                  entityPlural: 'work items',
-                  onChanged: _toggleArchived,
-                ),
-                const SizedBox(width: 4),
-                // The display sheet drives grouping and sorting, neither of
-                // which the archive uses, so it is not offered there.
-                if (!_showArchived)
-                  M3EIconButton(
-                    icon: Icons.tune,
-                    tooltip: 'Display options',
-                    size: M3EIconButtonSize.small,
-                    color: secondary,
-                    onPressed: () => showDisplayOptions(
-                        context, _display, () => setState(() {})),
+                Expanded(
+                  child: IssueListingSwitcher(
+                    value: _listing,
+                    onChanged: _selectListing,
                   ),
+                ),
+                const SizedBox(width: 8),
+                // A fixed slot rather than a conditional child: the button is
+                // only offered on the live list, and without reserving its
+                // width the switcher would resize every time the listing
+                // changed, under the finger that changed it.
+                SizedBox(
+                  width: M3EIconButtonSize.small.container,
+                  child: _listing == IssueListing.live
+                      // The display sheet drives grouping and sorting, neither
+                      // of which the drafts or archive listings use.
+                      ? M3EIconButton(
+                          icon: Icons.tune,
+                          tooltip: 'Display options',
+                          size: M3EIconButtonSize.small,
+                          color: secondary,
+                          onPressed: () => showDisplayOptions(
+                              context, _display, () => setState(() {})),
+                        )
+                      : null,
+                ),
               ],
             ),
           ),
           Expanded(
-            child: _showArchived
-                ? RefreshIndicator(
-                    onRefresh: _loadArchived,
-                    child: _archivedList(),
-                  )
-                : _liveList(),
+            child: switch (_listing) {
+              IssueListing.live => _liveList(),
+              IssueListing.drafts => RefreshIndicator(
+                  onRefresh: _loadDrafts,
+                  child: _draftsList(),
+                ),
+              IssueListing.archived => RefreshIndicator(
+                  onRefresh: _loadArchived,
+                  child: _archivedList(),
+                ),
+            },
           ),
         ],
       ),
+    );
+  }
+
+  Widget _draftsList() {
+    if (_draftsError != null) {
+      return ErrorStateWidget(
+        message: 'Failed to load drafts',
+        onRetry: _loadDrafts,
+      );
+    }
+    if (_drafts == null && _draftsLoading) {
+      return const LoadingStateWidget();
+    }
+    final drafts = _draftIssues;
+    if (drafts.isEmpty) {
+      return ListView(children: [
+        SizedBox(height: MediaQuery.of(context).size.height * 0.25),
+        const Center(
+          child: EmptyStateWidget(
+            message: 'No drafts',
+            icon: Icons.edit_note,
+            // Both halves are worth saying: the endpoint only ever returns the
+            // caller's own drafts, and it is the same set the web client
+            // writes to.
+            subtitle: 'Your unfinished work items, saved here or on the web',
+          ),
+        ),
+      ]);
+    }
+    return ListView.builder(
+      itemCount: drafts.length + 1,
+      itemBuilder: (ctx, i) {
+        if (i == 0) {
+          // "Your", because the server means it: the list filters on
+          // created_by, so a teammate's drafts are not missing from this
+          // count — they were never in scope.
+          return SectionHeader(label: 'Your drafts', count: drafts.length);
+        }
+        final draft = drafts[i - 1];
+        // The same IssueRow as every other list. The identifier is suppressed
+        // because a draft has none: `DraftIssueSerializer` omits sequence_id,
+        // so the row would render "PLM-0" for every draft in the project.
+        return IssueRow(
+          issue: draft.rowIssue,
+          state: _states[draft.issue.state],
+          showId: false,
+          subtitle: draftSavedLabel(draft.issue.updatedAt),
+          showPriority: true,
+          showState: true,
+          showLabels: true,
+          showAssignee: true,
+          allLabels: _labels,
+          allMembers: _members,
+          semanticExtras: const ['draft'],
+          onTap: () => _openDraft(draft),
+        );
+      },
     );
   }
 
@@ -290,9 +434,12 @@ class _IssueListScreenState extends ConsumerState<IssueListScreen>
       ]);
     }
     return ListView.builder(
-      itemCount: archived.length,
+      itemCount: archived.length + 1,
       itemBuilder: (ctx, i) {
-        final entry = archived[i];
+        if (i == 0) {
+          return SectionHeader(label: 'Archive', count: archived.length);
+        }
+        final entry = archived[i - 1];
         final issue = entry.issue;
         // The same IssueRow every other list uses. Archived reads through the
         // subtitle slot and through the label — the row is not a variant, it
