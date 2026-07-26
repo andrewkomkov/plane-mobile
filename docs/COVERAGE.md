@@ -24,9 +24,9 @@ compiles but no one has watched it work.
 
 | | Areas |
 |---|---|
-| Covered | 18 |
+| Covered | 19 |
 | Partial | 5 |
-| Missing | 9 |
+| Missing | 8 |
 
 Everything that was structurally unreachable is now reachable. What remains
 missing is missing because nobody has built it, not because the transport
@@ -54,6 +54,7 @@ forbids it — which was not true of this document's first two versions.
 | Saved views | project-level CRUD — *verified* (this was the screen that failed outright) |
 | Members | roles, invite, change role, remove, leave, pending invitations — *verified* |
 | Notifications | list, read/unread, archive, mark-all-read, preferences |
+| Workspace rollups | cross-project work items (paginated), workspace saved views incl. delete, cycles, modules — from the More menu. `workspaces/{}/states/` and `.../labels/` resolve the ids, which the project-scoped calls cannot |
 
 ## Partial
 
@@ -69,7 +70,6 @@ forbids it — which was not true of this document's first two versions.
 
 | Area | What it is | Pri |
 |---|---|---|
-| **Workspace-level rollups** | `workspaces/{}/issues/`, `views/`, `cycles/`, `modules/` — cross-project views. Mobile is project-scoped | P2 |
 | **Favorites** | `user-favorites/` and the per-entity favorite routes | P2 |
 | **Draft work items** | `draft-issues/`, `draft-to-issue/{}/`. Drafts made on web are invisible here | P2 |
 | **Trash / restore** | `deleted-issues/`, asset restore. Deleting on mobile is unrecoverable there | P2 |
@@ -100,6 +100,12 @@ workaround is commented where it lives.
 | Project invitation endpoint 500s twice | reads `.role` off a queryset, calls `.delay` on a list. Invite-by-email is offered only at workspace level |
 | Comment PATCH/DELETE guarded by `ProjectLitePermission` alone | any project member may rewrite anyone's comment. The app gates on authorship instead |
 | `ProjectMemberViewSet.partial_update` admits guests | a project guest can demote a project admin. The app gates on admin |
+| `workspaces/{}/cycles/` and `.../modules/` never check project membership | they select on `workspace__slug` alone behind `WorkspaceViewerPermission`, so any workspace member reads the cycles and modules — names, dates, issue counts — of every project in the workspace, including ones they are not in. The sibling `workspaces/{}/issues/` does filter. The rollup screens drop any row whose project is not in the caller's own project list |
+| `workspaces/{}/workspace-views/` is not a view list | `WorkspaceMemberUserViewsEndpoint` is POST-only and writes `view_props` onto the caller's workspace membership. A GET is a 405. The workspace saved views are at `workspaces/{}/views/` |
+| `WorkspaceViewViewSet.retrieve` has no permission decorator and no 404 | every other action on it carries `@allow_permission`; this one does not, and it serialises whatever `.first()` returned. For a view that does not exist, or is private to someone else, `IssueViewSerializer(None).data` is DRF's initial-value dict, so the caller gets a 200 and an empty view rather than a 404 |
+| `lib/models/view.dart` reads `query_data` | not a field on `IssueView` — the model holds `filters` and the compiled `query`. So `PlaneView.queryData` is empty for every view the server has ever sent, `view_detail_screen` filters on nothing and shows the whole project, and `view_list_screen` posts a key the serializer discards. The workspace views screen reads `filters` instead; the project one has not been changed |
+| `WorkspaceCyclesEndpoint`/`WorkspaceModulesEndpoint` read `order_by` from `self.kwargs` | that is the URL kwargs, which never contain it, so the `order_by` query parameter is silently ignored and the order is always `-created_at` |
+| `CycleSerializer` omits `created_at` and `archived_at` | so a cycle from any endpoint using it — including the workspace rollup — has a fabricated `createdAt` and always reads as not archived. Harmless only because nothing sorts cycles by creation |
 
 ## Architectural risk
 

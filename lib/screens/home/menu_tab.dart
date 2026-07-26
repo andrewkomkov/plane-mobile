@@ -12,6 +12,10 @@ import '../../services/workspace_service.dart';
 import '../../providers/workspace_provider.dart';
 import '../../providers/data_providers.dart';
 import '../workspace/workspace_members_screen.dart';
+import '../workspace/workspace_cycles_screen.dart';
+import '../workspace/workspace_issues_screen.dart';
+import '../workspace/workspace_modules_screen.dart';
+import '../workspace/workspace_views_screen.dart';
 import '../../utils/new_issue_flow.dart';
 import '../notifications/notification_screen.dart';
 import '../analytics/analytics_screen.dart';
@@ -133,6 +137,10 @@ class _MenuTabState extends ConsumerState<MenuTab> {
             WorkspaceMembersScreen(workspaceSlug: widget.workspaceSlug),
       ),
     );
+  }
+
+  void _push(Widget screen) {
+    Navigator.push(context, MaterialPageRoute(builder: (_) => screen));
   }
 
   @override
@@ -287,6 +295,43 @@ class _MenuTabState extends ConsumerState<MenuTab> {
                           ),
                         );
                       },
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                // The cross-project rollups: the same entities the project
+                // tabs show, listed across the whole workspace. This tab is
+                // the app's only workspace-scoped surface — everywhere else
+                // you are already inside a project — so it is where a list
+                // that spans projects belongs. Their own group, because they
+                // are one idea rather than four unrelated destinations.
+                _MenuGroup(
+                  children: [
+                    _MenuRow(
+                      icon: Icons.all_inbox_outlined,
+                      label: 'All Work Items',
+                      subtitle: 'Across every project',
+                      onTap: () => _push(WorkspaceIssuesScreen(
+                          workspaceSlug: widget.workspaceSlug)),
+                    ),
+                    _MenuRow(
+                      icon: Icons.view_list_outlined,
+                      label: 'Workspace Views',
+                      subtitle: 'Saved filters that span projects',
+                      onTap: () => _push(WorkspaceViewsScreen(
+                          workspaceSlug: widget.workspaceSlug)),
+                    ),
+                    _MenuRow(
+                      icon: Icons.loop,
+                      label: 'All Cycles',
+                      onTap: () => _push(WorkspaceCyclesScreen(
+                          workspaceSlug: widget.workspaceSlug)),
+                    ),
+                    _MenuRow(
+                      icon: Icons.view_module_outlined,
+                      label: 'All Modules',
+                      onTap: () => _push(WorkspaceModulesScreen(
+                          workspaceSlug: widget.workspaceSlug)),
                     ),
                   ],
                 ),
