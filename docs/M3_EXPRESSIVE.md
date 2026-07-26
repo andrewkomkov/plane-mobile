@@ -46,6 +46,37 @@ the default:
 - **It is an alpha.** Every composable used is behind
   `@ExperimentalMaterial3ExpressiveApi`.
 
+### Why not just wait for Flutter?
+
+Because there is nothing to wait for, and this is worth writing down so it is
+not re-litigated every few months.
+
+Flutter has been fully Material 3 since 3.16, and its component catalogue is
+complete for **M3**. Material 3 **Expressive** is the 2025 evolution on top of
+that — spring physics, the expanded shape library, ButtonGroup, SplitButton,
+FAB Menu, LoadingIndicator, toolbars — and none of it is in the framework.
+
+Checked against Flutter 3.44.5 stable (Dart 3.12.2), July 2026:
+
+- No `ButtonGroup`, `LoadingIndicator`, `SplitButton`, `FloatingToolbar` or
+  `MotionScheme` class exists anywhere in `packages/flutter/lib/src/material`.
+- `material/motion.dart` contains only `Durations` and `Easing` — the standard
+  M3 curve set. There are no spring tokens.
+- The one hit for "expressive" in the SDK is `DynamicSchemeVariant.expressive`,
+  a seed-palette variant in `color_scheme.dart`. It is a colour algorithm and
+  has nothing to do with M3E's shape or motion.
+
+The upstream tracking issue is
+[flutter#168813](https://github.com/flutter/flutter/issues/168813). It is open,
+it lists 15 expressive components with **none landed**, and the team states
+they are not actively developing them and are not accepting contributions for
+them — the work is blocked behind decoupling Material and Cupertino into
+standalone packages ([flutter#101479](https://github.com/flutter/flutter/issues/101479)).
+No target release.
+
+So upgrading Flutter does not deliver any of this. The two routes below are the
+only ones available.
+
 ### 2. Dart implementations of the same spec
 
 `lib/widgets/m3e/` implements the same language natively in Dart, on the one M3E
