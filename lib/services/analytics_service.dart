@@ -10,11 +10,17 @@ import '../services/project_service.dart';
 ///
 /// ## Why this sweeps instead of asking
 ///
-/// Plane's analytics endpoints live on the internal app API and authenticate
-/// by session cookie; this app authenticates by API token against `/api/v1/`,
-/// where no analytics routes exist. See the header of `models/analytics.dart`
-/// for the full trace. So the only server-side aggregate available is
-/// `total_count` on the work-item list, and the breakdowns are counted here.
+/// OUT OF DATE — this sweep exists because Plane's analytics endpoints were
+/// unreachable: they live on the internal app API behind a session cookie,
+/// and the app authenticated by API token against `/api/v1/`, which has no
+/// analytics routes at all.
+///
+/// That is no longer true. Requests now go through the session proxy in
+/// plane-mobile-api, and `workspaces/{slug}/analytics/` answers — it returns
+/// 400 asking for x-axis and y-axis dimensions, which is a reachable endpoint
+/// refusing an incomplete query, not an absent one. This whole sweep should be
+/// replaced by the real analytics API. Until it is, what it computes is still
+/// accurate; it is just far more expensive than it needs to be.
 ///
 /// Counting here is only honest if it counts *everything*, which is what
 /// [getWorkspaceAnalytics] does: it pages each project to exhaustion rather

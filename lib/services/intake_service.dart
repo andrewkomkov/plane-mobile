@@ -4,10 +4,11 @@ import '../models/intake_issue.dart';
 /// Intake — the per-project triage queue for work items submitted from outside
 /// the project. Plane shipped this as "Inbox" and renamed it to "Intake".
 ///
-/// These are the v1 routes from `plane/api/urls/intake.py`, which is the
-/// surface that matters: setup stores an API token for both sign-in paths, so
-/// [ApiClient] is always based at `{host}/api/v1` and the internal `/api`
-/// routes are unreachable in practice.
+/// These are the v1 routes from `plane/api/urls/intake.py`. They were chosen
+/// when the app talked to `/api/v1` directly. Requests now go through the
+/// session proxy onto the internal API instead, which serves
+/// `intake-issues/` under the same name, so these paths still resolve — but
+/// the internal API is the surface to check against when editing them.
 ///
 /// Two things about the current routes are worth knowing before editing them:
 ///
