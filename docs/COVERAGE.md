@@ -176,8 +176,17 @@ caller must be a workspace member, and the query joins `project_members` so it
 only returns activity from projects that caller belongs to. Worth revisiting
 once it is known why Plane is not populating its own table.
 
-The proxy is the pattern to prefer for anything new: it cannot have this class
-of bug, because the authorisation is not ours to get wrong.
+The rest were audited rather than assumed clean. Every handler that resolves a
+user from an API key now also proves membership before returning anything:
+`issue-info` checks project membership, `workspaces` selects on the caller's
+own membership row, `check-notifications` joins `project_members`, and device
+registration only ever writes the caller's own record. `_is_project_member`
+also pins the workspace when given a slug, so a caller cannot pair their own
+slug with someone else's project id. A scan of every `/auth/mobile/` route for
+"authenticates but does not authorise" now returns nothing.
+
+The proxy is still the pattern to prefer for anything new: it cannot have this
+class of bug at all, because the authorisation is not ours to get wrong.
 
 ## Known gaps in this document
 
