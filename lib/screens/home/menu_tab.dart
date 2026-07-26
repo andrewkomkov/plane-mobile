@@ -2,19 +2,17 @@ import 'package:flutter/material.dart';
 import '../../config/m3e/shapes.dart';
 import '../../config/m3e/typography.dart';
 import '../../widgets/m3e/loading_indicator.dart';
-import '../../widgets/m3e/app_bar.dart';
 import '../../widgets/m3e/icon_button.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../config/secure_storage.dart';
 import '../../config/api_client.dart';
 import '../../models/user.dart';
 import '../../models/workspace.dart';
-import '../../models/member.dart';
 import '../../services/workspace_service.dart';
 import '../../providers/workspace_provider.dart';
 import '../../providers/data_providers.dart';
+import '../workspace/workspace_members_screen.dart';
 import '../../utils/new_issue_flow.dart';
-import '../../widgets/loading_state.dart';
 import '../notifications/notification_screen.dart';
 import '../analytics/analytics_screen.dart';
 import '../profile/profile_screen.dart';
@@ -56,9 +54,8 @@ class _MenuTabState extends ConsumerState<MenuTab> {
     setState(() => _loadingWorkspaces = true);
     try {
       _workspaces = await WorkspaceService.getWorkspaces();
-      _currentWorkspace = _workspaces
-          .where((w) => w.slug == widget.workspaceSlug)
-          .firstOrNull;
+      _currentWorkspace =
+          _workspaces.where((w) => w.slug == widget.workspaceSlug).firstOrNull;
     } catch (_) {}
     if (!mounted) return;
     setState(() => _loadingWorkspaces = false);
@@ -102,15 +99,13 @@ class _MenuTabState extends ConsumerState<MenuTab> {
                                   .textTheme
                                   .titleSmall
                                   ?.copyWith(
-                                      color: Theme.of(ctx)
-                                          .colorScheme
-                                          .primary),
+                                      color: Theme.of(ctx).colorScheme.primary),
                             ),
                           ),
                     title: Text(ws.name,
                         style: Theme.of(ctx).textTheme.bodyMedium),
-                    subtitle: Text(ws.slug,
-                        style: Theme.of(ctx).textTheme.bodySmall),
+                    subtitle:
+                        Text(ws.slug, style: Theme.of(ctx).textTheme.bodySmall),
                     trailing: ws.slug == widget.workspaceSlug
                         ? const Icon(Icons.check, size: 18)
                         : null,
@@ -119,9 +114,7 @@ class _MenuTabState extends ConsumerState<MenuTab> {
                       if (ws.slug != widget.workspaceSlug) {
                         await SecureStorage.saveWorkspaceSlug(ws.slug);
                         ApiClient.reset();
-                        ref
-                            .read(workspaceProvider.notifier)
-                            .setSlug(ws.slug);
+                        ref.read(workspaceProvider.notifier).setSlug(ws.slug);
                         widget.onWorkspaceChanged?.call();
                       }
                     },
@@ -137,7 +130,7 @@ class _MenuTabState extends ConsumerState<MenuTab> {
       context,
       MaterialPageRoute(
         builder: (_) =>
-            _WorkspaceMembersScreen(workspaceSlug: widget.workspaceSlug),
+            WorkspaceMembersScreen(workspaceSlug: widget.workspaceSlug),
       ),
     );
   }
@@ -145,254 +138,255 @@ class _MenuTabState extends ConsumerState<MenuTab> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final wsName =
-        _currentWorkspace?.name ?? widget.workspaceSlug;
+    final wsName = _currentWorkspace?.name ?? widget.workspaceSlug;
 
     return SafeArea(
       bottom: false,
       child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Top bar matching mockup: grid icon + Plane + unfold + avatar
-            Padding(
-              padding: const EdgeInsets.fromLTRB(20, 8, 12, 0),
-              child: Row(
-                children: [
-                  // The visible text is the workspace name, which says nothing
-                  // about what tapping it does — hence an explicit label.
-                  Semantics(
-                    label: 'Switch workspace',
-                    button: true,
-                    child: GestureDetector(
-                      onTap: _showSwitchWorkspace,
-                      child: Row(
-                        children: [
-                          Icon(Icons.grid_view, size: 20, color: theme.colorScheme.primary),
-                          const SizedBox(width: 10),
-                          Text(
-                            'Plane',
-                            style: M3EType.emphasized(
-                                theme.textTheme.headlineSmall!),
-                          ),
-                          const SizedBox(width: 4),
-                          Icon(Icons.unfold_more,
-                              size: 14,
-                              color: theme.colorScheme.onSurfaceVariant),
-                        ],
-                      ),
-                    ),
-                  ),
-                  const Spacer(),
-                  M3EIconButton(
-                    icon: Icons.edit_square,
-                    tooltip: 'New issue',
-                    onPressed: () => startNewIssue(
-                      context,
-                      cache: ref.read(dataCacheProvider),
-                      workspaceSlug: widget.workspaceSlug,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const Padding(
-              padding: EdgeInsets.only(top: 12),
-              child: Divider(height: 0.5, thickness: 0.5),
-            ),
-            Expanded(
-              child: ListView(
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-                children: [
-                  // User profile section
-                  if (widget.user != null)
-                    Container(
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        color: theme.colorScheme.surfaceContainerLow,
-                        borderRadius: BorderRadius.circular(M3EShape.large),
-                        border: Border.all(
-                          color: theme.colorScheme.outlineVariant,
-                          width: 0.8,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Top bar matching mockup: grid icon + Plane + unfold + avatar
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 8, 12, 0),
+            child: Row(
+              children: [
+                // The visible text is the workspace name, which says nothing
+                // about what tapping it does — hence an explicit label.
+                Semantics(
+                  label: 'Switch workspace',
+                  button: true,
+                  child: GestureDetector(
+                    onTap: _showSwitchWorkspace,
+                    child: Row(
+                      children: [
+                        Icon(Icons.grid_view,
+                            size: 20, color: theme.colorScheme.primary),
+                        const SizedBox(width: 10),
+                        Text(
+                          'Plane',
+                          style: M3EType.emphasized(
+                              theme.textTheme.headlineSmall!),
                         ),
-                      ),
-                      child: Row(
-                        children: [
-                          CircleAvatar(
-                            radius: 28,
-                            backgroundColor:
-                                theme.colorScheme.primary.withValues(alpha: 0.15),
-                            child: Text(
-                              widget.user!.displayName[0].toUpperCase(),
-                              style: theme.textTheme.headlineSmall?.copyWith(
-                                color: theme.colorScheme.primary,
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 16),
-                          Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(widget.user!.displayName,
-                                  style: M3EType.emphasized(
-                                      theme.textTheme.titleLarge!)),
-                              const SizedBox(height: 2),
-                              Text(widget.user!.email,
-                                  style: theme.textTheme.labelLarge?.copyWith(
-                                      color: theme.colorScheme.onSurfaceVariant)),
-                            ],
-                          ),
-                        ],
+                        const SizedBox(width: 4),
+                        Icon(Icons.unfold_more,
+                            size: 14,
+                            color: theme.colorScheme.onSurfaceVariant),
+                      ],
+                    ),
+                  ),
+                ),
+                const Spacer(),
+                M3EIconButton(
+                  icon: Icons.edit_square,
+                  tooltip: 'New issue',
+                  onPressed: () => startNewIssue(
+                    context,
+                    cache: ref.read(dataCacheProvider),
+                    workspaceSlug: widget.workspaceSlug,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const Padding(
+            padding: EdgeInsets.only(top: 12),
+            child: Divider(height: 0.5, thickness: 0.5),
+          ),
+          Expanded(
+            child: ListView(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+              children: [
+                // User profile section
+                if (widget.user != null)
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: theme.colorScheme.surfaceContainerLow,
+                      borderRadius: BorderRadius.circular(M3EShape.large),
+                      border: Border.all(
+                        color: theme.colorScheme.outlineVariant,
+                        width: 0.8,
                       ),
                     ),
-                  const SizedBox(height: 24),
-                  // Menu group 1
-                  _MenuGroup(
-                    children: [
-                      _MenuRow(
-                        icon: Icons.notifications_outlined,
-                        label: 'Notifications',
-                        onTap: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) => NotificationScreen(
-                                  workspaceSlug: widget.workspaceSlug),
+                    child: Row(
+                      children: [
+                        CircleAvatar(
+                          radius: 28,
+                          backgroundColor:
+                              theme.colorScheme.primary.withValues(alpha: 0.15),
+                          child: Text(
+                            widget.user!.displayName[0].toUpperCase(),
+                            style: theme.textTheme.headlineSmall?.copyWith(
+                              color: theme.colorScheme.primary,
                             ),
-                          );
-                        },
-                      ),
-                      _MenuRow(
-                        icon: Icons.analytics_outlined,
-                        label: 'Analytics',
-                        onTap: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) => AnalyticsScreen(
-                                  workspaceSlug: widget.workspaceSlug),
-                            ),
-                          );
-                        },
-                      ),
-                      _MenuRow(
-                        icon: Icons.people_outline,
-                        label: 'Workspace Members',
-                        onTap: _showWorkspaceMembers,
-                      ),
-                      _MenuRow(
-                        icon: Icons.cloud_upload_outlined,
-                        label: 'Sync Queue',
-                        subtitle: widget.pendingWrites > 0
-                            ? '${widget.pendingWrites} pending'
-                            : 'All synced',
-                        onTap: () {
-                          widget.onSyncQueue?.call();
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text('Syncing queued writes...'),
-                              duration: Duration(seconds: 1),
-                            ),
-                          );
-                        },
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  // Menu group 2
-                  _MenuGroup(
-                    children: [
-                      _MenuRow(
-                        icon: Icons.sync_alt,
-                        label: 'Switch Workspace',
-                        subtitle: 'Current: $wsName',
-                        trailing: _loadingWorkspaces
-                            ? const SizedBox(
-                                width: 16,
-                                height: 16,
-                                child: M3ELoadingIndicator(size: 18))
-                            : null,
-                        onTap: _showSwitchWorkspace,
-                      ),
-                      _MenuRow(
-                        icon: Icons.palette_outlined,
-                        label: 'Profile & Appearance',
-                        onTap: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) =>
-                                  ProfileScreen(user: widget.user),
-                            ),
-                          );
-                        },
-                      ),
-                      _MenuRow(
-                        icon: Icons.info_outline,
-                        label: 'About Plane',
-                        onTap: () {
-                          showAboutDialog(
-                            context: context,
-                            applicationName: 'Plane Mobile',
-                            applicationVersion: '1.0.0',
-                            children: [const Text('Plane.so mobile client')],
-                          );
-                        },
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 24),
-                  // Disconnect button
-                  GestureDetector(
-                    onTap: () async {
-                      final ok = await showDialog<bool>(
-                        context: context,
-                        builder: (ctx) => AlertDialog(
-                          title: const Text('Disconnect'),
-                          content: const Text('Disconnect from this instance?'),
-                          actions: [
-                            TextButton(
-                                onPressed: () => Navigator.pop(ctx, false),
-                                child: const Text('Cancel')),
-                            TextButton(
-                                onPressed: () => Navigator.pop(ctx, true),
-                                child: const Text('Disconnect')),
+                          ),
+                        ),
+                        const SizedBox(width: 16),
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(widget.user!.displayName,
+                                style: M3EType.emphasized(
+                                    theme.textTheme.titleLarge!)),
+                            const SizedBox(height: 2),
+                            Text(widget.user!.email,
+                                style: theme.textTheme.labelLarge?.copyWith(
+                                    color: theme.colorScheme.onSurfaceVariant)),
                           ],
                         ),
-                      );
-                      if (ok == true) {
-                        await SecureStorage.clear();
-                        ApiClient.reset();
-                        widget.onLogout();
-                      }
-                    },
-                    child: Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                      decoration: BoxDecoration(
-                        color: theme.colorScheme.errorContainer.withValues(alpha: 0.20),
-                        borderRadius: BorderRadius.circular(M3EShape.large),
-                      ),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(Icons.logout, size: 20, color: theme.colorScheme.error),
-                          const SizedBox(width: 10),
-                          Text(
-                            'Disconnect',
-                            style: M3EType.emphasized(
-                                    theme.textTheme.titleMedium!)
-                                .copyWith(color: theme.colorScheme.error),
-                          ),
-                        ],
-                      ),
+                      ],
                     ),
                   ),
-                  const SizedBox(height: 100),
-                ],
-              ),
+                const SizedBox(height: 24),
+                // Menu group 1
+                _MenuGroup(
+                  children: [
+                    _MenuRow(
+                      icon: Icons.notifications_outlined,
+                      label: 'Notifications',
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => NotificationScreen(
+                                workspaceSlug: widget.workspaceSlug),
+                          ),
+                        );
+                      },
+                    ),
+                    _MenuRow(
+                      icon: Icons.analytics_outlined,
+                      label: 'Analytics',
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => AnalyticsScreen(
+                                workspaceSlug: widget.workspaceSlug),
+                          ),
+                        );
+                      },
+                    ),
+                    _MenuRow(
+                      icon: Icons.people_outline,
+                      label: 'Workspace Members',
+                      onTap: _showWorkspaceMembers,
+                    ),
+                    _MenuRow(
+                      icon: Icons.cloud_upload_outlined,
+                      label: 'Sync Queue',
+                      subtitle: widget.pendingWrites > 0
+                          ? '${widget.pendingWrites} pending'
+                          : 'All synced',
+                      onTap: () {
+                        widget.onSyncQueue?.call();
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Syncing queued writes...'),
+                            duration: Duration(seconds: 1),
+                          ),
+                        );
+                      },
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                // Menu group 2
+                _MenuGroup(
+                  children: [
+                    _MenuRow(
+                      icon: Icons.sync_alt,
+                      label: 'Switch Workspace',
+                      subtitle: 'Current: $wsName',
+                      trailing: _loadingWorkspaces
+                          ? const SizedBox(
+                              width: 16,
+                              height: 16,
+                              child: M3ELoadingIndicator(size: 18))
+                          : null,
+                      onTap: _showSwitchWorkspace,
+                    ),
+                    _MenuRow(
+                      icon: Icons.palette_outlined,
+                      label: 'Profile & Appearance',
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => ProfileScreen(user: widget.user),
+                          ),
+                        );
+                      },
+                    ),
+                    _MenuRow(
+                      icon: Icons.info_outline,
+                      label: 'About Plane',
+                      onTap: () {
+                        showAboutDialog(
+                          context: context,
+                          applicationName: 'Plane Mobile',
+                          applicationVersion: '1.0.0',
+                          children: [const Text('Plane.so mobile client')],
+                        );
+                      },
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 24),
+                // Disconnect button
+                GestureDetector(
+                  onTap: () async {
+                    final ok = await showDialog<bool>(
+                      context: context,
+                      builder: (ctx) => AlertDialog(
+                        title: const Text('Disconnect'),
+                        content: const Text('Disconnect from this instance?'),
+                        actions: [
+                          TextButton(
+                              onPressed: () => Navigator.pop(ctx, false),
+                              child: const Text('Cancel')),
+                          TextButton(
+                              onPressed: () => Navigator.pop(ctx, true),
+                              child: const Text('Disconnect')),
+                        ],
+                      ),
+                    );
+                    if (ok == true) {
+                      await SecureStorage.clear();
+                      ApiClient.reset();
+                      widget.onLogout();
+                    }
+                  },
+                  child: Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    decoration: BoxDecoration(
+                      color: theme.colorScheme.errorContainer
+                          .withValues(alpha: 0.20),
+                      borderRadius: BorderRadius.circular(M3EShape.large),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.logout,
+                            size: 20, color: theme.colorScheme.error),
+                        const SizedBox(width: 10),
+                        Text(
+                          'Disconnect',
+                          style:
+                              M3EType.emphasized(theme.textTheme.titleMedium!)
+                                  .copyWith(color: theme.colorScheme.error),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 100),
+              ],
             ),
-          ],
-        ),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -420,7 +414,8 @@ class _MenuGroup extends StatelessWidget {
             // One divider treatment from the scheme, rather than a black or
             // white wash picked per brightness.
             if (i < children.length - 1)
-              const Divider(height: 0.5, thickness: 0.5, indent: 16, endIndent: 16),
+              const Divider(
+                  height: 0.5, thickness: 0.5, indent: 16, endIndent: 16),
           ],
         ],
       ),
@@ -472,96 +467,6 @@ class _MenuRow extends StatelessWidget {
           ],
         ),
       ),
-    );
-  }
-}
-
-class _WorkspaceMembersScreen extends StatefulWidget {
-  final String workspaceSlug;
-  const _WorkspaceMembersScreen({required this.workspaceSlug});
-
-  @override
-  State<_WorkspaceMembersScreen> createState() =>
-      _WorkspaceMembersScreenState();
-}
-
-class _WorkspaceMembersScreenState
-    extends State<_WorkspaceMembersScreen> {
-  List<Member> _members = [];
-  bool _loading = true;
-  String? _error;
-
-  @override
-  void initState() {
-    super.initState();
-    _load();
-  }
-
-  Future<void> _load() async {
-    setState(() {
-      _loading = true;
-      _error = null;
-    });
-    try {
-      _members =
-          await WorkspaceService.getWorkspaceMembers(widget.workspaceSlug);
-      setState(() => _loading = false);
-    } catch (e) {
-      setState(() {
-        _error = e.toString();
-        _loading = false;
-      });
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Scaffold(
-      appBar: const M3EAppBar(title: 'Workspace Members'),
-      body: _loading
-          ? const LoadingStateWidget()
-          : _error != null
-              ? ErrorStateWidget(
-                  message: 'Failed to load members', onRetry: _load)
-              : _members.isEmpty
-                  ? const EmptyStateWidget(
-                      message: 'No members found',
-                      icon: Icons.people_outline)
-                  : ListView.builder(
-                      itemCount: _members.length,
-                      itemBuilder: (ctx, i) {
-                        final m = _members[i];
-                        return ListTile(
-                          leading: CircleAvatar(
-                            radius: 18,
-                            backgroundColor: theme.colorScheme.primary
-                                .withValues(alpha: 0.2),
-                            backgroundImage:
-                                m.avatar != null && m.avatar!.isNotEmpty
-                                    ? NetworkImage(m.avatar!)
-                                    : null,
-                            child:
-                                m.avatar == null || m.avatar!.isEmpty
-                                    ? Text(
-                                        (m.displayName.isNotEmpty
-                                                ? m.displayName
-                                                : '?')[0]
-                                            .toUpperCase(),
-                                        style: theme.textTheme.titleSmall
-                                            ?.copyWith(
-                                                color: theme
-                                                    .colorScheme.primary),
-                                      )
-                                    : null,
-                          ),
-                          title: Text(m.displayName,
-                              style: theme.textTheme.bodyMedium),
-                          subtitle: Text(m.email,
-                              style: theme.textTheme.bodySmall),
-                        );
-                      },
-                    ),
     );
   }
 }
