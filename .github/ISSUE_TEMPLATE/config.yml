@@ -1,0 +1,11 @@
+---
+blank_issues_enabled: false
+contact_links:
+  - name: Security vulnerability
+    url: https://github.com/andrewkomkov/plane-mobile/security/advisories/new
+    about: Report privately, not as a public issue. See SECURITY.md.
+  - name: Something Plane itself does
+    url: https://github.com/makeplane/plane/issues
+    about: >
+      Several oddities in this app work around defects in Plane's own API.
+      docs/COVERAGE.md lists the ones already found.

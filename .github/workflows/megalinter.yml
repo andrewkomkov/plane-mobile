@@ -1,0 +1,63 @@
+name: MegaLinter
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: megalinter-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
+jobs:
+  megalinter:
+    name: Lint everything that is not Dart
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    permissions:
+      contents: read
+      # So the run can leave its findings on the pull request rather than
+      # only in the log.
+      pull-requests: write
+      issues: write
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          # MegaLinter diffs against the base branch to lint only what changed;
+          # that needs more than the default single commit.
+          fetch-depth: 0
+
+      # The linter images are large and change rarely. Caching what MegaLinter
+      # writes between runs keeps a repeat run to the analysis itself.
+      - name: Cache MegaLinter
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/megalinter
+            megalinter-reports
+          key: megalinter-${{ github.ref_name }}-${{ github.sha }}
+          restore-keys: |
+            megalinter-${{ github.ref_name }}-
+            megalinter-
+
+      - name: MegaLinter
+        id: ml
+        uses: oxsecurity/megalinter@v9
+        env:
+          VALIDATE_ALL_CODEBASE: ${{ github.event_name != 'pull_request' }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload the report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: megalinter-reports
+          path: |
+            megalinter-reports
+            mega-linter.log
+          if-no-files-found: ignore
+          retention-days: 7

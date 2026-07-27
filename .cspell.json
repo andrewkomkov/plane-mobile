@@ -1,0 +1,38 @@
+{
+  "version": "0.2",
+  "language": "en-GB,en",
+  "ignorePaths": [
+    "**/build/**",
+    "**/.dart_tool/**",
+    "pubspec.lock",
+    "ios/Podfile.lock",
+    "LICENSE"
+  ],
+  "words": [
+    "androidx",
+    "appbar",
+    "cupertino",
+    "dartdoc",
+    "detekt",
+    "dotenv",
+    "gitleaks",
+    "gradlew",
+    "intake",
+    "jscpd",
+    "ktlint",
+    "lcov",
+    "megalinter",
+    "plane",
+    "psycopg",
+    "riverpod",
+    "secretlint",
+    "sqflite",
+    "subosito",
+    "temurin",
+    "unarchive",
+    "undismiss",
+    "unsnooze",
+    "unstarted",
+    "yamllint"
+  ]
+}

@@ -1,0 +1,147 @@
+name: Release
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  # Opens (and keeps updating) a release pull request from the conventional
+  # commits on main. Merging it tags the release, which is what the second job
+  # below waits for.
+  release-please:
+    name: Prepare the release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    outputs:
+      released: ${{ steps.release.outputs.release_created }}
+      tag: ${{ steps.release.outputs.tag_name }}
+      version: ${{ steps.release.outputs.version }}
+    steps:
+      - uses: googleapis/release-please-action@v4
+        id: release
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          config-file: release-please-config.json
+          manifest-file: .release-please-manifest.json
+
+  # The APK the app updates itself from. Built only when release-please has
+  # actually cut a release.
+  apk:
+    name: Build and attach the APK
+    needs: release-please
+    if: needs.release-please.outputs.released == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: write
+    # Resolved at job level: a step cannot read an `env` it declares itself
+    # from its own `if`, and `secrets` is not addressable there either.
+    env:
+      HAS_KEYSTORE: ${{ secrets.ANDROID_KEYSTORE_BASE64 != '' }}
+      HAS_FIREBASE: ${{ secrets.GOOGLE_SERVICES_JSON != '' }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ needs.release-please.outputs.tag }}
+
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: "3.44.5"
+          channel: stable
+          cache: true
+
+      - name: Cache pub packages
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.pub-cache
+            .dart_tool
+          key: pub-${{ runner.os }}-${{ hashFiles('pubspec.lock') }}
+          restore-keys: pub-${{ runner.os }}-
+
+      - name: Cache Gradle
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: gradle-${{ runner.os }}-${{ hashFiles('android/**/*.gradle*', 'android/gradle/wrapper/gradle-wrapper.properties') }}
+          restore-keys: gradle-${{ runner.os }}-
+
+      # The signing key has to be the same every release: Android refuses to
+      # install a package over one signed with a different key, so a rotated or
+      # per-run key would break in-place updates for everyone already running
+      # the app. Without the secrets this step is skipped and the build falls
+      # back to debug signing, which is fine for a fork but cannot update an
+      # installed release.
+      - name: Restore the signing key
+        if: env.HAS_KEYSTORE == 'true'
+        env:
+          KEYSTORE: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          STORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          echo "$KEYSTORE" | base64 --decode > android/upload-keystore.jks
+          {
+            echo "storeFile=upload-keystore.jks"
+            echo "storePassword=$STORE_PASSWORD"
+            echo "keyAlias=$KEY_ALIAS"
+            echo "keyPassword=$KEY_PASSWORD"
+          } > android/key.properties
+
+      - name: Restore the Firebase config
+        if: env.HAS_FIREBASE == 'true'
+        env:
+          GOOGLE_SERVICES: ${{ secrets.GOOGLE_SERVICES_JSON }}
+        run: printf '%s' "$GOOGLE_SERVICES" > android/app/google-services.json
+
+      - run: flutter pub get
+
+      # versionCode must increase with every release or Android will not accept
+      # the update. Derived from the version rather than from the run number so
+      # it is the same whatever re-runs happen: 1.2.3 -> 10203.
+      - name: Compute the version code
+        id: code
+        run: |
+          VERSION="${{ needs.release-please.outputs.version }}"
+          IFS=. read -r MAJOR MINOR PATCH <<< "$VERSION"
+          echo "value=$((MAJOR * 10000 + MINOR * 100 + PATCH))" >> "$GITHUB_OUTPUT"
+
+      - name: Build the release APK
+        run: |
+          flutter build apk --release \
+            --build-name="${{ needs.release-please.outputs.version }}" \
+            --build-number="${{ steps.code.outputs.value }}"
+
+      # Named and checksummed the way UpdateService expects to find them:
+      # it walks the asset list for one ending in `.apk` and one ending in
+      # `.apk.sha256`, and refuses a download that does not match.
+      - name: Name and checksum the artefact
+        id: artefact
+        run: |
+          VERSION="${{ needs.release-please.outputs.version }}"
+          APK="plane-mobile-${VERSION}.apk"
+          mv build/app/outputs/flutter-apk/app-release.apk "$APK"
+          sha256sum "$APK" > "${APK}.sha256"
+          echo "apk=$APK" >> "$GITHUB_OUTPUT"
+
+      - name: Attach them to the release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release upload "${{ needs.release-please.outputs.tag }}" \
+            "${{ steps.artefact.outputs.apk }}" \
+            "${{ steps.artefact.outputs.apk }}.sha256" \
+            --clobber

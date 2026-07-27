@@ -1,0 +1,59 @@
+---
+name: Bug report
+description: Something the app does that it should not
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: >
+        This is a client for a self-hosted Plane instance, so most of what goes
+        wrong is a disagreement between the two. Please say which Plane version
+        you run — it is the single most useful line in the report.
+
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: And what you expected instead.
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: How to get there
+      placeholder: |
+        1. Open a work item
+        2. …
+    validations:
+      required: true
+
+  - type: input
+    id: app-version
+    attributes:
+      label: App version
+      description: Menu -> About Plane.
+    validations:
+      required: true
+
+  - type: input
+    id: plane-version
+    attributes:
+      label: Plane version
+      placeholder: "1.2.0, or the image tag you deploy"
+    validations:
+      required: true
+
+  - type: input
+    id: device
+    attributes:
+      label: Device and Android version
+      placeholder: "Galaxy S20 FE, Android 13"
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Anything in the logs
+      description: >
+        `flutter logs`, or `adb logcat`. Redact your instance URL and token.
+      render: text

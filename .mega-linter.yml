@@ -1,0 +1,68 @@
+---
+# MegaLinter configuration.
+#
+# Dart is deliberately absent: `flutter analyze --fatal-infos` and
+# `dart format --set-exit-if-changed` run in ci.yml and are stricter than
+# anything MegaLinter would apply. This covers everything else in the tree —
+# the workflows, the Gradle and Kotlin sources, the docs, and a secrets sweep.
+
+APPLY_FIXES: none
+
+# Fail the run on any error rather than reporting and passing.
+DISABLE_ERRORS: false
+
+ENABLE_LINTERS:
+  # Repository-wide
+  - REPOSITORY_GITLEAKS
+  - REPOSITORY_SECRETLINT
+  - REPOSITORY_TRIVY
+  - REPOSITORY_GRYPE
+  - REPOSITORY_CHECKOV
+  # CI and configuration
+  - ACTION_ACTIONLINT
+  - YAML_YAMLLINT
+  - YAML_PRETTIER
+  - JSON_JSONLINT
+  - JSON_PRETTIER
+  # Docs
+  - MARKDOWN_MARKDOWNLINT
+  - MARKDOWN_MARKDOWN_LINK_CHECK
+  - SPELL_CSPELL
+  # Native sources
+  - KOTLIN_KTLINT
+  - KOTLIN_DETEKT
+  - BASH_SHELLCHECK
+  - BASH_SHFMT
+  - PYTHON_RUFF
+  # Text hygiene
+  - COPYPASTE_JSCPD
+  - EDITORCONFIG_EDITORCONFIG_CHECKER
+
+FILTER_REGEX_EXCLUDE: >-
+  (^|/)(build|\.dart_tool|ios/Pods|android/\.gradle|\.git|megalinter-reports)/|
+  ^LICENSE$|
+  ^pubspec\.lock$|
+  ^ios/Podfile\.lock$|
+  (^|/)gradlew(\.bat)?$|
+  ^android/gradle/
+
+# One long generated table per document; wrapping it would make it unreadable
+# and the line-length rule is the only thing it trips.
+MARKDOWN_MARKDOWNLINT_CONFIG_FILE: .markdownlint.yml
+
+SPELL_CSPELL_CONFIG_FILE: .cspell.json
+SPELL_CSPELL_FILE_EXTENSIONS:
+  - .md
+
+# Duplicate detection is worth having on the Dart sources, but the widget tests
+# legitimately repeat their fixtures.
+COPYPASTE_JSCPD_FILTER_REGEX_EXCLUDE: (^test/|^integration_test/)
+
+REPOSITORY_TRIVY_ARGUMENTS:
+  - --severity
+  - HIGH,CRITICAL
+
+# The report is uploaded as an artifact by the workflow; no need for a second
+# copy in the job summary.
+PRINT_ALL_FILES: false
+FLAVOR_SUGGESTIONS: false
