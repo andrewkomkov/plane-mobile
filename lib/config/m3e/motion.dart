@@ -255,6 +255,14 @@ class M3EPressable extends StatefulWidget {
   /// assistive tech entirely.
   final VoidCallback? onDoubleTap;
 
+  /// Names what [onLongPress] does, e.g. "remove from this module".
+  ///
+  /// A long-press is announced by TalkBack as an available action but not as a
+  /// *particular* one, so a row whose only route to an action is the long-press
+  /// tells a screen-reader user that something is there without saying what.
+  /// The hint is what turns it into an offer.
+  final String? longPressHint;
+
   const M3EPressable({
     super.key,
     required this.child,
@@ -266,6 +274,7 @@ class M3EPressable extends StatefulWidget {
     this.semanticLabel,
     this.selected,
     this.onDoubleTap,
+    this.longPressHint,
   });
 
   @override
@@ -325,6 +334,7 @@ class _M3EPressableState extends State<M3EPressable> {
       excludeSemantics: labelled,
       onTap: labelled ? widget.onTap : null,
       onLongPress: labelled ? widget.onLongPress : null,
+      onLongPressHint: labelled ? widget.longPressHint : null,
       child: gesture,
     );
   }

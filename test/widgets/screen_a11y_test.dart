@@ -87,6 +87,35 @@ SemanticsNode nodeLabelled(WidgetTester tester, String label) {
 /// Google's and Apple's floor, and the one `M3EIconButton` enforces.
 const double _minTarget = 48.0;
 
+/// The issue row offers its removal to something other than a swipe, by name.
+///
+/// The cycle and module lists drew a remove button in every row, which is what
+/// this used to assert. That button is gone — Material keeps a list's
+/// destructive action out of the row — and the long-press took over. A
+/// long-press is the one route that can silently stop existing without any
+/// test noticing: it renders nothing, so only the semantics tree shows whether
+/// it is there, and [SemanticsNode.hintOverrides] is the difference between a
+/// screen reader saying "actions available" and saying which one.
+void expectRemovableRow(WidgetTester tester, String hint) {
+  final rows = _nodes(tester)
+      .where((n) =>
+          !n.isMergedIntoParent &&
+          n.getSemanticsData().label.startsWith('Fix the thing'))
+      .toList();
+  expect(rows, hasLength(1), reason: 'all labels: ${labels(tester)}');
+
+  final row = rows.single;
+  expect(row.getSemanticsData().hasAction(SemanticsAction.longPress), isTrue,
+      reason: 'the swipe leaves no node, so the long-press is the only route '
+          'to removal that assistive tech and adb_drive.py can reach');
+  expect(row.hintOverrides?.onLongPressHint, hint);
+  expect(row.rect.height, greaterThanOrEqualTo(_minTarget));
+
+  // And the button really is gone, rather than merely moved.
+  expect(labels(tester).where((l) => l.startsWith('Remove Fix the thing')),
+      isEmpty);
+}
+
 /// A cache that already holds its states, so the detail screens never reach
 /// past the injected HTTP client.
 class _StubCache extends DataCache {
@@ -439,9 +468,7 @@ void main() {
         await tester.pump(const Duration(milliseconds: 50));
       }
 
-      final remove =
-          nodeLabelled(tester, 'Remove Fix the thing from this cycle');
-      expect(remove.rect.height, greaterThanOrEqualTo(_minTarget));
+      expectRemovableRow(tester, 'remove from this cycle');
       // The overflow used to be called "More" on this screen and on the
       // module one, so the two collided across a flow.
       nodeLabelled(tester, 'More actions for cycle Sprint 4');
@@ -479,9 +506,7 @@ void main() {
         await tester.pump(const Duration(milliseconds: 50));
       }
 
-      final remove =
-          nodeLabelled(tester, 'Remove Fix the thing from this module');
-      expect(remove.rect.height, greaterThanOrEqualTo(_minTarget));
+      expectRemovableRow(tester, 'remove from this module');
       nodeLabelled(tester, 'More actions for module Billing');
       expect(labels(tester), isNot(contains('More')));
       handle.dispose();

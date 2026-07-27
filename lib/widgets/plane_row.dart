@@ -110,6 +110,10 @@ class PlaneRow extends StatefulWidget {
   final VoidCallback? onTap;
   final VoidCallback? onLongPress;
 
+  /// Names what [onLongPress] does, for the rows where the long-press is the
+  /// only route to an action rather than a shortcut to one drawn in the row.
+  final String? longPressHint;
+
   const PlaneRow({
     super.key,
     this.icon,
@@ -134,6 +138,7 @@ class PlaneRow extends StatefulWidget {
     required this.semanticLabel,
     this.onTap,
     this.onLongPress,
+    this.longPressHint,
   });
 
   /// The identifier treatment, exposed because the table view draws its ID
@@ -225,6 +230,7 @@ class _PlaneRowState extends State<PlaneRow> {
     final pressable = M3EPressable(
       onTap: widget.onTap,
       onLongPress: widget.onLongPress,
+      longPressHint: widget.longPressHint,
       semanticLabel: widget.semanticLabel,
       selected: widget.selected,
       // The scale lives on the surface below, not here.

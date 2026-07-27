@@ -68,6 +68,13 @@ class IssueRow extends StatelessWidget {
   /// control, which is the pattern that silently drops the action for
   /// assistive tech.
   final VoidCallback? onLongPress;
+
+  /// Names what [onLongPress] does. The cycle and module lists set it, because
+  /// there the long-press is the only route to removing an issue that a
+  /// screen-reader user has — the swipe leaves no node behind and there is no
+  /// longer a button in the row.
+  final String? longPressHint;
+
   final List<Label> allLabels;
   final List<Member> allMembers;
 
@@ -105,6 +112,7 @@ class IssueRow extends StatelessWidget {
     this.semanticExtras = const [],
     this.onTap,
     this.onLongPress,
+    this.longPressHint,
     this.allLabels = const [],
     this.allMembers = const [],
     this.trailing,
@@ -208,6 +216,7 @@ class IssueRow extends StatelessWidget {
       semanticLabel: _semanticLabel(issueMembers, issueLabels),
       onTap: onTap,
       onLongPress: onLongPress,
+      longPressHint: longPressHint,
     );
   }
 }

@@ -142,6 +142,27 @@ class _CycleDetailScreenState extends ConsumerState<CycleDetailScreen> {
     }
   }
 
+  /// The row's actions, named — what the long-press opens.
+  ///
+  /// The sheet is titled with the issue, because it can be opened from any of
+  /// a screenful of rows that look alike and a user who long-pressed the wrong
+  /// one should find out here rather than from the snackbar afterwards.
+  Future<void> _showIssueActions(Issue issue) async {
+    final picked = await BottomSheetPicker.show<String>(
+      context: context,
+      title: issue.name,
+      items: const [
+        BottomSheetPickerItem(
+          value: 'remove',
+          label: 'Remove from this cycle',
+          icon: Icons.remove_circle_outline,
+          destructive: true,
+        ),
+      ],
+    );
+    if (picked == 'remove') await _removeIssue(issue);
+  }
+
   /// Takes an issue out of the cycle, and leaves the door open.
   ///
   /// Removal was one tap on a button that sits in every row, with no
@@ -490,30 +511,27 @@ class _CycleDetailScreenState extends ConsumerState<CycleDetailScreen> {
                             // while the list was already rebuilding without
                             // it.
                             onDismissed: (_) => _removeIssue(issue),
-                            // Removing an issue used to be the swipe and
-                            // nothing else: no button, no long-press, no
-                            // custom action. A swipe produces no semantics
-                            // node, so the action was not merely awkward
-                            // without sight — there was nothing for
-                            // `adb_drive.py check` to report as missing. The
-                            // swipe stays as the accelerator.
+                            // No remove button in the row. Material puts a
+                            // list's destructive action behind a swipe or in a
+                            // menu, not permanently beside the thing it
+                            // removes, and a screenful of near-identical rows
+                            // is exactly where such an icon gets hit by
+                            // accident.
                             //
-                            // The button rides in the row's own trailing slot,
-                            // which is the one part of the card outside its
-                            // semantics node and so the one place a real
-                            // button survives.
+                            // A swipe leaves no semantics node, so it cannot
+                            // be the only route — that was the whole reason a
+                            // button was put here in the first place. The
+                            // long-press is the reachable copy and
+                            // [IssueRow.longPressHint] is what stops it being
+                            // a secret: the action is announced by name, and
+                            // the sheet it opens is labelled like any other.
                             child: IssueRow(
                               issue: issue,
                               state: _states[issue.state],
                               showPriority: true,
                               showState: true,
-                              trailing: M3EIconButton(
-                                icon: Icons.remove_circle_outline,
-                                tooltip: 'Remove ${issue.name} from this cycle',
-                                size: M3EIconButtonSize.small,
-                                color: theme.colorScheme.onSurfaceVariant,
-                                onPressed: () => _removeIssue(issue),
-                              ),
+                              onLongPress: () => _showIssueActions(issue),
+                              longPressHint: 'remove from this cycle',
                               onTap: () async {
                                 await Navigator.push(
                                   context,
