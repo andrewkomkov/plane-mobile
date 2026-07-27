@@ -6,6 +6,8 @@ import '../../config/m3e/shapes.dart';
 import '../../config/theme.dart';
 import '../../models/analytics.dart';
 import '../../services/analytics_service.dart';
+import '../../services/export_service.dart';
+import '../../utils/say.dart';
 import '../../widgets/loading_state.dart';
 import '../../widgets/m3e/app_bar.dart';
 import '../../widgets/plane_row.dart';
@@ -70,9 +72,32 @@ class _AnalyticsScreenState extends ConsumerState<AnalyticsScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: const M3EAppBar(title: 'Analytics'),
+      appBar: M3EAppBar(
+        title: 'Analytics',
+        actions: [
+          M3EAppBarAction(
+            icon: Icons.download_outlined,
+            tooltip: 'Export these figures',
+            onPressed: _export,
+          ),
+        ],
+      ),
       body: _buildBody(context),
     );
+  }
+
+  /// Queue an analytics export.
+  ///
+  /// Nothing is downloaded: Plane queues a background job and sends the file
+  /// by email, the same shape the work-item export has. Saying so is the whole
+  /// of the feedback, because there is no progress to show.
+  Future<void> _export() async {
+    try {
+      await ExportService.exportAnalytics(widget.workspaceSlug);
+      if (mounted) say(context, 'Export queued. It arrives by email.');
+    } catch (_) {
+      if (mounted) say(context, 'Could not queue the export');
+    }
   }
 
   Widget _buildBody(BuildContext context) {

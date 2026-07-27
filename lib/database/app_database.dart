@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:path/path.dart';
+import 'package:flutter/foundation.dart';
 import 'package:sqflite/sqflite.dart';
 
 /// Single SQLite database for all local-first data.
@@ -8,11 +9,20 @@ class AppDatabase {
   static Database? _db;
   static const _version = 3;
 
+  /// Where the database file lives, overridden by tests.
+  ///
+  /// Widget tests point this at an in-memory database: they need the cache
+  /// layer to answer, not to persist, and a shared file on disk would let one
+  /// test see another's rows.
+  @visibleForTesting
+  static String? debugPath;
+
   static Future<Database> get instance async {
     if (_db != null) return _db!;
-    final dbPath = await getDatabasesPath();
+    final override = debugPath;
+    final path = override ?? join(await getDatabasesPath(), 'plane_local.db');
     _db = await openDatabase(
-      join(dbPath, 'plane_local.db'),
+      path,
       version: _version,
       onCreate: _onCreate,
       onUpgrade: _onUpgrade,

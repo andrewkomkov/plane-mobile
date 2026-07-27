@@ -1,4 +1,5 @@
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 import 'secure_storage.dart';
 
 /// Where the app's API token can actually reach Plane's full API.
@@ -26,6 +27,19 @@ import 'secure_storage.dart';
 const String kPlaneProxyBase = '/auth/mobile/_plane/api';
 
 class ApiClient {
+  /// Answers every request the app makes, in place of a network.
+  ///
+  /// The one seam that lets a test drive the real widget tree end to end.
+  /// Individual services expose their own `debugClient`, which is enough to
+  /// test a service — but a test that boots the app and taps through it goes
+  /// past a dozen services, and injecting each of them separately would test
+  /// the injection rather than the app. Set once, honoured by every client
+  /// this class hands out.
+  ///
+  /// Null in production, and nothing in `lib/` sets it.
+  @visibleForTesting
+  static HttpClientAdapter? debugAdapter;
+
   static Dio? _dio;
 
   static Future<Dio> getInstance() async {
@@ -53,6 +67,9 @@ class ApiClient {
       connectTimeout: const Duration(seconds: 10),
       receiveTimeout: const Duration(seconds: 30),
     ));
+
+    final adapter = debugAdapter;
+    if (adapter != null) _dio!.httpClientAdapter = adapter;
 
     _dio!.interceptors.add(InterceptorsWrapper(
       onError: (error, handler) async {
@@ -94,6 +111,8 @@ class ApiClient {
       connectTimeout: const Duration(seconds: 10),
       receiveTimeout: const Duration(seconds: 30),
     ));
+    final adapter = debugAdapter;
+    if (adapter != null) _dioInternal!.httpClientAdapter = adapter;
     return _dioInternal!;
   }
 

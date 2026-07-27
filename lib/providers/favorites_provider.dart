@@ -90,6 +90,15 @@ class FavoritesNotifier extends Notifier<FavoritesState> {
     final sameWorkspace = state.workspaceSlug == workspaceSlug;
     if (sameWorkspace && state.loaded && !force) return;
     if (!sameWorkspace) {
+      // Off the current frame before touching state.
+      //
+      // Eight list screens call this from `initState`, which runs *during* the
+      // build phase — and writing to a provider there is an assertion failure
+      // in Riverpod, not a warning. Deferring here rather than at the eight
+      // call sites means a ninth screen cannot reintroduce it: whoever calls
+      // this is asking for the workspace's favourites, not for a particular
+      // moment to be told about it.
+      await Future<void>.delayed(Duration.zero);
       state = FavoritesState(workspaceSlug: workspaceSlug);
     }
     try {
