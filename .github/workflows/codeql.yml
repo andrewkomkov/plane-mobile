@@ -17,7 +17,9 @@ jobs:
   analyze:
     name: Analyze Kotlin
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    # CodeQL builds the app before it can extract Kotlin, and then loads
+    # eighty query packs. 30 minutes cut it off mid-load.
+    timeout-minutes: 60
     permissions:
       security-events: write
       actions: read

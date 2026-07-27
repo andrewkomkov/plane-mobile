@@ -50,15 +50,11 @@ ENABLE_LINTERS:
 # - JSON_PRETTIER: it reformats .cspell.json and the release-please manifest
 #   into a shape release-please then rewrites. Two tools, one file, no winner.
 
-FILTER_REGEX_EXCLUDE: >-
-  (^|/)(build|\.dart_tool|ios/Pods|android/\.gradle|\.git|megalinter-reports)/|
-  ^LICENSE$|
-  ^CHANGELOG\.md$|
-  ^pubspec\.lock$|
-  ^ios/Podfile\.lock$|
-  (^|/)gradlew(\.bat)?$|
-  ^android/gradle/|
-  ^\.metadata$
+# One line, deliberately. A folded block (`>-`) joins its lines with spaces,
+# so every alternative after the first arrives as " ^LICENSE$" and matches
+# nothing — which is how Podfile.lock reached gitleaks and had its CocoaPods
+# checksums reported as API keys.
+FILTER_REGEX_EXCLUDE: '(^|/)(build|\.dart_tool|ios/Pods|android/\.gradle|\.git|megalinter-reports)/|^LICENSE$|^CHANGELOG\.md$|^pubspec\.lock$|^ios/Podfile\.lock$|(^|/)gradlew(\.bat)?$|^android/gradle/|^\.metadata$|^ios/Runner\.xcodeproj/|^ios/Runner/Base\.lproj/'
 
 MARKDOWN_MARKDOWNLINT_CONFIG_FILE: .markdownlint.yml
 
@@ -69,10 +65,9 @@ SPELL_CSPELL_FILE_EXTENSIONS:
 # detekt replaces its whole rule set with the file given to --config unless
 # told to build on the defaults, which would leave the four overrides in
 # detekt-config.yml as the entire configuration.
+KOTLIN_DETEKT_CONFIG_FILE: detekt-config.yml
 KOTLIN_DETEKT_ARGUMENTS:
   - --build-upon-default-config
-  - --config
-  - detekt-config.yml
 
 # Duplication is worth catching in the sources; the tests legitimately repeat
 # their fixtures, and the generated platform registrants are not ours. 3% over
