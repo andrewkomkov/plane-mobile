@@ -22,6 +22,8 @@ MD033: false
 # The first line of CHANGELOG.md is written by release-please.
 MD041: false
 
-# Dashes for unordered lists, consistently. The default wants asterisks.
+# One bullet character per document rather than one across the repository:
+# the design documents were written with asterisks and the rest with dashes,
+# and rewriting either way says nothing.
 MD004:
-  style: dash
+  style: consistent

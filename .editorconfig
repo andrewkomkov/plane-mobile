@@ -8,11 +8,16 @@ trim_trailing_whitespace = true
 indent_style = space
 indent_size = 2
 
+# Where a formatter runs in CI, the formatter owns layout and this file owns
+# the rest — encoding, line endings, the final newline, trailing whitespace.
+# Declaring an indent width as well only creates a disagreement no tool can
+# settle: `dart format` hangs a wrapped expression under its opening paren and
+# `ruff format` does the same, neither of which lands on a multiple of the
+# nominal indent, and neither of which is going to change its mind.
+
 [*.dart]
-# `dart format` is the only authority on Dart layout, and CI runs it with
-# --set-exit-if-changed. A second limit here only creates a disagreement
-# neither tool can win — it does not rewrap a comment that formatter leaves at
-# 81 columns, it just reports it.
+# dart format, run in CI with --set-exit-if-changed.
+indent_size = unset
 max_line_length = off
 
 [*.{kt,kts,gradle}]
@@ -33,7 +38,8 @@ ktlint_standard_package-name = disabled
 ktlint_standard_filename = disabled
 
 [*.py]
-indent_size = 4
+# ruff format, run in CI with --check.
+indent_size = unset
 
 [*.md]
 # Trailing double-space is a hard line break in Markdown.
