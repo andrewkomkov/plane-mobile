@@ -4,6 +4,15 @@ on:
   push:
     branches: [main]
   workflow_dispatch:
+    inputs:
+      tag:
+        description: >-
+          Existing tag to build and attach the APK for, such as v1.1.0. Leave
+          empty for the normal run, which only builds when release-please has
+          just cut a release. Use this to repair a release whose APK never
+          got built, so the artefact still comes from a tag built by CI.
+        required: false
+        default: ""
 
 permissions:
   contents: read
@@ -30,12 +39,14 @@ jobs:
           config-file: release-please-config.json
           manifest-file: .release-please-manifest.json
 
-  # The APK the app updates itself from. Built only when release-please has
-  # actually cut a release.
+  # The APK the app updates itself from. Built when release-please has just cut
+  # a release, or when a tag is passed by hand to repair one whose APK never
+  # got built. Both paths build from the tag here rather than accepting an
+  # upload, which is what lets UpdateService trust what it downloads.
   apk:
     name: Build and attach the APK
     needs: release-please
-    if: needs.release-please.outputs.released == 'true'
+    if: needs.release-please.outputs.released == 'true' || inputs.tag != ''
     runs-on: ubuntu-latest
     timeout-minutes: 30
     permissions:
@@ -48,7 +59,17 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         with:
-          ref: ${{ needs.release-please.outputs.tag }}
+          ref: ${{ inputs.tag || needs.release-please.outputs.tag }}
+
+      # release-please reports the tag and the bare version separately; a
+      # dispatch only gives the tag, so derive the version from it.
+      - name: Resolve the release
+        id: release
+        env:
+          TAG: ${{ inputs.tag || needs.release-please.outputs.tag }}
+        run: |
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "version=${TAG#v}" >> "$GITHUB_OUTPUT"
 
       - uses: actions/setup-java@v5
         with:
@@ -115,14 +136,14 @@ jobs:
       - name: Compute the version code
         id: code
         run: |
-          VERSION="${{ needs.release-please.outputs.version }}"
+          VERSION="${{ steps.release.outputs.version }}"
           IFS=. read -r MAJOR MINOR PATCH <<< "$VERSION"
           echo "value=$((MAJOR * 10000 + MINOR * 100 + PATCH))" >> "$GITHUB_OUTPUT"
 
       - name: Build the release APK
         run: |
           flutter build apk --release \
-            --build-name="${{ needs.release-please.outputs.version }}" \
+            --build-name="${{ steps.release.outputs.version }}" \
             --build-number="${{ steps.code.outputs.value }}"
 
       # Named and checksummed the way UpdateService expects to find them:
@@ -131,7 +152,7 @@ jobs:
       - name: Name and checksum the artefact
         id: artefact
         run: |
-          VERSION="${{ needs.release-please.outputs.version }}"
+          VERSION="${{ steps.release.outputs.version }}"
           APK="plane-mobile-${VERSION}.apk"
           mv build/app/outputs/flutter-apk/app-release.apk "$APK"
           sha256sum "$APK" > "${APK}.sha256"
@@ -141,7 +162,7 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          gh release upload "${{ needs.release-please.outputs.tag }}" \
+          gh release upload "${{ steps.release.outputs.tag }}" \
             "${{ steps.artefact.outputs.apk }}" \
             "${{ steps.artefact.outputs.apk }}.sha256" \
             --clobber
