@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
+import '../../utils/say.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../models/favorite.dart';
 import '../../models/project.dart';
 import '../../providers/data_providers.dart';
 import '../../providers/favorites_provider.dart';
 import '../project/project_screen.dart';
+import '../../widgets/app_navbar.dart';
 import '../../widgets/favorite_toggle.dart';
 import '../../widgets/loading_state.dart';
 import '../../widgets/plane_row.dart';
@@ -62,7 +64,18 @@ class _ProjectsTabState extends ConsumerState<ProjectsTab>
     // The favourites read is one request for the whole workspace and every
     // list that draws a star shares it, so it is fired here rather than waited
     // on: the project rows render either way, they just start unstarred.
-    ref.read(favoritesProvider.notifier).load(widget.workspaceSlug);
+    //
+    // Deferred by a turn of the event loop because this is also reached from
+    // [didUpdateWidget] — the home screen rebuilds this tab with a resolved
+    // workspace slug once it has one — and Riverpod refuses a provider write
+    // inside a widget lifecycle. It threw "Tried to modify a provider while
+    // the widget tree was building" on the first frame after sign-in, which
+    // took every integration test with it.
+    Future(() {
+      if (mounted) {
+        ref.read(favoritesProvider.notifier).load(widget.workspaceSlug);
+      }
+    });
     try {
       await cache.loadProjects(widget.workspaceSlug);
     } catch (_) {
@@ -162,9 +175,7 @@ class _ProjectsTabState extends ConsumerState<ProjectsTab>
           icon: Icons.help_outline,
           tooltip: 'How to create a project',
           onPressed: () {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Create projects in the web app')),
-            );
+            say(context, 'Create projects in the web app');
           },
         ),
       ],
@@ -191,7 +202,8 @@ class _ProjectsTabState extends ConsumerState<ProjectsTab>
                     onRefresh: _refresh,
                     child: _error != null && projects.isEmpty
                         ? ScrollableCenter(
-                            padding: const EdgeInsets.only(bottom: 100),
+                            padding: EdgeInsets.only(
+                                bottom: appNavBarClearance(context)),
                             child: ErrorStateWidget(
                                 message: _error, onRetry: _load),
                           )
@@ -204,11 +216,13 @@ class _ProjectsTabState extends ConsumerState<ProjectsTab>
                                 subtitle: _searchQuery.isEmpty
                                     ? 'Projects are created in the web app'
                                     : null,
-                                padding: const EdgeInsets.only(bottom: 100),
+                                padding: EdgeInsets.only(
+                                    bottom: appNavBarClearance(context)),
                               )
                             : ListView.builder(
-                                padding:
-                                    const EdgeInsets.only(bottom: 100, top: 4),
+                                padding: EdgeInsets.only(
+                                    bottom: appNavBarClearance(context),
+                                    top: 4),
                                 itemCount: projects.length,
                                 itemBuilder: (ctx, i) => _projectRow(
                                   projects[i],
