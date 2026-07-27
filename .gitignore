@@ -16,3 +16,27 @@ android/.kotlin/
 
 # Agent worktrees
 .claude/worktrees/
+
+# Firebase. Names a specific project; see google-services.json.example.
+android/app/google-services.json
+ios/Runner/GoogleService-Info.plist
+macos/Runner/GoogleService-Info.plist
+lib/firebase_options.dart
+
+# Signing material. Never belongs in the repository.
+*.jks
+*.keystore
+*.p8
+*.p12
+*.mobileprovision
+android/key.properties
+
+# Coverage output
+coverage/
+lcov.info
+
+# MegaLinter
+megalinter-reports/
+
+# macOS
+.DS_Store

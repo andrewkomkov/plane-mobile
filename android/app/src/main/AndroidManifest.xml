@@ -1,4 +1,12 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <uses-permission android:name="android.permission.INTERNET"/>
+
+    <!-- The app updates itself from its GitHub releases: there is no store in
+         this picture to deliver one. The permission only lets the app *ask*;
+         the user still grants "install unknown apps" by hand in settings, and
+         the system still refuses a package signed with a different key. -->
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES"/>
+
     <application
         android:label="Plane"
         android:name="${applicationName}"
@@ -24,6 +32,18 @@
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
         </activity>
+        <!-- Where the package installer reports back to. Not exported: the
+             only sender is the PendingIntent this app hands to its own
+             session. -->
+        <receiver
+            android:name=".InstallReceiver"
+            android:enabled="true"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.slimshaggy.plane_mobile.INSTALL_RESULT"/>
+            </intent-filter>
+        </receiver>
+
         <!-- Don't delete the meta-data below.
              This is used by the Flutter tool to generate GeneratedPluginRegistrant.java -->
         <meta-data

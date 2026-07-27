@@ -9,6 +9,7 @@ import '../../models/user.dart';
 import '../../models/workspace.dart';
 import '../../providers/data_providers.dart';
 import '../../providers/workspace_provider.dart';
+import '../../services/update_service.dart';
 import '../../services/workspace_service.dart';
 import '../../utils/new_issue_flow.dart';
 import '../../widgets/app_navbar.dart';
@@ -66,10 +67,30 @@ class _MenuTabState extends ConsumerState<MenuTab> {
   List<Workspace> _workspaces = [];
   bool _loadingWorkspaces = false;
 
+  /// The installed version, read from the manifest rather than written here.
+  /// The about box used to carry a literal "1.0.0" that nothing updated.
+  String _version = '';
+
+  /// A newer release, once the quiet check on open has found one.
+  AppUpdate? _update;
+  bool _checkingUpdate = false;
+  UpdateProgress? _updateProgress;
+
   @override
   void initState() {
     super.initState();
     _loadWorkspaces();
+    _loadVersion();
+  }
+
+  Future<void> _loadVersion() async {
+    final version = await UpdateService.currentVersion();
+    if (!mounted) return;
+    setState(() => _version = version);
+    // Quiet: a check that finds nothing, or cannot reach GitHub, says nothing.
+    final update = await UpdateService.check();
+    if (!mounted || update == null) return;
+    setState(() => _update = update);
   }
 
   Future<void> _loadWorkspaces() async {
@@ -137,8 +158,9 @@ class _MenuTabState extends ConsumerState<MenuTab> {
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Plane Mobile'),
-        content: const Text(
-          'Version 1.0.0\n\nA mobile client for a self-hosted Plane instance.',
+        content: Text(
+          'Version ${_version.isEmpty ? 'unknown' : _version}\n\n'
+          'A mobile client for a self-hosted Plane instance.',
         ),
         actions: [
           TextButton(
@@ -148,6 +170,107 @@ class _MenuTabState extends ConsumerState<MenuTab> {
         ],
       ),
     );
+  }
+
+  /// Look for a release now, and say so either way.
+  ///
+  /// The check on open is deliberately silent; this one is not, because the
+  /// user asked.
+  Future<void> _checkForUpdate() async {
+    final pending = _update;
+    if (pending != null) {
+      await _offerUpdate(pending);
+      return;
+    }
+
+    setState(() => _checkingUpdate = true);
+    final found = await UpdateService.check();
+    if (!mounted) return;
+    setState(() {
+      _checkingUpdate = false;
+      _update = found;
+    });
+    if (found == null) {
+      say(context, 'You are on the latest version');
+    } else {
+      await _offerUpdate(found);
+    }
+  }
+
+  Future<void> _offerUpdate(AppUpdate update) async {
+    final notes = update.notes;
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text('Version ${update.version}'),
+        content: SingleChildScrollView(
+          child: Text(
+            notes ?? 'A newer release is available.',
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Not now'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: Text(update.installable ? 'Update' : 'Open release'),
+          ),
+        ],
+      ),
+    );
+    if (ok != true || !mounted) return;
+
+    if (!update.installable) {
+      say(context, 'That release has no build attached');
+      return;
+    }
+
+    // Granted once, by hand, on a settings screen Android will not let an app
+    // skip. Asking first means the download is not wasted.
+    if (!await UpdateService.canInstall()) {
+      if (!mounted) return;
+      say(context, 'Allow installing apps from Plane, then try again');
+      await UpdateService.requestInstallPermission();
+      return;
+    }
+
+    setState(
+        () => _updateProgress = const UpdateProgress(UpdateStage.download));
+    final error = await UpdateService.install(
+      update,
+      onProgress: (p) {
+        if (mounted) setState(() => _updateProgress = p);
+      },
+    );
+    if (!mounted) return;
+    setState(() => _updateProgress = null);
+    if (error != null) say(context, error);
+  }
+
+  /// What the update row says, which is the whole of its state.
+  String get _updateLabel {
+    if (_updateProgress != null) {
+      return switch (_updateProgress!.stage) {
+        UpdateStage.download => 'Downloading…',
+        UpdateStage.verify => 'Checking the download…',
+        UpdateStage.install => 'Handing it to the installer…',
+      };
+    }
+    if (_checkingUpdate) return 'Checking…';
+    final update = _update;
+    if (update != null) return 'Update to ${update.version}';
+    return 'Check for updates';
+  }
+
+  String? get _updateSubtitle {
+    final progress = _updateProgress;
+    if (progress != null && progress.stage == UpdateStage.download) {
+      final fraction = progress.fraction;
+      return fraction == null ? null : '${(fraction * 100).round()}%';
+    }
+    return _version.isEmpty ? null : 'Version $_version';
   }
 
   void _push(Widget screen) {
@@ -305,6 +428,18 @@ class _MenuTabState extends ConsumerState<MenuTab> {
             icon: Icons.palette_outlined,
             label: 'Profile & appearance',
             onTap: () => _push(ProfileScreen(user: widget.user)),
+          ),
+          // The app is installed from an APK, so there is no store to deliver
+          // an update. This row is the only channel.
+          _menuRow(
+            icon: _update == null
+                ? Icons.system_update_outlined
+                : Icons.new_releases_outlined,
+            label: _updateLabel,
+            subtitle: _updateSubtitle,
+            onTap: _updateProgress == null || _checkingUpdate
+                ? _checkForUpdate
+                : () {},
           ),
           _menuRow(
             icon: Icons.info_outline,

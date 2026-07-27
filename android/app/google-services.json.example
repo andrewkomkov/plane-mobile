@@ -1,0 +1,42 @@
+{
+  "_comment": [
+    "Copy this to google-services.json and fill it in from your own Firebase",
+    "project to enable push notifications. Without it the app builds and runs",
+    "normally; only push is inert.",
+    "",
+    "Download the real file from the Firebase console:",
+    "  Project settings -> Your apps -> Android -> google-services.json",
+    "",
+    "The Android package name must match `namespace` in app/build.gradle.",
+    "",
+    "The server side needs the matching service account — see the sidecar's",
+    "FCM_SERVICE_ACCOUNT_PATH."
+  ],
+  "project_info": {
+    "project_number": "000000000000",
+    "project_id": "your-firebase-project",
+    "storage_bucket": "your-firebase-project.appspot.com"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:000000000000:android:0000000000000000000000",
+        "android_client_info": {
+          "package_name": "com.slimshaggy.plane_mobile"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "YOUR_ANDROID_API_KEY"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

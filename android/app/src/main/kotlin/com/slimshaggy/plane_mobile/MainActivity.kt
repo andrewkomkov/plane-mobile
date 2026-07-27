@@ -18,6 +18,8 @@ class MainActivity : FlutterFragmentActivity() {
         val messenger = flutterEngine.dartExecutor.binaryMessenger
         val registry = flutterEngine.platformViewsController.registry
 
+        UpdateInstaller.register(messenger, { this }, applicationContext)
+
         registry.registerViewFactory(
             M3ExpressiveViewFactory.BUTTON_GROUP_ID,
             M3ExpressiveViewFactory(
