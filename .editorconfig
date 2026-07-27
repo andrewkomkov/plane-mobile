@@ -35,6 +35,11 @@ indent_size = 4
 [*.md]
 # Trailing double-space is a hard line break in Markdown.
 trim_trailing_whitespace = false
+# Indentation in Markdown is semantic, not stylistic: a continuation line
+# under "1. " needs three spaces to stay part of that item, and a nested list
+# needs to align with its parent's content. Rounding those to a multiple of
+# two changes what the document means.
+indent_size = unset
 
 [{Makefile,*.mk}]
 indent_style = tab
