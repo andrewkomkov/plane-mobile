@@ -21,3 +21,7 @@ MD033: false
 
 # The first line of CHANGELOG.md is written by release-please.
 MD041: false
+
+# Dashes for unordered lists, consistently. The default wants asterisks.
+MD004:
+  style: dash
