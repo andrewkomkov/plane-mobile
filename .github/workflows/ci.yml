@@ -34,7 +34,7 @@ jobs:
       # subosito/flutter-action caches the SDK; the package cache is separate
       # and is the one that actually costs time here.
       - name: Cache pub packages
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: |
             ~/.pub-cache
@@ -82,7 +82,7 @@ jobs:
           cache: true
 
       - name: Cache pub packages
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: |
             ~/.pub-cache
@@ -91,7 +91,7 @@ jobs:
           restore-keys: pub-${{ runner.os }}-
 
       - name: Cache Gradle
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: |
             ~/.gradle/caches
@@ -128,7 +128,7 @@ jobs:
           cache: true
 
       - name: Cache pub packages
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: |
             ~/.pub-cache
@@ -137,7 +137,7 @@ jobs:
           restore-keys: pub-macos-
 
       - name: Cache CocoaPods
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: |
             ios/Pods
