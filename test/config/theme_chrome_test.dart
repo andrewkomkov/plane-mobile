@@ -32,10 +32,18 @@ void main() {
     });
 
     test('the app bar theme carries the same style, per theme', () {
-      expect(PlaneTheme.light().appBarTheme.systemOverlayStyle
-          ?.statusBarIconBrightness, Brightness.dark);
-      expect(PlaneTheme.dark().appBarTheme.systemOverlayStyle
-          ?.statusBarIconBrightness, Brightness.light);
+      expect(
+          PlaneTheme.light()
+              .appBarTheme
+              .systemOverlayStyle
+              ?.statusBarIconBrightness,
+          Brightness.dark);
+      expect(
+          PlaneTheme.dark()
+              .appBarTheme
+              .systemOverlayStyle
+              ?.statusBarIconBrightness,
+          Brightness.light);
     });
   });
 

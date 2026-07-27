@@ -362,7 +362,8 @@ void main() {
       }
 
       double rowHeight() => tester
-          .getSize(find.ancestor(of: largeTitle, matching: find.byType(ClipRect))
+          .getSize(find
+              .ancestor(of: largeTitle, matching: find.byType(ClipRect))
               .first)
           .height;
 

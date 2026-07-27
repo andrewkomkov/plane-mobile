@@ -84,7 +84,8 @@ class _M3ELoadingIndicatorState extends State<M3ELoadingIndicator>
           final index = position.floor() % _sequence.length;
           final next = (index + 1) % _sequence.length;
           // Ease the blend so each shape holds briefly before giving way.
-          final t = Curves.easeInOutCubic.transform(position - position.floor());
+          final t =
+              Curves.easeInOutCubic.transform(position - position.floor());
 
           return CustomPaint(
             painter: _CookiePainter(
@@ -93,9 +94,8 @@ class _M3ELoadingIndicatorState extends State<M3ELoadingIndicator>
               t: t,
               rotation: _controller.value * 2 * 3.14159,
               color: color,
-              backdrop: widget.contained
-                  ? scheme.surfaceContainerHighest
-                  : null,
+              backdrop:
+                  widget.contained ? scheme.surfaceContainerHighest : null,
             ),
           );
         },
@@ -137,11 +137,10 @@ class _CookiePainter extends CustomPainter {
     canvas.translate(-size.width / 2, -size.height / 2);
 
     // Inset so the contained backdrop stays visible around the shape.
-    final inner = backdrop != null
-        ? Size(size.width * 0.62, size.height * 0.62)
-        : size;
-    canvas.translate((size.width - inner.width) / 2,
-        (size.height - inner.height) / 2);
+    final inner =
+        backdrop != null ? Size(size.width * 0.62, size.height * 0.62) : size;
+    canvas.translate(
+        (size.width - inner.width) / 2, (size.height - inner.height) / 2);
 
     canvas.drawPath(
       shape.toPath(inner, morphTo: morphTo, t: t),

@@ -203,10 +203,8 @@ class _M3EButtonGroupState extends State<M3EButtonGroup>
         spring: M3EMotion.defaultEffects,
         builder: (context, tintT, _) {
           final t = tintT.clamp(0.0, 1.0);
-          final background =
-              Color.lerp(restBackground, selectedBackground, t)!;
-          final foreground =
-              Color.lerp(restForeground, selectedForeground, t)!;
+          final background = Color.lerp(restBackground, selectedBackground, t)!;
+          final foreground = Color.lerp(restForeground, selectedForeground, t)!;
 
           return Container(
             decoration: BoxDecoration(
@@ -229,13 +227,9 @@ class _M3EButtonGroupState extends State<M3EButtonGroup>
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       softWrap: false,
-                      style: Theme.of(context)
-                          .textTheme
-                          .titleSmall
-                          ?.copyWith(
-                            fontWeight: isSelected
-                                ? FontWeight.w600
-                                : FontWeight.w500,
+                      style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                            fontWeight:
+                                isSelected ? FontWeight.w600 : FontWeight.w500,
                             color: foreground,
                           ),
                     ),

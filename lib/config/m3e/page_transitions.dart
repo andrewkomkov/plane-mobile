@@ -48,7 +48,8 @@ class M3ESpringPageTransitionsBuilder extends PageTransitionsBuilder {
   static final M3ESpringCurve spatial = M3ESpringCurve(M3EMotion.slowSpatial);
 
   /// Fades, on their own settle window so both channels finish together.
-  static final M3ESpringCurve effects = M3ESpringCurve(M3EMotion.defaultEffects);
+  static final M3ESpringCurve effects =
+      M3ESpringCurve(M3EMotion.defaultEffects);
 
   /// The spring's own settle time, so the controller runs the simulation at its
   /// natural rate instead of stretching or clipping it. It lands within a few
@@ -96,7 +97,8 @@ class M3ESpringPageTransitionsBuilder extends PageTransitionsBuilder {
         bool allowSnapshotting,
         Widget? child,
       ) =>
-          _coveredTransition(context, secondaryAnimation, backgroundColor, child);
+          _coveredTransition(
+              context, secondaryAnimation, backgroundColor, child);
 
   /// What happens to a route while another one covers it.
   static Widget _coveredTransition(

@@ -132,8 +132,8 @@ class M3EIconButton extends StatelessWidget {
                 final t = tintT.clamp(0.0, 1.0);
                 final background =
                     Color.lerp(restBackground, selectedBackground, t)!;
-                final resolved = color ??
-                    Color.lerp(restForeground, selectedForeground, t)!;
+                final resolved =
+                    color ?? Color.lerp(restForeground, selectedForeground, t)!;
                 final corner = restCorner +
                     (selectedCorner - restCorner) * shapeT.clamp(0.0, 1.0);
 
@@ -150,9 +150,8 @@ class M3EIconButton extends StatelessWidget {
                   child: Icon(
                     icon,
                     size: size.icon,
-                    color: enabled
-                        ? resolved
-                        : resolved.withValues(alpha: 0.38),
+                    color:
+                        enabled ? resolved : resolved.withValues(alpha: 0.38),
                   ),
                 );
               },

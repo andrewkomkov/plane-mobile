@@ -279,8 +279,8 @@ class AppDatabase {
 
   static Future<DateTime?> getLastSyncedAt(String entityKey) async {
     final db = await instance;
-    final rows = await db.query('sync_meta',
-        where: 'entity_key = ?', whereArgs: [entityKey]);
+    final rows = await db
+        .query('sync_meta', where: 'entity_key = ?', whereArgs: [entityKey]);
     if (rows.isEmpty) return null;
     return DateTime.tryParse(rows.first['last_synced_at'] as String);
   }
@@ -349,9 +349,7 @@ class AppDatabase {
   static Future<List<Map<String, dynamic>>> getProjects(String ws) async {
     final db = await instance;
     return db.query('projects',
-        where: 'workspace_slug = ?',
-        whereArgs: [ws],
-        orderBy: 'name ASC');
+        where: 'workspace_slug = ?', whereArgs: [ws], orderBy: 'name ASC');
   }
 
   static Future<void> saveProjects(
@@ -371,8 +369,7 @@ class AppDatabase {
       String ws, String pid) async {
     final db = await instance;
     return db.query('issues',
-        where: 'workspace_slug = ? AND project_id = ?',
-        whereArgs: [ws, pid]);
+        where: 'workspace_slug = ? AND project_id = ?', whereArgs: [ws, pid]);
   }
 
   static Future<void> saveIssues(
@@ -392,8 +389,7 @@ class AppDatabase {
     }).toList();
     await upsertAll('issues', enriched);
     final freshIds = rows.map((r) => r['id'] as String).toSet();
-    await deleteStale('issues', freshIds,
-        workspaceSlug: ws, projectId: pid);
+    await deleteStale('issues', freshIds, workspaceSlug: ws, projectId: pid);
     await setLastSyncedAt('issues:${ws}_$pid');
   }
 
@@ -437,18 +433,17 @@ class AppDatabase {
       String ws, String pid) async {
     final db = await instance;
     return db.query('labels',
-        where: 'workspace_slug = ? AND project_id = ?',
-        whereArgs: [ws, pid]);
+        where: 'workspace_slug = ? AND project_id = ?', whereArgs: [ws, pid]);
   }
 
   static Future<void> saveLabels(
       String ws, String pid, List<Map<String, dynamic>> rows) async {
-    final enriched =
-        rows.map((r) => {...r, 'workspace_slug': ws, 'project_id': pid}).toList();
+    final enriched = rows
+        .map((r) => {...r, 'workspace_slug': ws, 'project_id': pid})
+        .toList();
     await upsertAll('labels', enriched);
     final freshIds = rows.map((r) => r['id'] as String).toSet();
-    await deleteStale('labels', freshIds,
-        workspaceSlug: ws, projectId: pid);
+    await deleteStale('labels', freshIds, workspaceSlug: ws, projectId: pid);
     await setLastSyncedAt('labels:${ws}_$pid');
   }
 
@@ -460,18 +455,17 @@ class AppDatabase {
       String ws, String pid) async {
     final db = await instance;
     return db.query('members',
-        where: 'workspace_slug = ? AND project_id = ?',
-        whereArgs: [ws, pid]);
+        where: 'workspace_slug = ? AND project_id = ?', whereArgs: [ws, pid]);
   }
 
   static Future<void> saveMembers(
       String ws, String pid, List<Map<String, dynamic>> rows) async {
-    final enriched =
-        rows.map((r) => {...r, 'workspace_slug': ws, 'project_id': pid}).toList();
+    final enriched = rows
+        .map((r) => {...r, 'workspace_slug': ws, 'project_id': pid})
+        .toList();
     await upsertAll('members', enriched);
     final freshIds = rows.map((r) => r['id'] as String).toSet();
-    await deleteStale('members', freshIds,
-        workspaceSlug: ws, projectId: pid);
+    await deleteStale('members', freshIds, workspaceSlug: ws, projectId: pid);
     await setLastSyncedAt('members:${ws}_$pid');
   }
 
@@ -483,18 +477,17 @@ class AppDatabase {
       String ws, String pid) async {
     final db = await instance;
     return db.query('cycles',
-        where: 'workspace_slug = ? AND project_id = ?',
-        whereArgs: [ws, pid]);
+        where: 'workspace_slug = ? AND project_id = ?', whereArgs: [ws, pid]);
   }
 
   static Future<void> saveCycles(
       String ws, String pid, List<Map<String, dynamic>> rows) async {
-    final enriched =
-        rows.map((r) => {...r, 'workspace_slug': ws, 'project_id': pid}).toList();
+    final enriched = rows
+        .map((r) => {...r, 'workspace_slug': ws, 'project_id': pid})
+        .toList();
     await upsertAll('cycles', enriched);
     final freshIds = rows.map((r) => r['id'] as String).toSet();
-    await deleteStale('cycles', freshIds,
-        workspaceSlug: ws, projectId: pid);
+    await deleteStale('cycles', freshIds, workspaceSlug: ws, projectId: pid);
     await setLastSyncedAt('cycles:${ws}_$pid');
   }
 
@@ -506,8 +499,7 @@ class AppDatabase {
       String ws, String pid) async {
     final db = await instance;
     return db.query('modules',
-        where: 'workspace_slug = ? AND project_id = ?',
-        whereArgs: [ws, pid]);
+        where: 'workspace_slug = ? AND project_id = ?', whereArgs: [ws, pid]);
   }
 
   static Future<void> saveModules(
@@ -523,8 +515,7 @@ class AppDatabase {
     }).toList();
     await upsertAll('modules', enriched);
     final freshIds = rows.map((r) => r['id'] as String).toSet();
-    await deleteStale('modules', freshIds,
-        workspaceSlug: ws, projectId: pid);
+    await deleteStale('modules', freshIds, workspaceSlug: ws, projectId: pid);
     await setLastSyncedAt('modules:${ws}_$pid');
   }
 
@@ -536,18 +527,17 @@ class AppDatabase {
       String ws, String pid) async {
     final db = await instance;
     return db.query('pages',
-        where: 'workspace_slug = ? AND project_id = ?',
-        whereArgs: [ws, pid]);
+        where: 'workspace_slug = ? AND project_id = ?', whereArgs: [ws, pid]);
   }
 
   static Future<void> savePages(
       String ws, String pid, List<Map<String, dynamic>> rows) async {
-    final enriched =
-        rows.map((r) => {...r, 'workspace_slug': ws, 'project_id': pid}).toList();
+    final enriched = rows
+        .map((r) => {...r, 'workspace_slug': ws, 'project_id': pid})
+        .toList();
     await upsertAll('pages', enriched);
     final freshIds = rows.map((r) => r['id'] as String).toSet();
-    await deleteStale('pages', freshIds,
-        workspaceSlug: ws, projectId: pid);
+    await deleteStale('pages', freshIds, workspaceSlug: ws, projectId: pid);
     await setLastSyncedAt('pages:${ws}_$pid');
   }
 
@@ -565,8 +555,7 @@ class AppDatabase {
 
   static Future<void> saveInboxItems(
       String ws, List<Map<String, dynamic>> rows) async {
-    final enriched =
-        rows.map((r) => {...r, 'workspace_slug': ws}).toList();
+    final enriched = rows.map((r) => {...r, 'workspace_slug': ws}).toList();
     await upsertAll('inbox_items', enriched);
     final freshIds = rows.map((r) => r['id'] as String).toSet();
     await deleteStale('inbox_items', freshIds, workspaceSlug: ws);

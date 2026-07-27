@@ -132,8 +132,8 @@ void main() {
 
       // M3EPressable replaces the subtree's semantics, so the subtitle only
       // reaches a screen reader if the row's own label carries it.
-      expect(find.bySemanticsLabel('Member, Can edit work items'),
-          findsOneWidget);
+      expect(
+          find.bySemanticsLabel('Member, Can edit work items'), findsOneWidget);
       handle.dispose();
     });
 
@@ -360,8 +360,7 @@ void main() {
       expect(chosen, isNull);
     });
 
-    testWidgets('says so when there is nothing to choose from',
-        (tester) async {
+    testWidgets('says so when there is nothing to choose from', (tester) async {
       await pumpOpener(tester, (context) async {
         await MultiSelectSheet.show<String>(
           context: context,
@@ -505,7 +504,8 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(created, isTrue);
-      expect(chosen, isNull, reason: 'a discard, so the caller applies nothing');
+      expect(chosen, isNull,
+          reason: 'a discard, so the caller applies nothing');
     });
   });
 }

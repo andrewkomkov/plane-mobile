@@ -208,8 +208,7 @@ void main() {
       expect(entries.map((e) => e.id), ['n1', 'a2']);
     });
 
-    test('an empty notification half still yields the activity half',
-        () async {
+    test('an empty notification half still yields the activity half', () async {
       // The single-operator case that made this feed necessary: Plane never
       // notifies the actor of their own activity, so `notifications/` is
       // legitimately empty and the screen would otherwise be blank.

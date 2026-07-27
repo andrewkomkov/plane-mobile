@@ -12,8 +12,8 @@ void main() {
       expect(ListCountHeader.label(1, 'cycle'), '1 cycle');
       expect(ListCountHeader.label(3, 'cycle'), '3 cycles');
       // The nouns that do not just take an "s".
-      expect(ListCountHeader.label(2, 'entity', plural: 'entities'),
-          '2 entities');
+      expect(
+          ListCountHeader.label(2, 'entity', plural: 'entities'), '2 entities');
     });
 
     testWidgets('draws the count', (tester) async {
@@ -44,8 +44,8 @@ void main() {
 
     testWidgets('stays tight when there is nothing beside the count',
         (tester) async {
-      await tester.pumpWidget(
-          wrap(const ListCountHeader(count: 4, singular: 'page')));
+      await tester
+          .pumpWidget(wrap(const ListCountHeader(count: 4, singular: 'page')));
       expect(tester.getSize(find.byType(ListCountHeader)).height, lessThan(48));
     });
   });

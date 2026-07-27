@@ -20,8 +20,7 @@ class Attachment {
       filename: attributes['name'] as String? ?? json['attributes']?.toString(),
       size: attributes['size'] as int?,
       asset: json['asset'] as String?,
-      createdAt:
-          DateTime.tryParse(json['created_at'] ?? '') ?? DateTime.now(),
+      createdAt: DateTime.tryParse(json['created_at'] ?? '') ?? DateTime.now(),
     );
   }
 

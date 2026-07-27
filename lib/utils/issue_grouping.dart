@@ -100,8 +100,7 @@ Map<String, List<Issue>> groupIssuesBy(
 }) {
   switch (groupBy) {
     case GroupByField.state:
-      return groupIssuesByStateGroup(issues, states,
-          excludeDone: excludeDone);
+      return groupIssuesByStateGroup(issues, states, excludeDone: excludeDone);
     case GroupByField.priority:
       return groupIssuesByPriority(issues);
     case GroupByField.assignee:
@@ -117,7 +116,8 @@ List<Issue> applyFilters(List<Issue> issues, FilterState filterState) {
 
   if (filterState.selectedStates.isNotEmpty) {
     filtered = filtered
-        .where((i) => i.state != null && filterState.selectedStates.contains(i.state))
+        .where((i) =>
+            i.state != null && filterState.selectedStates.contains(i.state))
         .toList();
   }
   if (filterState.selectedPriorities.isNotEmpty) {
@@ -133,8 +133,8 @@ List<Issue> applyFilters(List<Issue> issues, FilterState filterState) {
   }
   if (filterState.selectedLabels.isNotEmpty) {
     filtered = filtered
-        .where((i) =>
-            i.labels.any((l) => filterState.selectedLabels.contains(l)))
+        .where(
+            (i) => i.labels.any((l) => filterState.selectedLabels.contains(l)))
         .toList();
   }
 

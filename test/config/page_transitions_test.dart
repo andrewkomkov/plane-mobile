@@ -17,7 +17,8 @@ void main() {
       // that cannot overshoot is a curve with extra steps.
       double peak = 0;
       for (int i = 0; i <= 200; i++) {
-        peak = peak > curve.transform(i / 200) ? peak : curve.transform(i / 200);
+        peak =
+            peak > curve.transform(i / 200) ? peak : curve.transform(i / 200);
       }
       expect(peak, greaterThan(1.0));
     });
@@ -126,8 +127,8 @@ void main() {
       // directly, and a widget-level MediaQuery would not reach it.
       tester.binding.platformDispatcher.accessibilityFeaturesTestValue =
           const FakeAccessibilityFeatures(disableAnimations: true);
-      addTearDown(
-          tester.binding.platformDispatcher.clearAccessibilityFeaturesTestValue);
+      addTearDown(tester
+          .binding.platformDispatcher.clearAccessibilityFeaturesTestValue);
 
       final navigator = GlobalKey<NavigatorState>();
       await tester.pumpWidget(MaterialApp(

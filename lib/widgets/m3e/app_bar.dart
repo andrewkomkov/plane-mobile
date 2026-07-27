@@ -161,9 +161,8 @@ class M3EAppBarAction extends StatelessWidget {
       tooltip: tooltip,
       onPressed: onPressed,
       color: color,
-      style: emphasized
-          ? M3EIconButtonStyle.filled
-          : M3EIconButtonStyle.standard,
+      style:
+          emphasized ? M3EIconButtonStyle.filled : M3EIconButtonStyle.standard,
     );
   }
 }

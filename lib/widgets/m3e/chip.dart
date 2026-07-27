@@ -82,10 +82,8 @@ class M3EChip extends StatelessWidget {
             final t = tintT.clamp(0.0, 1.0);
             final background =
                 Color.lerp(Colors.transparent, selectedBackground, t)!;
-            final foreground =
-                Color.lerp(scheme.onSurfaceVariant, accent, t)!;
-            final borderColor =
-                Color.lerp(scheme.outline, selectedBorder, t)!;
+            final foreground = Color.lerp(scheme.onSurfaceVariant, accent, t)!;
+            final borderColor = Color.lerp(scheme.outline, selectedBorder, t)!;
 
             const rest = M3EShape.largeIncreased;
             final corner =
@@ -109,12 +107,10 @@ class M3EChip extends StatelessWidget {
                   ],
                   Text(
                     label,
-                    style: (dense
-                            ? textTheme.labelMedium
-                            : textTheme.labelLarge)
-                        ?.copyWith(
-                      fontWeight:
-                          selected ? FontWeight.w600 : FontWeight.w500,
+                    style:
+                        (dense ? textTheme.labelMedium : textTheme.labelLarge)
+                            ?.copyWith(
+                      fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
                       color: foreground,
                     ),
                   ),

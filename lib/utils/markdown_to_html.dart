@@ -14,8 +14,7 @@ String markdownToHtml(String md) {
       RegExp(r'\*\*(.+?)\*\*'), (m) => '<strong>${m[1]}</strong>');
 
   // Italic
-  html = html.replaceAllMapped(
-      RegExp(r'\*(.+?)\*'), (m) => '<em>${m[1]}</em>');
+  html = html.replaceAllMapped(RegExp(r'\*(.+?)\*'), (m) => '<em>${m[1]}</em>');
 
   // Inline code
   html =
@@ -30,8 +29,7 @@ String markdownToHtml(String md) {
       RegExp(r'^- (.+)$', multiLine: true), (m) => '<li>${m[1]}</li>');
 
   // Blockquotes
-  html = html.replaceAllMapped(
-      RegExp(r'^> (.+)$', multiLine: true),
+  html = html.replaceAllMapped(RegExp(r'^> (.+)$', multiLine: true),
       (m) => '<blockquote>${m[1]}</blockquote>');
 
   // Wrap remaining paragraphs

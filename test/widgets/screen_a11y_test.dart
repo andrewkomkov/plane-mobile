@@ -368,7 +368,14 @@ void main() {
                 'id': 'n1',
                 'title': 'Ada commented on PLM-7',
                 'entity_name': 'Fix the thing',
-                'created_at': '2026-07-20T10:00:00Z',
+                // Relative to now, not a literal date. A fixed timestamp
+                // made the "6d" in the expected label below drift by a day
+                // every day, so this test failed on the calendar rather than
+                // on the code.
+                'created_at': DateTime.now()
+                    .toUtc()
+                    .subtract(const Duration(days: 6, hours: 1))
+                    .toIso8601String(),
                 'data': <String, dynamic>{},
               },
             ],

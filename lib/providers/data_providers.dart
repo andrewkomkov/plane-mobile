@@ -127,8 +127,10 @@ class DataCache {
   //  States
   // -------------------------------------------------------------------------
 
-  Map<String, IssueState>? getStates(String ws, String pid) => _states['$ws/$pid'];
-  bool isStatesLoading(String ws, String pid) => _statesLoading['$ws/$pid'] ?? false;
+  Map<String, IssueState>? getStates(String ws, String pid) =>
+      _states['$ws/$pid'];
+  bool isStatesLoading(String ws, String pid) =>
+      _statesLoading['$ws/$pid'] ?? false;
 
   Future<void> loadStates(String ws, String pid, {bool force = false}) async {
     final k = '$ws/$pid';
@@ -185,7 +187,8 @@ class DataCache {
   // -------------------------------------------------------------------------
 
   List<Issue>? getIssues(String ws, String pid) => _issues['$ws/$pid'];
-  bool isIssuesLoading(String ws, String pid) => _issuesLoading['$ws/$pid'] ?? false;
+  bool isIssuesLoading(String ws, String pid) =>
+      _issuesLoading['$ws/$pid'] ?? false;
 
   Future<void> loadIssues(String ws, String pid, {bool force = false}) async {
     final k = '$ws/$pid';
@@ -247,7 +250,8 @@ class DataCache {
   // -------------------------------------------------------------------------
 
   List<Label>? getLabels(String ws, String pid) => _labels['$ws/$pid'];
-  bool isLabelsLoading(String ws, String pid) => _labelsLoading['$ws/$pid'] ?? false;
+  bool isLabelsLoading(String ws, String pid) =>
+      _labelsLoading['$ws/$pid'] ?? false;
 
   Future<void> loadLabels(String ws, String pid) async {
     final k = '$ws/$pid';
@@ -291,7 +295,8 @@ class DataCache {
   // -------------------------------------------------------------------------
 
   List<Member>? getMembers(String ws, String pid) => _members['$ws/$pid'];
-  bool isMembersLoading(String ws, String pid) => _membersLoading['$ws/$pid'] ?? false;
+  bool isMembersLoading(String ws, String pid) =>
+      _membersLoading['$ws/$pid'] ?? false;
 
   Future<void> loadMembers(String ws, String pid) async {
     final k = '$ws/$pid';
@@ -335,7 +340,8 @@ class DataCache {
   // -------------------------------------------------------------------------
 
   List<Cycle>? getCycles(String ws, String pid) => _cycles['$ws/$pid'];
-  bool isCyclesLoading(String ws, String pid) => _cyclesLoading['$ws/$pid'] ?? false;
+  bool isCyclesLoading(String ws, String pid) =>
+      _cyclesLoading['$ws/$pid'] ?? false;
 
   Future<void> loadCycles(String ws, String pid, {bool force = false}) async {
     final k = '$ws/$pid';
@@ -385,7 +391,8 @@ class DataCache {
   // -------------------------------------------------------------------------
 
   List<Module>? getModules(String ws, String pid) => _modules['$ws/$pid'];
-  bool isModulesLoading(String ws, String pid) => _modulesLoading['$ws/$pid'] ?? false;
+  bool isModulesLoading(String ws, String pid) =>
+      _modulesLoading['$ws/$pid'] ?? false;
 
   Future<void> loadModules(String ws, String pid, {bool force = false}) async {
     final k = '$ws/$pid';
@@ -435,7 +442,8 @@ class DataCache {
   // -------------------------------------------------------------------------
 
   List<PlanePage>? getPages(String ws, String pid) => _pages['$ws/$pid'];
-  bool isPagesLoading(String ws, String pid) => _pagesLoading['$ws/$pid'] ?? false;
+  bool isPagesLoading(String ws, String pid) =>
+      _pagesLoading['$ws/$pid'] ?? false;
 
   Future<void> loadPages(String ws, String pid, {bool force = false}) async {
     final k = '$ws/$pid';

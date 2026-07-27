@@ -41,11 +41,12 @@ class CacheIndicator extends StatelessWidget {
                     ?.copyWith(color: theme.colorScheme.primary)),
           ] else ...[
             Icon(Icons.cloud_off,
-                size: PlaneTheme.iconSmall, color: PlaneTheme.pendingColor(context)),
+                size: PlaneTheme.iconSmall,
+                color: PlaneTheme.pendingColor(context)),
             const SizedBox(width: 6),
             Text('Cached data',
-                style:
-                    theme.textTheme.labelSmall?.copyWith(color: PlaneTheme.pendingColor(context))),
+                style: theme.textTheme.labelSmall
+                    ?.copyWith(color: PlaneTheme.pendingColor(context))),
           ],
         ],
       ),

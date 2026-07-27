@@ -42,7 +42,8 @@ class PageRepository {
     String pageId,
     Map<String, dynamic> data,
   ) async {
-    final page = await PageService.updatePage(workspaceSlug, projectId, pageId, data);
+    final page =
+        await PageService.updatePage(workspaceSlug, projectId, pageId, data);
     _cache.remove('$workspaceSlug/$projectId');
     return page;
   }

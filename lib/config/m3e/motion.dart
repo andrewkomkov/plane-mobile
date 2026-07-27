@@ -16,21 +16,24 @@ class M3EMotion {
   // ─── Expressive spatial: bouncy, used for anything that moves ───
 
   /// Small, immediate movement — press states, icon nudges, chip selection.
-  static final SpringDescription fastSpatial = SpringDescription.withDampingRatio(
+  static final SpringDescription fastSpatial =
+      SpringDescription.withDampingRatio(
     mass: 1.0,
     stiffness: 800.0,
     ratio: 0.6,
   );
 
   /// The workhorse — sheets, list reordering, nav indicator, FAB menu items.
-  static final SpringDescription defaultSpatial = SpringDescription.withDampingRatio(
+  static final SpringDescription defaultSpatial =
+      SpringDescription.withDampingRatio(
     mass: 1.0,
     stiffness: 380.0,
     ratio: 0.8,
   );
 
   /// Large surfaces travelling a long distance — full-screen transitions.
-  static final SpringDescription slowSpatial = SpringDescription.withDampingRatio(
+  static final SpringDescription slowSpatial =
+      SpringDescription.withDampingRatio(
     mass: 1.0,
     stiffness: 200.0,
     ratio: 0.8,
@@ -38,19 +41,22 @@ class M3EMotion {
 
   // ─── Expressive effects: critically damped, never overshoots ───
 
-  static final SpringDescription fastEffects = SpringDescription.withDampingRatio(
+  static final SpringDescription fastEffects =
+      SpringDescription.withDampingRatio(
     mass: 1.0,
     stiffness: 3800.0,
     ratio: 1.0,
   );
 
-  static final SpringDescription defaultEffects = SpringDescription.withDampingRatio(
+  static final SpringDescription defaultEffects =
+      SpringDescription.withDampingRatio(
     mass: 1.0,
     stiffness: 1600.0,
     ratio: 1.0,
   );
 
-  static final SpringDescription slowEffects = SpringDescription.withDampingRatio(
+  static final SpringDescription slowEffects =
+      SpringDescription.withDampingRatio(
     mass: 1.0,
     stiffness: 800.0,
     ratio: 1.0,
@@ -58,7 +64,8 @@ class M3EMotion {
 
   // ─── Standard (non-expressive) scheme, for surfaces that should stay calm ───
 
-  static final SpringDescription standardSpatial = SpringDescription.withDampingRatio(
+  static final SpringDescription standardSpatial =
+      SpringDescription.withDampingRatio(
     mass: 1.0,
     stiffness: 700.0,
     ratio: 0.9,
@@ -117,8 +124,8 @@ class M3ESpringCurve extends Curve {
         settleTime = _settleTimeOf(simulation);
 
   /// Rounded to whole milliseconds, ready for an `AnimationController`.
-  Duration get settleDuration =>
-      Duration(microseconds: (settleTime * Duration.microsecondsPerSecond).round());
+  Duration get settleDuration => Duration(
+      microseconds: (settleTime * Duration.microsecondsPerSecond).round());
 
   static double _settleTimeOf(SpringSimulation simulation) {
     // 240Hz, so the answer is finer than any frame that will render it.
@@ -147,7 +154,8 @@ class M3ESpringCurve extends Curve {
 class M3ESpringBuilder extends StatefulWidget {
   final double value;
   final SpringDescription spring;
-  final Widget Function(BuildContext context, double value, Widget? child) builder;
+  final Widget Function(BuildContext context, double value, Widget? child)
+      builder;
   final Widget? child;
 
   const M3ESpringBuilder({

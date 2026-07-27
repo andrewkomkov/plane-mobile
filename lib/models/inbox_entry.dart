@@ -151,9 +151,8 @@ class InboxEntry {
         id: (row['id'] ?? '').toString(),
         title: (row['title'] ?? '').toString(),
         description: (row['description'] ?? '').toString(),
-        createdAt:
-            DateTime.tryParse(row['created_at']?.toString() ?? '') ??
-                DateTime.now(),
+        createdAt: DateTime.tryParse(row['created_at']?.toString() ?? '') ??
+            DateTime.now(),
         issueId: row['issue_id']?.toString(),
         projectId: row['project_id']?.toString(),
         projectIdentifier: row['project_identifier']?.toString(),
@@ -165,7 +164,8 @@ class InboxEntry {
 
   Map<String, dynamic> toCache() => {
         'id': id,
-        'kind': kind == InboxEntryKind.notification ? 'notification' : 'activity',
+        'kind':
+            kind == InboxEntryKind.notification ? 'notification' : 'activity',
         'title': title,
         'description': description,
         'project_id': projectId,
@@ -203,8 +203,14 @@ class InboxEntry {
     }
     if (f == 'comment') return '$actor commented';
     if (f == 'assignees') return '$actor changed the assignees';
-    if (f == 'state') return n.isEmpty ? '$actor changed the state' : '$actor moved it to $n';
-    if (f == 'priority') return n.isEmpty ? '$actor changed the priority' : '$actor set priority to $n';
+    if (f == 'state') {
+      return n.isEmpty ? '$actor changed the state' : '$actor moved it to $n';
+    }
+    if (f == 'priority') {
+      return n.isEmpty
+          ? '$actor changed the priority'
+          : '$actor set priority to $n';
+    }
     if (n.isNotEmpty) return '$actor set $f to $n';
     return '$actor updated $f';
   }
@@ -215,10 +221,9 @@ class InboxEntry {
       final triggered = n.data['triggered_by_details'];
       final triggeredMap = triggered is Map ? triggered : const {};
       return describeActivity(
-        actor: (triggeredMap['display_name'] ??
-                triggeredMap['email'] ??
-                'Someone')
-            .toString(),
+        actor:
+            (triggeredMap['display_name'] ?? triggeredMap['email'] ?? 'Someone')
+                .toString(),
         field: activity['field']?.toString(),
         verb: activity['verb']?.toString(),
         newValue: activity['new_value']?.toString(),

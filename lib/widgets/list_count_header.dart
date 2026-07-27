@@ -38,8 +38,8 @@ class ListCountHeader extends StatelessWidget {
     return Padding(
       // A trailing control brings its own 48dp target and sets the height on
       // its own; without one the strip should stay as tight as the text.
-      padding: EdgeInsets.fromLTRB(20, trailing == null ? 8 : 0, 12,
-          trailing == null ? 4 : 0),
+      padding: EdgeInsets.fromLTRB(
+          20, trailing == null ? 8 : 0, 12, trailing == null ? 4 : 0),
       child: Row(
         children: [
           Text(

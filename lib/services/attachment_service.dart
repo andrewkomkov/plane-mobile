@@ -25,7 +25,8 @@ class AttachmentService {
     String issueId,
   ) async {
     final dio = await ApiClient.getInstance();
-    final response = await dio.get(_collection(workspaceSlug, projectId, issueId));
+    final response =
+        await dio.get(_collection(workspaceSlug, projectId, issueId));
     final data = response.data;
     final list = data is Map ? (data['results'] ?? []) : data;
     if (list is List) {

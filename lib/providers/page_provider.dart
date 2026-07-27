@@ -75,7 +75,6 @@ final pageRepositoryProvider = Provider<PageRepository>((ref) {
   return PageRepository();
 });
 
-final pageListProvider =
-    NotifierProvider<PageListNotifier, PageListState>(() {
+final pageListProvider = NotifierProvider<PageListNotifier, PageListState>(() {
   return PageListNotifier();
 });

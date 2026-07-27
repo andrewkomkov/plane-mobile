@@ -205,8 +205,7 @@ class _IssueListSkeletonState extends State<IssueListSkeleton>
             // Vary the title width for a more natural look
             final titleFraction = [0.75, 0.60, 0.85, 0.50, 0.70, 0.65][i % 6];
             return Padding(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 20, vertical: 9),
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 9),
               child: Row(
                 children: [
                   // Priority icon placeholder
@@ -276,8 +275,7 @@ class _ProjectListSkeletonState extends State<ProjectListSkeleton>
           itemBuilder: (_, i) {
             final nameFraction = [0.65, 0.80, 0.55, 0.70, 0.60][i % 5];
             return Padding(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 16, vertical: 3),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 3),
               child: Container(
                 padding: const EdgeInsets.all(14),
                 decoration: BoxDecoration(
@@ -301,8 +299,7 @@ class _ProjectListSkeletonState extends State<ProjectListSkeleton>
                             child: _SkeletonBox(height: 14, color: color),
                           ),
                           const SizedBox(height: 6),
-                          _SkeletonBox(
-                              width: 90, height: 10, color: color),
+                          _SkeletonBox(width: 90, height: 10, color: color),
                         ],
                       ),
                     ),
@@ -410,8 +407,7 @@ class _IssueDetailSkeletonState extends State<IssueDetailSkeleton>
                             child: _SkeletonBox(height: 12, color: color),
                           ),
                           const SizedBox(height: 4),
-                          _SkeletonBox(
-                              width: 60, height: 10, color: color),
+                          _SkeletonBox(width: 60, height: 10, color: color),
                         ],
                       ),
                     ),
@@ -466,11 +462,9 @@ class _InboxSkeletonState extends State<InboxSkeleton>
           separatorBuilder: (_, __) =>
               Divider(indent: 60, endIndent: 20, height: 0.5),
           itemBuilder: (_, i) {
-            final titleFraction =
-                [0.70, 0.55, 0.80, 0.60, 0.75, 0.50][i % 6];
+            final titleFraction = [0.70, 0.55, 0.80, 0.60, 0.75, 0.50][i % 6];
             return Padding(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 20, vertical: 9),
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 9),
               child: Row(
                 children: [
                   // Priority icon
@@ -491,8 +485,7 @@ class _InboxSkeletonState extends State<InboxSkeleton>
                         ),
                         const SizedBox(height: 6),
                         // Activity subtitle
-                        _SkeletonBox(
-                            width: 140, height: 10, color: color),
+                        _SkeletonBox(width: 140, height: 10, color: color),
                       ],
                     ),
                   ),

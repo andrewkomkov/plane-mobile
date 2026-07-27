@@ -25,9 +25,8 @@ class PlaneNotification {
         title: json['title'] ?? '',
         data: (json['data'] as Map<String, dynamic>?) ?? {},
         entityName: json['entity_name'],
-        readAt: json['read_at'] != null
-            ? DateTime.tryParse(json['read_at'])
-            : null,
+        readAt:
+            json['read_at'] != null ? DateTime.tryParse(json['read_at']) : null,
         snoozedTill: json['snoozed_till'] != null
             ? DateTime.tryParse(json['snoozed_till'])
             : null,
@@ -59,7 +58,6 @@ class PlaneNotification {
   }
 
   String? get workspaceSlug {
-    return data['workspace_slug']?.toString() ??
-        data['workspace']?.toString();
+    return data['workspace_slug']?.toString() ?? data['workspace']?.toString();
   }
 }

@@ -41,7 +41,8 @@ class IssueRepository {
     String projectId,
     Map<String, dynamic> data,
   ) async {
-    final issue = await IssueService.createIssue(workspaceSlug, projectId, data);
+    final issue =
+        await IssueService.createIssue(workspaceSlug, projectId, data);
     _issueCache.remove('$workspaceSlug/$projectId');
     return issue;
   }
@@ -52,7 +53,8 @@ class IssueRepository {
     String issueId,
     Map<String, dynamic> data,
   ) async {
-    final issue = await IssueService.updateIssue(workspaceSlug, projectId, issueId, data);
+    final issue =
+        await IssueService.updateIssue(workspaceSlug, projectId, issueId, data);
     _issueCache.remove('$workspaceSlug/$projectId');
     return issue;
   }

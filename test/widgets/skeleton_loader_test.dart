@@ -5,7 +5,8 @@ import 'package:plane_mobile/widgets/skeleton_loader.dart';
 void main() {
   /// The alpha the shimmer is currently painting its blocks at.
   double shimmerAlpha(WidgetTester tester) {
-    final container = tester.widgetList<Container>(find.byType(Container)).first;
+    final container =
+        tester.widgetList<Container>(find.byType(Container)).first;
     return (container.decoration! as BoxDecoration).color!.a;
   }
 

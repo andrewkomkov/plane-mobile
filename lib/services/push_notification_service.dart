@@ -81,9 +81,8 @@ class PushNotificationService {
       ));
       await dio.post('/auth/mobile/register-device/', data: {
         'fcm_token': token,
-        'platform': defaultTargetPlatform == TargetPlatform.iOS
-            ? 'ios'
-            : 'android',
+        'platform':
+            defaultTargetPlatform == TargetPlatform.iOS ? 'ios' : 'android',
       });
       developer.log('Device registered for push', name: 'push');
     } catch (e) {
