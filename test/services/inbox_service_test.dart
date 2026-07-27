@@ -122,8 +122,15 @@ void main() {
 
   setUpAll(() {
     sqfliteFfiInit();
-    databaseFactory = databaseFactoryFfi;
+    // No isolate, and in memory. The default factory writes a real file under
+    // `getDatabasesPath()`, which is read-only on the Linux CI runner — the
+    // suite passed on a Mac and failed there with "attempt to write a readonly
+    // database". A unit test has no business writing to disk anyway.
+    databaseFactory = databaseFactoryFfiNoIsolate;
+    AppDatabase.debugPath = inMemoryDatabasePath;
   });
+
+  tearDownAll(() => AppDatabase.debugPath = null);
 
   setUp(() async {
     FlutterSecureStorage.setMockInitialValues({

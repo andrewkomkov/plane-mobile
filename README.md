@@ -108,6 +108,25 @@ All three run on every push and every pull request, alongside
 (`test/e2e/fake_plane.dart`) and asserts both what they draw and what they
 send. Those run in CI; the `integration_test/` suite below does not.
 
+### A workspace to look at
+
+`tool/seed_demo.py` fills a workspace with a project that exercises every
+screen — five states, every priority, six labels, three modules, a finished
+sprint and a running one, sub-issues, comments, and a few work items
+deliberately overdue so the analytics screen has something to count. It talks
+to Plane's external API with a plain token, so it needs neither the proxy nor
+a session:
+
+```sh
+PLANE_BASE_URL=https://plane.example.com \
+PLANE_API_KEY=plane_api_... \
+PLANE_WORKSPACE_SLUG=my-workspace \
+  python3 tool/seed_demo.py
+```
+
+`--reset` removes only a project whose identifier is `AUR`; `--dry-run`
+answers its own reads, so it prints what it would do without credentials.
+
 ### Integration tests
 
 `integration_test/` drives the real app against a real instance, so it needs
