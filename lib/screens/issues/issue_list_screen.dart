@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../widgets/m3e/icon_button.dart';
 import '../../widgets/m3e/text_field.dart';
 import '../../services/archived_issue_service.dart';
+import '../../services/bulk_service.dart';
 import '../../services/draft_issue_service.dart';
 import '../../services/view_service.dart';
 import '../../config/theme.dart';
@@ -15,6 +16,7 @@ import '../../models/state.dart';
 import '../../utils/api_error.dart';
 import '../../utils/issue_grouping.dart';
 import '../../widgets/archive_toggle.dart';
+import '../../widgets/confirm_dialog.dart';
 import '../../widgets/issue_listing_switcher.dart';
 import '../../widgets/issue_row.dart';
 import '../../widgets/section_header.dart';
@@ -54,6 +56,24 @@ class IssueListScreen extends ConsumerStatefulWidget {
 
 class _IssueListScreenState extends ConsumerState<IssueListScreen>
     with AutomaticKeepAliveClientMixin {
+  /// The work items picked for a bulk action, by id.
+  ///
+  /// Empty means the list is in its normal mode. Entering selection is a
+  /// long-press on a row, which is the only gesture on this screen that was
+  /// still unspoken for — a checkbox in every row would cost 40dp of width on
+  /// a screen that already has none to give.
+  final Set<String> _selection = {};
+
+  bool get _selecting => _selection.isNotEmpty;
+
+  void _toggleSelected(String id) {
+    setState(() {
+      if (!_selection.remove(id)) _selection.add(id);
+    });
+  }
+
+  void _clearSelection() => setState(_selection.clear);
+
   final DisplayState _display = DisplayState();
 
   /// The four selections the [FilterBar] holds.
@@ -536,6 +556,122 @@ class _IssueListScreenState extends ConsumerState<IssueListScreen>
 
   Widget _liveList() {
     final grouped = _grouped;
+    final list = _liveListView(grouped);
+    if (!_selecting) return list;
+    // The bar sits under the list rather than over it, so the rows it acts on
+    // stay readable while it is up.
+    return Column(children: [Expanded(child: list), _selectionBar()]);
+  }
+
+  /// What the selection can be done to.
+  ///
+  /// Archiving and deleting only. Plane has three bulk endpoints and the third
+  /// creates labels, which is not something a selection of work items can ask
+  /// for.
+  Widget _selectionBar() {
+    final scheme = Theme.of(context).colorScheme;
+    return Material(
+      color: scheme.surfaceContainerHigh,
+      child: SafeArea(
+        top: false,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(8, 8, 8, 8),
+          child: Row(
+            children: [
+              IconButton(
+                icon: const Icon(Icons.close),
+                tooltip: 'Cancel the selection',
+                onPressed: _clearSelection,
+              ),
+              Expanded(
+                child: Text(
+                  '${_selection.length} selected',
+                  style: Theme.of(context).textTheme.labelLarge,
+                ),
+              ),
+              TextButton.icon(
+                icon: const Icon(Icons.archive_outlined),
+                label: const Text('Archive'),
+                onPressed: _bulkArchive,
+              ),
+              TextButton.icon(
+                icon: const Icon(Icons.delete_outline),
+                label: const Text('Delete'),
+                style: TextButton.styleFrom(foregroundColor: scheme.error),
+                onPressed: _bulkDelete,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// Archive everything selected.
+  ///
+  /// Plane refuses to archive anything that is not completed or cancelled, and
+  /// answers 400 naming the first offender rather than archiving the rest — so
+  /// the unarchivable ones are dropped here and the count says how many.
+  Future<void> _bulkArchive() async {
+    final eligible = [
+      for (final issue in _filteredAndSorted)
+        if (_selection.contains(issue.id) &&
+            const {'completed', 'cancelled'}
+                .contains(_states[issue.state]?.group))
+          issue.id,
+    ];
+    final skipped = _selection.length - eligible.length;
+
+    if (eligible.isEmpty) {
+      say(context, 'Only completed or cancelled work items can be archived');
+      return;
+    }
+    final ok = await confirmDestructive(
+      context,
+      title: 'Archive ${eligible.length}?',
+      message: skipped == 0
+          ? 'They leave the list and can be restored from the archive.'
+          : '$skipped of them are not finished and stay where they are.',
+      confirmLabel: 'Archive',
+    );
+    if (!ok) return;
+
+    try {
+      await BulkService.archiveIssues(
+          widget.workspaceSlug, widget.projectId, eligible);
+      _clearSelection();
+      widget.onRefresh();
+    } catch (e) {
+      if (mounted) {
+        say(context, describeApiError(e, fallback: 'Could not archive them'));
+      }
+    }
+  }
+
+  Future<void> _bulkDelete() async {
+    final ids = _selection.toList();
+    final ok = await confirmDestructive(
+      context,
+      title: 'Delete ${ids.length}?',
+      message: 'They are gone for good, along with their place in any cycle '
+          'or module. Only a project admin can do this.',
+      confirmLabel: 'Delete',
+    );
+    if (!ok) return;
+
+    try {
+      await BulkService.deleteIssues(
+          widget.workspaceSlug, widget.projectId, ids);
+      _clearSelection();
+      widget.onRefresh();
+    } catch (e) {
+      if (mounted) {
+        say(context, describeApiError(e, fallback: 'Could not delete them'));
+      }
+    }
+  }
+
+  Widget _liveListView(Map<String, List<Issue>> grouped) {
     return RefreshIndicator(
       onRefresh: widget.onRefresh,
       child: _filteredAndSorted.isEmpty
@@ -571,6 +707,10 @@ class _IssueListScreenState extends ConsumerState<IssueListScreen>
                     return IssueRow(
                       issue: issue,
                       state: state,
+                      selected:
+                          _selecting ? _selection.contains(issue.id) : null,
+                      onLongPress: () => _toggleSelected(issue.id),
+                      longPressHint: 'Select for a bulk action',
                       identifier: widget.projectIdentifier,
                       showId: _display.rowProperties.contains('id'),
                       showPriority: _display.rowProperties.contains('priority'),
@@ -583,6 +723,13 @@ class _IssueListScreenState extends ConsumerState<IssueListScreen>
                       allLabels: _labels,
                       allMembers: _members,
                       onTap: () async {
+                        // While selecting, a tap adds and removes rather than
+                        // opening: leaving the screen mid-selection and coming
+                        // back to a half-made one is worse than either.
+                        if (_selecting) {
+                          _toggleSelected(issue.id);
+                          return;
+                        }
                         await Navigator.push(
                             context,
                             MaterialPageRoute(

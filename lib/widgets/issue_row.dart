@@ -52,6 +52,12 @@ class IssueRow extends StatelessWidget {
   /// the board card currently under the finger.
   final bool highlighted;
 
+  /// Whether this row is picked for a bulk action, or null when the list is
+  /// not selecting at all. Null and false are different: false draws the
+  /// unpicked half of a selection, which on a list nobody is selecting would
+  /// be a mark with no meaning.
+  final bool? selected;
+
   final int maxTitleLines;
   final PlaneRowDensity density;
 
@@ -107,6 +113,7 @@ class IssueRow extends StatelessWidget {
     this.showSubIssues = false,
     this.unread = false,
     this.highlighted = false,
+    this.selected,
     this.maxTitleLines = 1,
     this.density = PlaneRowDensity.standard,
     this.semanticExtras = const [],
@@ -160,6 +167,7 @@ class IssueRow extends StatelessWidget {
 
     return PlaneRow(
       density: density,
+      selected: selected,
       icon: showState ? PlaneTheme.stateIcon(state?.group ?? 'backlog') : null,
       iconColor: PlaneTheme.stateGroupColor(context, state?.group ?? 'backlog'),
       identifier: _showId && identifier != null
