@@ -18,6 +18,48 @@ class NavItem {
   });
 }
 
+/// Gap between the glass bar and the bottom of its safe area.
+const double _kNavBarOutset = 8;
+
+/// Gap between the top of the glass bar and whatever scrolls beneath it.
+const double _kNavBarContentGap = 8;
+
+/// Vertical space [AppNavBar] occupies, including the gesture inset under it.
+///
+/// The bar floats over the body of a Scaffold with `extendBody: true`, so
+/// every screen that scrolls beneath one has to pad its list by this much or
+/// lose the last row behind the glass. Six screens were doing that with a
+/// literal — 96 on one, 100 on five — against a bar that is 60dp only at a
+/// text scale of 1.0 and sits above an inset that is 34dp on a notched phone
+/// and 0 on a desktop. Both guesses were wrong somewhere.
+///
+/// Two answers, and the larger wins, because each is zero exactly where the
+/// other is authoritative:
+///
+/// * Inside the body of the Scaffold that hosts the bar, Flutter has already
+///   laid the bar out and hands the body its measured height as
+///   `padding.bottom` — the real number, whatever the bar did about the text
+///   scale. That same Scaffold zeroes both `padding.bottom` and
+///   `viewPadding.bottom` on the way in, so the arithmetic below cannot see
+///   the gesture inset from there.
+/// * Anywhere else — beside the bar, or in a test that pumps it alone — there
+///   is nothing measured to read, and the geometry the bar builds itself from
+///   is what is left.
+double appNavBarHeight(BuildContext context) {
+  final media = MediaQuery.of(context);
+  final measured = media.padding.bottom;
+  final computed = _NavMetrics.barHeightFor(context) +
+      _kNavBarOutset +
+      media.viewPadding.bottom;
+  return measured > computed ? measured : computed;
+}
+
+/// [appNavBarHeight] plus the gap that keeps the last row off the glass.
+///
+/// What a list's bottom padding wants, as opposed to the bar's own height.
+double appNavBarClearance(BuildContext context) =>
+    appNavBarHeight(context) + _kNavBarContentGap;
+
 /// Bottom navigation, rebuilt on the Material 3 Expressive nav bar.
 ///
 /// M3E's contribution here is the active indicator: a pill that physically
@@ -30,6 +72,15 @@ class AppNavBar extends StatelessWidget {
   final int currentIndex;
   final ValueChanged<int> onTap;
   final bool showSearch;
+
+  /// Whether Search is the destination currently on screen.
+  ///
+  /// The search affordance sits outside the pill, so the travelling indicator
+  /// cannot mark it — and while Search was showing, `currentIndex` was -1 and
+  /// no destination anywhere in the bar was marked at all. The glass tile
+  /// carries the state itself instead: tinted icon, and a selected semantics
+  /// node so a screen reader is told which destination it is on.
+  final bool searchSelected;
   final VoidCallback? onSearchTap;
   final VoidCallback? onSearchDoubleTap;
   final VoidCallback? onSearchLongPress;
@@ -43,6 +94,7 @@ class AppNavBar extends StatelessWidget {
     required this.currentIndex,
     required this.onTap,
     this.showSearch = false,
+    this.searchSelected = false,
     this.onSearchTap,
     this.onSearchDoubleTap,
     this.onSearchLongPress,
@@ -67,7 +119,7 @@ class AppNavBar extends StatelessWidget {
     return SafeArea(
       top: false,
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+        padding: const EdgeInsets.fromLTRB(16, 0, 16, _kNavBarOutset),
         child: Row(
           children: [
             Expanded(
@@ -102,15 +154,18 @@ class AppNavBar extends StatelessWidget {
                 // dropped this gesture for assistive tech.
                 onDoubleTap: onSearchDoubleTap,
                 semanticLabel: 'Search',
+                selected: searchSelected,
                 child: Builder(
                   builder: (context) => M3EGlassContainer(
                     height: _NavMetrics.barHeightFor(context),
                     width: 56,
                     child: Center(
                       child: Icon(
-                        Icons.search,
+                        searchSelected ? Icons.search : Icons.search_outlined,
                         size: 22,
-                        color: theme.colorScheme.onSurfaceVariant,
+                        color: searchSelected
+                            ? theme.colorScheme.primary
+                            : theme.colorScheme.onSurfaceVariant,
                       ),
                     ),
                   ),

@@ -102,5 +102,52 @@ void main() {
       ));
       expect(find.text('Try adjusting filters'), findsNothing);
     });
+
+    testWidgets('shows the action under the copy', (tester) async {
+      var tapped = false;
+      await tester.pumpWidget(wrapWidget(
+        EmptyStateWidget(
+          message: 'No cycles',
+          action: FilledButton(
+            onPressed: () => tapped = true,
+            child: const Text('New cycle'),
+          ),
+        ),
+      ));
+
+      final message = tester.getBottomLeft(find.text('No cycles')).dy;
+      expect(
+          tester.getTopLeft(find.text('New cycle')).dy, greaterThan(message));
+
+      await tester.tap(find.text('New cycle'));
+      expect(tapped, isTrue);
+    });
+
+    testWidgets('has no action by default', (tester) async {
+      await tester.pumpWidget(wrapWidget(
+        const EmptyStateWidget(message: 'No cycles'),
+      ));
+      expect(find.byType(FilledButton), findsNothing);
+    });
+  });
+
+  group('ScrollableEmptyState', () {
+    testWidgets('forwards the action to the empty state', (tester) async {
+      // The four list screens that wanted a button under their empty state
+      // could not use this widget at all before, and hand-rolled the column
+      // instead. It has to arrive through here or they go back to doing that.
+      await tester.pumpWidget(wrapWidget(
+        ScrollableEmptyState(
+          message: 'No pages',
+          action: FilledButton(
+            onPressed: () {},
+            child: const Text('New page'),
+          ),
+        ),
+      ));
+
+      expect(find.text('No pages'), findsOneWidget);
+      expect(find.text('New page'), findsOneWidget);
+    });
   });
 }

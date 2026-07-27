@@ -23,8 +23,8 @@ class ErrorStateWidget extends StatelessWidget {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(Icons.error_outline, size: 40,
-              color: theme.colorScheme.error.withValues(alpha: 0.7)),
+          Icon(Icons.error_outline,
+              size: 40, color: theme.colorScheme.error.withValues(alpha: 0.7)),
           const SizedBox(height: 12),
           Text(
             message ?? 'Something went wrong',
@@ -94,12 +94,16 @@ class ScrollableEmptyState extends StatelessWidget {
   final String? subtitle;
   final EdgeInsetsGeometry padding;
 
+  /// The way out of the empty state, where the user has one.
+  final Widget? action;
+
   const ScrollableEmptyState({
     super.key,
     required this.message,
     this.icon,
     this.subtitle,
     this.padding = EdgeInsets.zero,
+    this.action,
   });
 
   @override
@@ -110,6 +114,7 @@ class ScrollableEmptyState extends StatelessWidget {
         message: message,
         icon: icon,
         subtitle: subtitle,
+        action: action,
       ),
     );
   }
@@ -120,11 +125,20 @@ class EmptyStateWidget extends StatelessWidget {
   final IconData? icon;
   final String? subtitle;
 
+  /// A button under the copy, for the screens where the empty state is
+  /// something the user can act on.
+  ///
+  /// Four list screens wrapped this widget in a `Column` to put a "New …"
+  /// button beneath it, which meant four different gaps between the two and a
+  /// [ScrollableEmptyState] none of them could use. The gap belongs here.
+  final Widget? action;
+
   const EmptyStateWidget({
     super.key,
     required this.message,
     this.icon,
     this.subtitle,
+    this.action,
   });
 
   @override
@@ -135,8 +149,10 @@ class EmptyStateWidget extends StatelessWidget {
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           if (icon != null) ...[
-            Icon(icon, size: 40,
-                color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.5)),
+            Icon(icon,
+                size: 40,
+                color:
+                    theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.5)),
             const SizedBox(height: 12),
           ],
           Text(
@@ -150,10 +166,15 @@ class EmptyStateWidget extends StatelessWidget {
             Text(
               subtitle!,
               style: theme.textTheme.bodySmall?.copyWith(
-                color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.7),
+                color:
+                    theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.7),
               ),
               textAlign: TextAlign.center,
             ),
+          ],
+          if (action != null) ...[
+            const SizedBox(height: 16),
+            action!,
           ],
         ],
       ),
