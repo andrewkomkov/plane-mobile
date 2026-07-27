@@ -1,5 +1,9 @@
 # plane-mobile
 
+[![CI](https://github.com/andrewkomkov/plane-mobile/actions/workflows/ci.yml/badge.svg)](https://github.com/andrewkomkov/plane-mobile/actions/workflows/ci.yml)
+[![MegaLinter](https://github.com/andrewkomkov/plane-mobile/actions/workflows/megalinter.yml/badge.svg)](https://github.com/andrewkomkov/plane-mobile/actions/workflows/megalinter.yml)
+[![Licence: AGPL v3](https://img.shields.io/badge/licence-AGPL--3.0-blue.svg)](LICENSE)
+
 A Flutter client for a self-hosted [Plane](https://plane.so) instance.
 
 Built against a real deployment rather than against Plane's public docs: the
@@ -8,8 +12,8 @@ server's own route table, and every claim in it is either backed by a test or
 marked as unverified.
 
 > **Status:** works, used daily against one instance. Android is the platform
-> that gets exercised; iOS builds but is less travelled. The other four Flutter
-> targets are unmodified scaffolding.
+> that gets exercised; iOS compiles in CI but nobody runs it. The other four
+> Flutter targets are unmodified scaffolding.
 
 ## What it does
 
@@ -69,6 +73,14 @@ flutter run
 The app asks for your instance URL and signs you in on first launch; there is
 nothing to configure at build time.
 
+### Releases and updates
+
+Merging to `main` opens a release pull request via
+[release-please](https://github.com/googleapis/release-please); merging that
+tags the release and CI attaches a signed APK with its SHA-256. The app checks
+those releases itself and can install one in place — see
+`lib/services/update_service.dart` for the trust chain.
+
 ### Push notifications (optional)
 
 Push needs a Firebase project. `android/app/google-services.json` is not in the
@@ -82,14 +94,19 @@ Firebase is unavailable.
 ## Development
 
 ```sh
-flutter analyze          # must be clean
-flutter test             # unit and widget tests
-flutter test --coverage  # with lcov output
+flutter analyze --fatal-infos --fatal-warnings   # must be clean
+dart format --output=none --set-exit-if-changed .
+flutter test                                     # 743 tests
+flutter test --coverage                          # with lcov output
 ```
 
-`flutter analyze` and the test suite run on every push and every pull request,
-alongside [MegaLinter](https://megalinter.io). See
+All three run on every push and every pull request, alongside
+[MegaLinter](https://megalinter.io), an Android build and an iOS build. See
 [`CONTRIBUTING.md`](CONTRIBUTING.md).
+
+`test/e2e/` boots real screens against a fake Plane instance
+(`test/e2e/fake_plane.dart`) and asserts both what they draw and what they
+send. Those run in CI; the `integration_test/` suite below does not.
 
 ### Integration tests
 
