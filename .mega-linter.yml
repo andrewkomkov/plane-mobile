@@ -1,68 +1,84 @@
 ---
 # MegaLinter configuration.
 #
-# Dart is deliberately absent: `flutter analyze --fatal-infos` and
-# `dart format --set-exit-if-changed` run in ci.yml and are stricter than
-# anything MegaLinter would apply. This covers everything else in the tree —
-# the workflows, the Gradle and Kotlin sources, the docs, and a secrets sweep.
+# Dart is deliberately absent: `flutter analyze --fatal-infos
+# --fatal-warnings` and `dart format --set-exit-if-changed` run in ci.yml and
+# are stricter than anything MegaLinter would apply. This covers everything
+# else in the tree — the workflows, the Kotlin, the configuration, the docs —
+# plus a secrets sweep, which is the check that matters most for a repository
+# going public.
+#
+# Anything switched off below is switched off for a stated reason. A linter set
+# that fails on noise is a linter set nobody reads.
 
 APPLY_FIXES: none
-
-# Fail the run on any error rather than reporting and passing.
 DISABLE_ERRORS: false
+SHOW_ELAPSED_TIME: true
+PRINT_ALL_FILES: false
+FLAVOR_SUGGESTIONS: false
 
 ENABLE_LINTERS:
-  # Repository-wide
+  # Secrets. The reason this runs at all.
   - REPOSITORY_GITLEAKS
   - REPOSITORY_SECRETLINT
-  - REPOSITORY_TRIVY
-  - REPOSITORY_GRYPE
-  - REPOSITORY_CHECKOV
   # CI and configuration
   - ACTION_ACTIONLINT
   - YAML_YAMLLINT
   - YAML_PRETTIER
   - JSON_JSONLINT
-  - JSON_PRETTIER
   # Docs
   - MARKDOWN_MARKDOWNLINT
-  - MARKDOWN_MARKDOWN_LINK_CHECK
   - SPELL_CSPELL
-  # Native sources
+  # Native and tooling sources
   - KOTLIN_KTLINT
   - KOTLIN_DETEKT
   - BASH_SHELLCHECK
   - BASH_SHFMT
   - PYTHON_RUFF
-  # Text hygiene
   - COPYPASTE_JSCPD
   - EDITORCONFIG_EDITORCONFIG_CHECKER
+
+# Not enabled, and why:
+#
+# - REPOSITORY_TRIVY / REPOSITORY_GRYPE: both scan container images and OS
+#   packages. There is no image here, and neither reads pubspec.lock, so all
+#   they contributed was a build failure when their vulnerability database
+#   would not download.
+# - REPOSITORY_CHECKOV: infrastructure-as-code. There is none.
+# - MARKDOWN_MARKDOWN_LINK_CHECK: walks every external link on every run, so a
+#   third party's downtime fails the build.
+# - JSON_PRETTIER: it reformats .cspell.json and the release-please manifest
+#   into a shape release-please then rewrites. Two tools, one file, no winner.
 
 FILTER_REGEX_EXCLUDE: >-
   (^|/)(build|\.dart_tool|ios/Pods|android/\.gradle|\.git|megalinter-reports)/|
   ^LICENSE$|
+  ^CHANGELOG\.md$|
   ^pubspec\.lock$|
   ^ios/Podfile\.lock$|
   (^|/)gradlew(\.bat)?$|
-  ^android/gradle/
+  ^android/gradle/|
+  ^\.metadata$
 
-# One long generated table per document; wrapping it would make it unreadable
-# and the line-length rule is the only thing it trips.
 MARKDOWN_MARKDOWNLINT_CONFIG_FILE: .markdownlint.yml
 
 SPELL_CSPELL_CONFIG_FILE: .cspell.json
 SPELL_CSPELL_FILE_EXTENSIONS:
   - .md
 
-# Duplicate detection is worth having on the Dart sources, but the widget tests
-# legitimately repeat their fixtures.
-COPYPASTE_JSCPD_FILTER_REGEX_EXCLUDE: (^test/|^integration_test/)
+# detekt replaces its whole rule set with the file given to --config unless
+# told to build on the defaults, which would leave the four overrides in
+# detekt-config.yml as the entire configuration.
+KOTLIN_DETEKT_ARGUMENTS:
+  - --build-upon-default-config
+  - --config
+  - detekt-config.yml
 
-REPOSITORY_TRIVY_ARGUMENTS:
-  - --severity
-  - HIGH,CRITICAL
-
-# The report is uploaded as an artifact by the workflow; no need for a second
-# copy in the job summary.
-PRINT_ALL_FILES: false
-FLAVOR_SUGGESTIONS: false
+# Duplication is worth catching in the sources; the tests legitimately repeat
+# their fixtures, and the generated platform registrants are not ours. 3% over
+# a repository this size is a signal rather than a tripwire — the default of 0%
+# fails on the second identical import block.
+COPYPASTE_JSCPD_ARGUMENTS:
+  - --threshold
+  - "3"
+COPYPASTE_JSCPD_FILTER_REGEX_EXCLUDE: (^test/|^integration_test/|generated_plugin)

@@ -15,6 +15,16 @@ max_line_length = 80
 [*.{kt,kts,gradle}]
 indent_size = 4
 
+[*.{kt,kts}]
+# ktlint reads its rules from here.
+max_line_length = 120
+ktlint_code_style = intellij_idea
+# Compose components are PascalCase; the rule assumes camelCase everywhere.
+ktlint_standard_function-naming = disabled
+# The Flutter-generated package name carries an underscore and has to match
+# the Android applicationId, so it is not ours to rename.
+ktlint_standard_package-name = disabled
+
 [*.py]
 indent_size = 4
 
