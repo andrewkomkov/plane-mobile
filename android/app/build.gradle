@@ -85,7 +85,10 @@ android {
     signingConfigs {
         release {
             if (keystoreProperties.containsKey('storeFile')) {
-                storeFile file(keystoreProperties['storeFile'])
+                // Relative to android/, the directory key.properties itself is
+                // read from — not to android/app/, which is what a bare file()
+                // would resolve against here. Absolute paths pass through.
+                storeFile rootProject.file(keystoreProperties['storeFile'])
                 storePassword keystoreProperties['storePassword']
                 keyAlias keystoreProperties['keyAlias']
                 keyPassword keystoreProperties['keyPassword']
