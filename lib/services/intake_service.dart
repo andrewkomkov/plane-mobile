@@ -171,6 +171,59 @@ class IntakeService {
     return IntakeIssue.fromJson(response.data);
   }
 
+  /// Submit something into the triage queue.
+  ///
+  /// Three things the route name does not tell you, all of them enforced by
+  /// `IntakeIssueViewSet.create`:
+  ///
+  /// - The work item goes in **nested under `issue`**, not at the top level.
+  ///   A flat payload is read as an entry with no name and refused.
+  /// - A name is required, and a priority outside Plane's five is refused by
+  ///   name rather than coerced.
+  /// - The state is not the caller's to choose: the view overwrites
+  ///   `issue.state_id` with the project's triage state before saving.
+  static Future<IntakeIssue> createIntakeIssue(
+    String workspaceSlug,
+    String projectId, {
+    required String name,
+    String? descriptionHtml,
+    String priority = 'none',
+  }) async {
+    final dio = await ApiClient.getInstance();
+    final response = await dio.post(
+      '/workspaces/$workspaceSlug/projects/$projectId/intake-issues/',
+      data: {
+        'issue': {
+          'name': name,
+          'priority': priority,
+          if (descriptionHtml != null) 'description_html': descriptionHtml,
+        },
+      },
+    );
+    return IntakeIssue.fromJson(response.data);
+  }
+
+  /// Remove an entry from the queue.
+  ///
+  /// This deletes the **work item too** for anything not yet accepted:
+  /// `destroy` checks the status and, for pending, declined, snoozed or
+  /// duplicate, deletes the issue before the intake row. Only an entry that
+  /// was accepted leaves its work item behind. Nothing about the route says
+  /// so, which is why the screen asks first.
+  ///
+  /// Takes the *work item* id, like every other write here — see the note at
+  /// the top of this class.
+  static Future<void> deleteIntakeIssue(
+    String workspaceSlug,
+    String projectId,
+    String issueId,
+  ) async {
+    final dio = await ApiClient.getInstance();
+    await dio.delete(
+      '/workspaces/$workspaceSlug/projects/$projectId/intake-issues/$issueId/',
+    );
+  }
+
   /// Moves an entry to [status] and reports whether the server agreed.
   ///
   /// Wraps [updateIntakeIssue] with the silent-no-op check described there:

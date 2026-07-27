@@ -28,6 +28,9 @@ import '../workspace/workspace_issues_screen.dart';
 import '../workspace/workspace_members_screen.dart';
 import '../workspace/workspace_modules_screen.dart';
 import '../workspace/workspace_views_screen.dart';
+import '../workspace/home_widgets_screen.dart';
+import '../workspace/integrations_screen.dart';
+import '../../services/export_service.dart';
 
 /// The workspace-scoped tab: who you are, where else you can go, and the way
 /// out.
@@ -273,6 +276,34 @@ class _MenuTabState extends ConsumerState<MenuTab> {
     return _version.isEmpty ? null : 'Version $_version';
   }
 
+  /// Queue a work-item export of the whole workspace.
+  ///
+  /// Nothing is downloaded: Plane queues a background job and delivers the
+  /// file by email. Saying so is the whole of the feedback, because there is
+  /// no progress to show and nothing arrives on the device.
+  Future<void> _exportIssues() async {
+    final format = await BottomSheetPicker.show<ExportFormat>(
+      context: context,
+      title: 'Export work items',
+      subtitle: 'Every project you belong to',
+      items: [
+        for (final f in ExportFormat.values)
+          BottomSheetPickerItem(
+            value: f,
+            label: f.label,
+            icon: Icons.description_outlined,
+          ),
+      ],
+    );
+    if (format == null || !mounted) return;
+    try {
+      await ExportService.exportIssues(widget.workspaceSlug, format: format);
+      if (mounted) say(context, 'Export queued. It arrives by email.');
+    } catch (_) {
+      if (mounted) say(context, 'Could not queue the export');
+    }
+  }
+
   void _push(Widget screen) {
     Navigator.push(context, MaterialPageRoute(builder: (_) => screen));
   }
@@ -423,11 +454,28 @@ class _MenuTabState extends ConsumerState<MenuTab> {
             onTap: () => _push(
                 WorkspaceModulesScreen(workspaceSlug: widget.workspaceSlug)),
           ),
+          _menuRow(
+            icon: Icons.push_pin_outlined,
+            label: 'Notes & links',
+            onTap: () =>
+                _push(HomeWidgetsScreen(workspaceSlug: widget.workspaceSlug)),
+          ),
+          _menuRow(
+            icon: Icons.download_outlined,
+            label: 'Export work items',
+            onTap: _exportIssues,
+          ),
           const SectionHeader(label: 'Settings'),
           _menuRow(
             icon: Icons.palette_outlined,
             label: 'Profile & appearance',
             onTap: () => _push(ProfileScreen(user: widget.user)),
+          ),
+          _menuRow(
+            icon: Icons.key_outlined,
+            label: 'Tokens & webhooks',
+            onTap: () =>
+                _push(IntegrationsScreen(workspaceSlug: widget.workspaceSlug)),
           ),
           // The app is installed from an APK, so there is no store to deliver
           // an update. This row is the only channel.

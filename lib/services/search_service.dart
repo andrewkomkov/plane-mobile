@@ -19,6 +19,54 @@ class SearchService {
     'module': 'modules',
   };
 
+  /// Work items in one project, matched on name or on `PLM-123`.
+  ///
+  /// A different endpoint from [searchAll], not a filtered call to it:
+  /// `IssueSearchEndpoint` exists to feed the pickers that need work items and
+  /// nothing else — parent, relation, cycle and module — and it takes the
+  /// flags that make each of those correct.
+  ///
+  /// [excludeIssueId] leaves out that work item and, when [forParent] is set,
+  /// its descendants too: a work item cannot be its own parent, and Plane
+  /// excludes the subtree so a cycle cannot be built by choosing a child.
+  static Future<List<Map<String, dynamic>>> searchProjectIssues(
+    String workspaceSlug,
+    String projectId,
+    String query, {
+    String? excludeIssueId,
+    bool forParent = false,
+    bool forRelation = false,
+  }) async {
+    if (query.trim().isEmpty) return const [];
+    try {
+      final dio = await ApiClient.getInstance();
+      final response = await dio.get(
+        '/workspaces/$workspaceSlug/projects/$projectId/search-issues/',
+        queryParameters: {
+          'search': query,
+          // Left unset the endpoint searches the whole workspace; this one is
+          // project-scoped by definition.
+          'workspace_search': 'false',
+          if (forParent) 'parent': 'true',
+          if (forRelation) 'issue_relation': 'true',
+          if (excludeIssueId != null) 'issue_id': excludeIssueId,
+        },
+      );
+      // A bare list, not an envelope: the endpoint returns `issues.values(...)`
+      // sliced to 100 and does not paginate. Rows carry the double-underscore
+      // spellings — `project__identifier`, `state__group` — because they come
+      // straight from `.values()` rather than through a serialiser.
+      final rows = response.data;
+      if (rows is! List) return const [];
+      return rows
+          .whereType<Map>()
+          .map((e) => Map<String, dynamic>.from(e))
+          .toList();
+    } catch (_) {
+      return const [];
+    }
+  }
+
   static Future<Map<String, List<Map<String, dynamic>>>> searchAll(
       String workspaceSlug, String query) async {
     try {
