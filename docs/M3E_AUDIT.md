@@ -1250,7 +1250,7 @@ the untouched palette, the Compose bridge kept opt-in per call site, the
 
 ## Appendix: verification commands
 
-```
+```text
 # radii, colour and type literals — all should stay at zero
 grep -rn "BorderRadius.circular([0-9]" lib/ | grep -v M3EShape
 grep -rn "Color(0x" lib/ --include='*.dart' | grep -v config/theme.dart

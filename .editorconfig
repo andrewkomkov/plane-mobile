@@ -9,8 +9,11 @@ indent_style = space
 indent_size = 2
 
 [*.dart]
-# `dart format` decides; these only stop an editor from fighting it.
-max_line_length = 80
+# `dart format` is the only authority on Dart layout, and CI runs it with
+# --set-exit-if-changed. A second limit here only creates a disagreement
+# neither tool can win — it does not rewrap a comment that formatter leaves at
+# 81 columns, it just reports it.
+max_line_length = off
 
 [*.{kt,kts,gradle}]
 indent_size = 4

@@ -183,7 +183,7 @@ tracks a changing target. Full token table in
 
 ## Navigation Flow
 
-```
+```text
 SetupScreen (login)
     |
     v

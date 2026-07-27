@@ -23,7 +23,7 @@ is built from roles passed over from the Dart theme so the two never diverge.
 
 Verify it is genuinely in the build:
 
-```
+```sh
 cd android && ./gradlew :app:dependencies --configuration debugRuntimeClasspath \
   | grep material3
 # +--- androidx.compose.material3:material3:1.5.0-alpha24
@@ -274,7 +274,7 @@ Dart-side test hooks. Flutter enables its semantics tree as soon as an
 accessibility client attaches, and `adb shell uiautomator dump` is one — so
 every labelled widget shows up as a node with `content-desc` and a tap target.
 
-```
+```text
 tool/adb_drive.py tree              # labelled nodes + tap coordinates
 tool/adb_drive.py check             # tappable nodes with NO label — the gaps
 tool/adb_drive.py tap "New issue"   # tap by label

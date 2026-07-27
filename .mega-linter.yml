@@ -54,7 +54,7 @@ ENABLE_LINTERS:
 # so every alternative after the first arrives as " ^LICENSE$" and matches
 # nothing — which is how Podfile.lock reached gitleaks and had its CocoaPods
 # checksums reported as API keys.
-FILTER_REGEX_EXCLUDE: '(^|/)(build|\.dart_tool|ios/Pods|android/\.gradle|\.git|megalinter-reports)/|^LICENSE$|^CHANGELOG\.md$|^pubspec\.lock$|^ios/Podfile\.lock$|(^|/)gradlew(\.bat)?$|^android/gradle/|^\.metadata$|^ios/Runner\.xcodeproj/|^ios/Runner/Base\.lproj/'
+FILTER_REGEX_EXCLUDE: '(^|/)(build|\.dart_tool|ios/Pods|android/\.gradle|\.git|megalinter-reports)/|^LICENSE$|^CHANGELOG\.md$|^pubspec\.lock$|^ios/Podfile\.lock$|(^|/)gradlew(\.bat)?$|^android/gradle/|^\.metadata$|^ios/Runner\.xcodeproj/|^ios/Runner\.xcworkspace/|^ios/Runner/Base\.lproj/|^ios/Runner/Assets\.xcassets/'
 
 MARKDOWN_MARKDOWNLINT_CONFIG_FILE: .markdownlint.yml
 
