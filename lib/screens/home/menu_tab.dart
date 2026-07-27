@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../utils/say.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../config/api_client.dart';
@@ -10,6 +11,7 @@ import '../../providers/data_providers.dart';
 import '../../providers/workspace_provider.dart';
 import '../../services/workspace_service.dart';
 import '../../utils/new_issue_flow.dart';
+import '../../widgets/app_navbar.dart';
 import '../../widgets/bottom_sheet_picker.dart';
 import '../../widgets/confirm_dialog.dart';
 import '../../widgets/m3e/flexible_app_bar.dart';
@@ -82,11 +84,8 @@ class _MenuTabState extends ConsumerState<MenuTab> {
   }
 
   Future<void> _showSwitchWorkspace() async {
-    final messenger = ScaffoldMessenger.of(context);
     if (_workspaces.isEmpty) {
-      messenger.showSnackBar(
-        const SnackBar(content: Text('No workspaces found')),
-      );
+      say(context, 'No workspaces found');
       return;
     }
 
@@ -205,7 +204,7 @@ class _MenuTabState extends ConsumerState<MenuTab> {
         ),
       ],
       body: ListView(
-        padding: const EdgeInsets.only(top: 8, bottom: 100),
+        padding: EdgeInsets.only(top: 8, bottom: appNavBarClearance(context)),
         children: [
           if (user != null)
             PlaneRow(
@@ -267,12 +266,7 @@ class _MenuTabState extends ConsumerState<MenuTab> {
                 : 'All synced',
             onTap: () {
               widget.onSyncQueue?.call();
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Syncing queued writes...'),
-                  duration: Duration(seconds: 1),
-                ),
-              );
+              say(context, 'Syncing queued writes…');
             },
           ),
           // The cross-project rollups: the same entities the project tabs show,

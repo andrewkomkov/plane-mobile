@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../utils/say.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../config/theme.dart';
 import '../../providers/data_providers.dart';
@@ -7,6 +8,7 @@ import '../../models/state.dart';
 import '../../models/label.dart';
 import '../../models/member.dart';
 import '../../utils/issue_grouping.dart';
+import '../../widgets/app_navbar.dart';
 import '../../widgets/bottom_sheet_picker.dart';
 import '../../widgets/display_options.dart';
 import '../../widgets/filter_bar.dart';
@@ -215,9 +217,7 @@ class _MyIssuesTabState extends ConsumerState<MyIssuesTab>
     final cache = _cache;
     final projects = cache.getProjects(widget.workspaceSlug) ?? [];
     if (projects.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('No projects available')),
-      );
+      say(context, 'No projects available');
       return;
     }
     if (projects.length == 1) {
@@ -330,7 +330,7 @@ class _MyIssuesTabState extends ConsumerState<MyIssuesTab>
           ),
           Positioned(
             right: 20,
-            bottom: 96,
+            bottom: appNavBarClearance(context),
             child: M3EFabMenu(
               actions: [
                 M3EFabAction(
@@ -360,11 +360,11 @@ class _MyIssuesTabState extends ConsumerState<MyIssuesTab>
     // nothing else on the screen.
     final grouped = _grouped;
     if (grouped.isEmpty) {
-      return const ScrollableEmptyState(
+      return ScrollableEmptyState(
         message: 'No issues',
         icon: Icons.check_circle_outline,
         subtitle: 'All caught up',
-        padding: EdgeInsets.only(bottom: 100),
+        padding: EdgeInsets.only(bottom: appNavBarClearance(context)),
       );
     }
 

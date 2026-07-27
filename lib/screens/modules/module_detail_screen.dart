@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import '../../utils/api_error.dart';
+import '../../utils/say.dart';
 import '../../config/m3e/shapes.dart';
 import '../../config/m3e/typography.dart';
 import '../../widgets/m3e/app_bar.dart';
@@ -12,6 +14,8 @@ import '../../providers/data_providers.dart';
 import '../../models/module.dart';
 import '../../models/issue.dart';
 import '../../models/state.dart';
+import '../../widgets/bottom_sheet_picker.dart';
+import '../../widgets/confirm_dialog.dart';
 import '../../widgets/loading_state.dart';
 import '../../widgets/issue_row.dart';
 import '../../widgets/property_chip.dart';
@@ -113,9 +117,7 @@ class _ModuleDetailScreenState extends ConsumerState<ModuleDetailScreen> {
         }
       } catch (_) {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Failed to load issues')),
-          );
+          sayError(context, 'Failed to load issues');
         }
         return;
       }
@@ -127,98 +129,39 @@ class _ModuleDetailScreenState extends ConsumerState<ModuleDetailScreen> {
     final selected = <String>{};
 
     if (!mounted) return;
-    showModalBottomSheet(
+    final chosen = await MultiSelectSheet.show<String>(
       context: context,
-      isScrollControlled: true,
-      builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setSheetState) => DraggableScrollableSheet(
-          initialChildSize: 0.6,
-          maxChildSize: 0.9,
-          minChildSize: 0.3,
-          expand: false,
-          builder: (ctx, scrollController) => SafeArea(
-            child: Column(
-              children: [
-                Padding(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                  child: Row(
-                    children: [
-                      Text('Add issues',
-                          style: Theme.of(ctx).textTheme.titleMedium),
-                      const Spacer(),
-                      TextButton(
-                        onPressed: selected.isEmpty
-                            ? null
-                            : () async {
-                                Navigator.pop(ctx);
-                                try {
-                                  await ModuleService.addIssuesToModule(
-                                    widget.workspaceSlug,
-                                    widget.projectId,
-                                    widget.module.id,
-                                    selected.toList(),
-                                  );
-                                  _load();
-                                } catch (e) {
-                                  if (mounted) {
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      SnackBar(
-                                          content:
-                                              Text('Failed to add issues: $e')),
-                                    );
-                                  }
-                                }
-                              },
-                        child: Text('Add (${selected.length})'),
-                      ),
-                    ],
-                  ),
-                ),
-                if (available.isEmpty)
-                  const Padding(
-                    padding: EdgeInsets.all(24),
-                    child: Text('No more issues to add'),
-                  ),
-                Expanded(
-                  child: ListView.builder(
-                    controller: scrollController,
-                    itemCount: available.length,
-                    itemBuilder: (ctx, i) {
-                      final issue = available[i];
-                      return CheckboxListTile(
-                        value: selected.contains(issue.id),
-                        onChanged: (v) {
-                          setSheetState(() {
-                            if (v == true) {
-                              selected.add(issue.id);
-                            } else {
-                              selected.remove(issue.id);
-                            }
-                          });
-                        },
-                        title: Text(issue.name,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: Theme.of(ctx).textTheme.bodyMedium),
-                        secondary: Icon(
-                          PlaneTheme.priorityIcon(issue.priority),
-                          size: 16,
-                          color:
-                              PlaneTheme.priorityColor(context, issue.priority),
-                        ),
-                        controlAffinity: ListTileControlAffinity.trailing,
-                        dense: true,
-                      );
-                    },
-                  ),
-                ),
-              ],
-            ),
+      title: 'Add issues',
+      selected: selected,
+      emptyMessage: 'No more issues to add',
+      confirmLabel: 'Add',
+      showCount: true,
+      requireSelection: true,
+      items: [
+        for (final issue in available)
+          BottomSheetPickerItem(
+            value: issue.id,
+            label: issue.name,
+            icon: PlaneTheme.priorityIcon(issue.priority),
+            iconColor: PlaneTheme.priorityColor(context, issue.priority),
           ),
-        ),
-      ),
+      ],
     );
+    if (chosen == null || chosen.isEmpty) return;
+    try {
+      await ModuleService.addIssuesToModule(
+        widget.workspaceSlug,
+        widget.projectId,
+        widget.module.id,
+        chosen.toList(),
+      );
+      _load();
+    } catch (e) {
+      if (mounted) {
+        sayError(
+            context, describeApiError(e, fallback: 'Failed to add issues'));
+      }
+    }
   }
 
   Future<void> _removeIssue(Issue issue) async {
@@ -232,9 +175,8 @@ class _ModuleDetailScreenState extends ConsumerState<ModuleDetailScreen> {
       _load();
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to remove issue: $e')),
-        );
+        sayError(
+            context, describeApiError(e, fallback: 'Failed to remove issue'));
       }
     }
   }
@@ -308,15 +250,12 @@ class _ModuleDetailScreenState extends ConsumerState<ModuleDetailScreen> {
                     },
                   );
                   if (mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Module updated')),
-                    );
+                    say(context, 'Module updated');
                   }
                 } catch (e) {
                   if (mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text('Failed to update: $e')),
-                    );
+                    sayError(context,
+                        describeApiError(e, fallback: 'Failed to update'));
                   }
                 }
               },
@@ -329,24 +268,16 @@ class _ModuleDetailScreenState extends ConsumerState<ModuleDetailScreen> {
   }
 
   Future<void> _confirmArchive() async {
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Archive module'),
-        content: Text(
-            'Move "${widget.module.name}" out of the active modules? It stays '
-            'readable under Archived and can be restored from there.'),
-        actions: [
-          TextButton(
-              onPressed: () => Navigator.pop(ctx, false),
-              child: const Text('Cancel')),
-          TextButton(
-              onPressed: () => Navigator.pop(ctx, true),
-              child: const Text('Archive')),
-        ],
-      ),
+    // Reversible, so not the error role — see the cycle screen's twin.
+    final ok = await confirmAction(
+      context,
+      title: 'Archive module',
+      message:
+          'Move "${widget.module.name}" out of the active modules? It stays '
+          'readable under Archived and can be restored from there.',
+      confirmLabel: 'Archive',
     );
-    if (ok != true) return;
+    if (!ok) return;
     try {
       await ModuleService.archiveModule(
           widget.workspaceSlug, widget.projectId, widget.module.id);
@@ -354,9 +285,7 @@ class _ModuleDetailScreenState extends ConsumerState<ModuleDetailScreen> {
       if (mounted) Navigator.pop(context);
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to archive: $e')),
-        );
+        sayError(context, describeApiError(e, fallback: 'Failed to archive'));
       }
     }
   }
@@ -368,48 +297,32 @@ class _ModuleDetailScreenState extends ConsumerState<ModuleDetailScreen> {
       if (mounted) Navigator.pop(context);
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to restore: $e')),
-        );
+        sayError(context, describeApiError(e, fallback: 'Failed to restore'));
       }
     }
   }
 
-  void _confirmDelete() {
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Delete module'),
-        content: const Text('Are you sure you want to delete this module?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () async {
-              Navigator.pop(ctx);
-              try {
-                await ModuleService.deleteModule(
-                  widget.workspaceSlug,
-                  widget.projectId,
-                  widget.module.id,
-                );
-                if (mounted) Navigator.pop(context);
-              } catch (e) {
-                if (mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('Failed to delete: $e')),
-                  );
-                }
-              }
-            },
-            child: Text('Delete',
-                style: TextStyle(color: Theme.of(ctx).colorScheme.error)),
-          ),
-        ],
-      ),
+  Future<void> _confirmDelete() async {
+    final ok = await confirmDestructive(
+      context,
+      title: 'Delete module',
+      message: 'Are you sure you want to delete this module? '
+          'The work items in it are not deleted.',
+      confirmLabel: 'Delete',
     );
+    if (!ok) return;
+    try {
+      await ModuleService.deleteModule(
+        widget.workspaceSlug,
+        widget.projectId,
+        widget.module.id,
+      );
+      if (mounted) Navigator.pop(context);
+    } catch (e) {
+      if (mounted) {
+        sayError(context, describeApiError(e, fallback: 'Failed to delete'));
+      }
+    }
   }
 
   Color _statusColorFor(String? status) {
@@ -549,10 +462,11 @@ class _ModuleDetailScreenState extends ConsumerState<ModuleDetailScreen> {
                           ],
                         ),
                       ),
-                      Divider(
-                          height: 0.5,
-                          thickness: 0.5,
-                          color: theme.colorScheme.outlineVariant),
+                      // Bare: `dividerTheme` already says 0.5 on
+                      // `outlineVariant` with no space around it, and a local
+                      // copy is how two screens end up disagreeing after
+                      // someone changes the token.
+                      const Divider(),
                       // Issues header. The trailing add button carries its own
                       // 48dp target, so the row's vertical padding is trimmed
                       // to keep the header the same optical height as before.
@@ -578,11 +492,12 @@ class _ModuleDetailScreenState extends ConsumerState<ModuleDetailScreen> {
                         ),
                       ),
                       if (_issues.isEmpty)
-                        Padding(
-                          padding: const EdgeInsets.all(24),
-                          child: Center(
-                            child: Text('No issues in this module',
-                                style: theme.textTheme.bodySmall),
+                        const Padding(
+                          padding: EdgeInsets.all(24),
+                          child: EmptyStateWidget(
+                            message: 'No issues in this module',
+                            icon: Icons.view_module_outlined,
+                            subtitle: 'Add the work items that ship it',
                           ),
                         ),
                       ..._issues.map((issue) => Dismissible(
@@ -658,72 +573,52 @@ class _ModuleDetailScreenState extends ConsumerState<ModuleDetailScreen> {
     );
   }
 
-  void _showMoreMenu() {
+  Future<void> _showMoreMenu() async {
     final mod = widget.module;
-    showModalBottomSheet(
+    final chosen = await BottomSheetPicker.show<String>(
       context: context,
-      builder: (ctx) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            // Plane answers 400 to a PATCH on an archived module, so the edit
-            // entry is withheld rather than offered and then failing.
-            if (!mod.isArchived)
-              ListTile(
-                leading: const Icon(Icons.edit_outlined, size: 20),
-                title: Text('Edit module',
-                    style: Theme.of(ctx).textTheme.bodyMedium),
-                onTap: () {
-                  Navigator.pop(ctx);
-                  _showEditModuleDialog();
-                },
-              ),
-            if (mod.isArchived)
-              ListTile(
-                leading: const Icon(Icons.unarchive_outlined, size: 20),
-                title: Text('Restore module',
-                    style: Theme.of(ctx).textTheme.bodyMedium),
-                onTap: () {
-                  Navigator.pop(ctx);
-                  _unarchive();
-                },
-              )
-            else
-              ListTile(
-                leading: const Icon(Icons.inventory_2_outlined, size: 20),
-                title: Text('Archive module',
-                    style: Theme.of(ctx).textTheme.bodyMedium),
-                // Plane only archives a completed or cancelled module. Shown
-                // disabled with the reason: "no archive action here" and "not
-                // archivable yet" are different things to a reader.
-                subtitle: mod.canArchive
-                    ? null
-                    : Text('Only a completed or cancelled module',
-                        style: Theme.of(ctx).textTheme.bodySmall),
-                enabled: mod.canArchive,
-                onTap: mod.canArchive
-                    ? () {
-                        Navigator.pop(ctx);
-                        _confirmArchive();
-                      }
-                    : null,
-              ),
-            ListTile(
-              leading: Icon(Icons.delete_outline,
-                  color: Theme.of(ctx).colorScheme.error, size: 20),
-              title: Text('Delete module',
-                  style: Theme.of(ctx)
-                      .textTheme
-                      .bodyMedium
-                      ?.copyWith(color: Theme.of(ctx).colorScheme.error)),
-              onTap: () {
-                Navigator.pop(ctx);
-                _confirmDelete();
-              },
-            ),
-          ],
+      title: mod.name,
+      items: [
+        // Plane answers 400 to a PATCH on an archived module, so the edit
+        // entry is withheld rather than offered and then failing.
+        if (!mod.isArchived)
+          const BottomSheetPickerItem(
+              value: 'edit', label: 'Edit module', icon: Icons.edit_outlined),
+        if (mod.isArchived)
+          const BottomSheetPickerItem(
+            value: 'restore',
+            label: 'Restore module',
+            icon: Icons.unarchive_outlined,
+          )
+        else
+          BottomSheetPickerItem(
+            value: 'archive',
+            label: 'Archive module',
+            icon: Icons.inventory_2_outlined,
+            // Plane only archives a completed or cancelled module. Shown
+            // disabled with the reason: "no archive action here" and "not
+            // archivable yet" are different things to a reader.
+            enabled: mod.canArchive,
+            subtitle:
+                mod.canArchive ? null : 'Only a completed or cancelled module',
+          ),
+        const BottomSheetPickerItem(
+          value: 'delete',
+          label: 'Delete module',
+          icon: Icons.delete_outline,
+          destructive: true,
         ),
-      ),
+      ],
     );
+    switch (chosen) {
+      case 'edit':
+        _showEditModuleDialog();
+      case 'restore':
+        await _unarchive();
+      case 'archive':
+        await _confirmArchive();
+      case 'delete':
+        await _confirmDelete();
+    }
   }
 }

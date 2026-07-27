@@ -1,4 +1,7 @@
 import 'package:dio/dio.dart';
+import '../../widgets/label_pill.dart';
+import '../../utils/say.dart';
+import '../../config/m3e/motion.dart';
 import 'package:flutter/material.dart';
 import '../../config/m3e/shapes.dart';
 import '../../widgets/m3e/loading_indicator.dart';
@@ -147,13 +150,12 @@ class _ProjectSettingsScreenState extends ConsumerState<ProjectSettingsScreen> {
         },
       );
       if (mounted) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(const SnackBar(content: Text('Project updated')));
+        say(context, 'Project updated');
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text('Error: $e')));
+        sayError(context,
+            describeApiError(e, fallback: 'Could not save the change'));
       }
     }
     setState(() => _saving = false);
@@ -169,8 +171,7 @@ class _ProjectSettingsScreenState extends ConsumerState<ProjectSettingsScreen> {
 
   void _report(String message) {
     if (!mounted) return;
-    ScaffoldMessenger.of(context)
-        .showSnackBar(SnackBar(content: Text(message)));
+    say(context, message);
   }
 
   /// Add a workspace member to the project.
@@ -420,8 +421,8 @@ class _ProjectSettingsScreenState extends ConsumerState<ProjectSettingsScreen> {
         _load();
       } catch (e) {
         if (mounted) {
-          ScaffoldMessenger.of(context)
-              .showSnackBar(SnackBar(content: Text('Error: $e')));
+          sayError(context,
+              describeApiError(e, fallback: 'Could not save the change'));
         }
       }
     }
@@ -443,8 +444,8 @@ class _ProjectSettingsScreenState extends ConsumerState<ProjectSettingsScreen> {
         _load();
       } catch (e) {
         if (mounted) {
-          ScaffoldMessenger.of(context)
-              .showSnackBar(SnackBar(content: Text('Error: $e')));
+          sayError(context,
+              describeApiError(e, fallback: 'Could not save the change'));
         }
       }
     }
@@ -495,7 +496,11 @@ class _ProjectSettingsScreenState extends ConsumerState<ProjectSettingsScreen> {
                       // GestureDetector's action with it.
                       excludeSemantics: true,
                       onTap: () => setDialogState(() => color = c),
-                      child: GestureDetector(
+                      child: M3EPressable(
+                        // The swatch is a control, so it answers a press the
+                        // way every other control in the app does.
+                        pressedScale: 0.88,
+                        selected: color == c,
                         onTap: () => setDialogState(() => color = c),
                         // 32dp circle, 48dp target: a swatch is a control.
                         child: SizedBox(
@@ -506,7 +511,9 @@ class _ProjectSettingsScreenState extends ConsumerState<ProjectSettingsScreen> {
                               width: 32,
                               height: 32,
                               decoration: BoxDecoration(
-                                color: _parseColor(c),
+                                color: parseHexColor(c,
+                                    fallback:
+                                        Theme.of(context).colorScheme.outline),
                                 shape: BoxShape.circle,
                                 border: color == c
                                     ? Border.all(
@@ -547,8 +554,8 @@ class _ProjectSettingsScreenState extends ConsumerState<ProjectSettingsScreen> {
         _load();
       } catch (e) {
         if (mounted) {
-          ScaffoldMessenger.of(context)
-              .showSnackBar(SnackBar(content: Text('Error: $e')));
+          sayError(context,
+              describeApiError(e, fallback: 'Could not save the change'));
         }
       }
     }
@@ -569,8 +576,8 @@ class _ProjectSettingsScreenState extends ConsumerState<ProjectSettingsScreen> {
         _load();
       } catch (e) {
         if (mounted) {
-          ScaffoldMessenger.of(context)
-              .showSnackBar(SnackBar(content: Text('Error: $e')));
+          sayError(context,
+              describeApiError(e, fallback: 'Could not save the change'));
         }
       }
     }
@@ -590,18 +597,6 @@ class _ProjectSettingsScreenState extends ConsumerState<ProjectSettingsScreen> {
   };
 
   String _colorName(String hex) => _swatchNames[hex] ?? hex;
-
-  Color _parseColor(String hex) {
-    var h = hex.replaceFirst('#', '');
-    if (h.length == 6) h = 'FF$h';
-    final parsed = int.tryParse(h, radix: 16);
-    // A hex the server sent that will not parse is not a colour. `outline` is
-    // this app's neutral for exactly that, rather than a literal grey that
-    // belongs to neither theme.
-    return parsed == null
-        ? Theme.of(context).colorScheme.outline
-        : Color(parsed);
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -689,10 +684,10 @@ class _ProjectSettingsScreenState extends ConsumerState<ProjectSettingsScreen> {
                   ),
                 ]),
 
-                _headerRow(
+                SectionHeader(
                   label: 'Members',
                   count: _members.length,
-                  action: !_permissions.canAddProjectMembers
+                  trailing: !_permissions.canAddProjectMembers
                       ? null
                       : M3EIconButton(
                           icon: Icons.person_add_alt,
@@ -708,10 +703,10 @@ class _ProjectSettingsScreenState extends ConsumerState<ProjectSettingsScreen> {
                       actions: _memberActions(m),
                     )),
 
-                _headerRow(
+                SectionHeader(
                   label: 'States',
                   count: _states.length,
-                  action: M3EIconButton(
+                  trailing: M3EIconButton(
                     icon: Icons.add,
                     tooltip: 'Add state',
                     size: M3EIconButtonSize.small,
@@ -739,10 +734,10 @@ class _ProjectSettingsScreenState extends ConsumerState<ProjectSettingsScreen> {
                       ),
                     )),
 
-                _headerRow(
+                SectionHeader(
                   label: 'Labels',
                   count: _labels.length,
-                  action: M3EIconButton(
+                  trailing: M3EIconButton(
                     icon: Icons.add,
                     tooltip: 'Add label',
                     size: M3EIconButtonSize.small,
@@ -759,13 +754,16 @@ class _ProjectSettingsScreenState extends ConsumerState<ProjectSettingsScreen> {
                           width: 12,
                           height: 12,
                           decoration: BoxDecoration(
-                            color: _parseColor(l.color),
+                            color: parseHexColor(l.color,
+                                fallback:
+                                    Theme.of(context).colorScheme.outline),
                             shape: BoxShape.circle,
                           ),
                         ),
                         label: Text(l.name, style: theme.textTheme.labelMedium),
                         deleteIcon: Icon(Icons.close,
-                            size: 16, semanticLabel: 'Delete label ${l.name}'),
+                            size: PlaneTheme.iconMedium,
+                            semanticLabel: 'Delete label ${l.name}'),
                         // Named per label, like the icon beside it. A single
                         // "Delete label" repeated across every chip made
                         // `adb_drive.py tap` pick whichever one it found
@@ -803,17 +801,53 @@ class _ProjectSettingsScreenState extends ConsumerState<ProjectSettingsScreen> {
                     );
                   }),
 
-                // The "Features" section is gone rather than fixed. It drew a
-                // green check and the word "Enabled" beside Cycles, Modules,
-                // Views and Pages from a hardcoded `true` — `Project` carries
-                // no such field, so the `false` branch was unreachable and the
-                // section reported the same four answers for every project in
-                // every workspace. Reading the real flags needs them on the
-                // model first; until then, saying nothing beats saying
-                // something false. See the report.
+                // Back, and reading the real columns this time. The old version
+                // drew a green check and the word "Enabled" beside all four
+                // from a hardcoded `true`, so the `false` branch was
+                // unreachable and every project in every workspace reported the
+                // same four answers. `Project` now carries `cycle_view`,
+                // `module_view`, `issue_views_view` and `page_view`.
+                //
+                // Read-only: switching a feature off is a project-admin action
+                // that also decides what happens to the cycles and modules that
+                // already exist, and this screen has no answer for that yet.
+                const SectionHeader(label: 'Features'),
+                _featureRow('Cycles', Icons.loop, widget.project.cyclesEnabled),
+                _featureRow('Modules', Icons.view_module_outlined,
+                    widget.project.modulesEnabled),
+                _featureRow('Views', Icons.view_list_outlined,
+                    widget.project.viewsEnabled),
+                _featureRow('Pages', Icons.description_outlined,
+                    widget.project.pagesEnabled),
+                _featureRow('Intake', Icons.inbox_outlined,
+                    widget.project.intakeEnabled),
+
                 const SizedBox(height: 40),
               ],
             ),
+    );
+  }
+
+  /// One feature and whether this project has it switched on.
+  ///
+  /// The state is carried by the word as well as the hue, because "on" and
+  /// "off" told apart by green and grey alone is exactly the pattern the audit
+  /// flagged elsewhere on this screen.
+  Widget _featureRow(String label, IconData icon, bool enabled) {
+    final scheme = Theme.of(context).colorScheme;
+    return PlaneRow(
+      icon: icon,
+      iconColor: enabled ? null : scheme.onSurfaceVariant,
+      title: label,
+      subtitle: enabled ? 'Enabled' : 'Disabled for this project',
+      semanticLabel: '$label, ${enabled ? 'enabled' : 'disabled'}',
+      trailing: Icon(
+        enabled ? Icons.check_circle_outline : Icons.remove_circle_outline,
+        size: PlaneTheme.iconLarge,
+        color: enabled
+            ? PlaneTheme.stateGroupColor(context, 'completed')
+            : scheme.onSurfaceVariant,
+      ),
     );
   }
 
@@ -825,24 +859,5 @@ class _ProjectSettingsScreenState extends ConsumerState<ProjectSettingsScreen> {
           mainAxisSize: MainAxisSize.min,
           children: children,
         ),
-      );
-
-  /// [SectionHeader] with the section's own control beside it.
-  ///
-  /// The four headings on this screen were plain `Text(titleMedium)` with the
-  /// count folded into the string, which is a fifth rendering of a concept the
-  /// app already has one widget for. [SectionHeader] carries its own inset, so
-  /// this sits outside [_inset].
-  Widget _headerRow({
-    required String label,
-    int? count,
-    Widget? action,
-  }) =>
-      Row(
-        children: [
-          Expanded(child: SectionHeader(label: label, count: count)),
-          if (action != null)
-            Padding(padding: const EdgeInsets.only(right: 8), child: action),
-        ],
       );
 }

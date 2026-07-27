@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import '../../utils/say.dart';
+import '../../widgets/app_navbar.dart';
 import '../../widgets/m3e/text_field.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../config/theme.dart';
@@ -9,6 +11,7 @@ import '../../models/module.dart';
 import '../../providers/favorites_provider.dart';
 import '../../utils/api_error.dart';
 import '../../widgets/archive_toggle.dart';
+import '../../widgets/confirm_dialog.dart';
 import '../../widgets/bottom_sheet_picker.dart';
 import '../../widgets/favorite_toggle.dart';
 import '../../widgets/list_count_header.dart';
@@ -17,7 +20,6 @@ import '../../widgets/m3e/icon_button.dart';
 import '../../widgets/plane_row.dart';
 import '../../widgets/skeleton_loader.dart';
 import '../../widgets/property_chip.dart';
-import '../project/project_screen.dart' show kProjectListBottomInset;
 import 'module_detail_screen.dart';
 
 class ModuleListScreen extends ConsumerStatefulWidget {
@@ -134,39 +136,24 @@ class ModuleListScreenState extends ConsumerState<ModuleListScreen>
       _cache.invalidateModules(widget.workspaceSlug, widget.projectId);
       await _loadArchived();
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('${module.name} restored')),
-        );
+        say(context, '${module.name} restored');
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-                describeApiError(e, fallback: 'Could not restore the module')),
-          ),
-        );
+        sayError(context,
+            describeApiError(e, fallback: 'Could not restore the module'));
       }
     }
   }
 
   Future<void> _confirmUnarchive(Module module) async {
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Restore module'),
-        content: Text('Move "${module.name}" back into the active modules?'),
-        actions: [
-          TextButton(
-              onPressed: () => Navigator.pop(ctx, false),
-              child: const Text('Cancel')),
-          TextButton(
-              onPressed: () => Navigator.pop(ctx, true),
-              child: const Text('Restore')),
-        ],
-      ),
+    final ok = await confirmAction(
+      context,
+      title: 'Restore module',
+      message: 'Move "${module.name}" back into the active modules?',
+      confirmLabel: 'Restore',
     );
-    if (ok == true) await _unarchive(module);
+    if (ok) await _unarchive(module);
   }
 
   Color _statusColor(String? status) {
@@ -302,12 +289,10 @@ class ModuleListScreenState extends ConsumerState<ModuleListScreen>
                   _load();
                 } catch (e) {
                   if (mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text(describeApiError(e,
-                            fallback: 'Could not create the module')),
-                      ),
-                    );
+                    sayError(
+                        context,
+                        describeApiError(e,
+                            fallback: 'Could not create the module'));
                   }
                 }
               },
@@ -365,26 +350,18 @@ class ModuleListScreenState extends ConsumerState<ModuleListScreen>
           message: 'Failed to load modules', onRetry: _load);
     }
     if (_modules.isEmpty) {
-      return ScrollableCenter(
-        padding: const EdgeInsets.only(bottom: kProjectListBottomInset),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const EmptyStateWidget(
-              message: 'No modules',
-              icon: Icons.view_module,
-              subtitle: 'A module groups the work items that ship one feature',
-            ),
-            if (widget.canCreate) ...[
-              const SizedBox(height: 16),
-              FilledButton.tonalIcon(
+      return ScrollableEmptyState(
+        padding: EdgeInsets.only(bottom: appNavBarClearance(context)),
+        message: 'No modules',
+        icon: Icons.view_module,
+        subtitle: 'A module groups the work items that ship one feature',
+        action: widget.canCreate
+            ? FilledButton.tonalIcon(
                 onPressed: startCreate,
                 icon: const Icon(Icons.add),
                 label: const Text('New module'),
-              ),
-            ],
-          ],
-        ),
+              )
+            : null,
       );
     }
     // Favourites first. Plane's own module list already orders `-is_favorite`,
@@ -397,7 +374,7 @@ class ModuleListScreenState extends ConsumerState<ModuleListScreen>
       // Without this a list too short to scroll cannot be pulled, so the
       // RefreshIndicator wrapping it never fires.
       physics: const AlwaysScrollableScrollPhysics(),
-      padding: const EdgeInsets.only(bottom: kProjectListBottomInset),
+      padding: EdgeInsets.only(bottom: appNavBarClearance(context)),
       itemCount: ordered.length,
       itemBuilder: (ctx, i) => _moduleRow(module: ordered[i]),
     );
@@ -413,8 +390,8 @@ class ModuleListScreenState extends ConsumerState<ModuleListScreen>
       return const ProjectListSkeleton();
     }
     if (archived.isEmpty) {
-      return const ScrollableEmptyState(
-        padding: EdgeInsets.only(bottom: kProjectListBottomInset),
+      return ScrollableEmptyState(
+        padding: EdgeInsets.only(bottom: appNavBarClearance(context)),
         message: 'No archived modules',
         icon: Icons.inventory_2_outlined,
         subtitle: 'Modules archived from here or from the web appear here',
@@ -424,7 +401,7 @@ class ModuleListScreenState extends ConsumerState<ModuleListScreen>
         favorites.favoritesFirst(FavoriteEntity.module, archived, (m) => m.id);
     return ListView.builder(
       physics: const AlwaysScrollableScrollPhysics(),
-      padding: const EdgeInsets.only(bottom: kProjectListBottomInset),
+      padding: EdgeInsets.only(bottom: appNavBarClearance(context)),
       itemCount: ordered.length,
       itemBuilder: (ctx, i) => _moduleRow(module: ordered[i]),
     );

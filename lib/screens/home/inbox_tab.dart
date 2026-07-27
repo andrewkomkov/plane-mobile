@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../utils/say.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:dio/dio.dart';
 import '../../config/secure_storage.dart';
@@ -8,6 +9,7 @@ import '../../models/state.dart';
 import '../../utils/time_ago.dart';
 import '../../database/sync_service.dart';
 import '../issues/issue_detail_screen.dart';
+import '../../widgets/app_navbar.dart';
 import '../../widgets/bottom_sheet_picker.dart';
 import '../../widgets/confirm_dialog.dart';
 import '../../widgets/loading_state.dart';
@@ -249,8 +251,7 @@ class _InboxTabState extends ConsumerState<InboxTab>
   }
 
   void _complain(String message) {
-    ScaffoldMessenger.of(context)
-        .showSnackBar(SnackBar(content: Text(message)));
+    say(context, message);
   }
 
   Future<void> _refresh() async {
@@ -393,23 +394,26 @@ class _InboxTabState extends ConsumerState<InboxTab>
                       // because a failed inbox is the one screen where a user
                       // has no rows to pull against.
                       ? ScrollableCenter(
-                          padding: const EdgeInsets.only(bottom: 100),
+                          padding: EdgeInsets.only(
+                              bottom: appNavBarClearance(context)),
                           child: ErrorStateWidget(
                             message: _error,
                             onRetry: _refresh,
                           ),
                         )
-                      : const ScrollableEmptyState(
+                      : ScrollableEmptyState(
                           message: 'No notifications',
                           icon: Icons.inbox_outlined,
                           subtitle: 'Activity on your issues will appear here',
-                          padding: EdgeInsets.only(bottom: 100),
+                          padding: EdgeInsets.only(
+                              bottom: appNavBarClearance(context)),
                         ))
                   // Rows are separated by the gap between their cards now, the
                   // same as every other list; a divider on top of that drew a
                   // line through the middle of the gap.
                   : ListView.builder(
-                      padding: const EdgeInsets.only(bottom: 100),
+                      padding:
+                          EdgeInsets.only(bottom: appNavBarClearance(context)),
                       itemCount: _notifications.length,
                       itemBuilder: (ctx, i) {
                         final n = _notifications[i];
@@ -492,46 +496,41 @@ class _InboxTabState extends ConsumerState<InboxTab>
                           child: Row(
                             children: [
                               Expanded(
-                                child: GestureDetector(
+                                child: IssueRow(
                                   onLongPress: () =>
                                       _showNotificationOptions(n),
-                                  child: IssueRow(
-                                    issue: issue,
-                                    state: fakeState,
-                                    identifier: identifier.isNotEmpty
-                                        ? identifier
-                                        : null,
-                                    subtitle: activityText,
-                                    showId: identifier.isNotEmpty,
-                                    showPriority: true,
-                                    unread: !isRead,
-                                    timeAgo: createdAt != null
-                                        ? timeAgoShort(createdAt)
-                                        : null,
-                                    onTap: () {
-                                      if (projectId.isEmpty ||
-                                          issueId.isEmpty) {
-                                        return;
-                                      }
-                                      // Mark as read on tap
-                                      if (!isRead &&
-                                          notificationId.isNotEmpty) {
-                                        _markRead(notificationId);
-                                      }
-                                      Navigator.push(
-                                        context,
-                                        MaterialPageRoute(
-                                          builder: (_) => IssueDetailScreen(
-                                            workspaceSlug: widget.workspaceSlug,
-                                            projectId: projectId,
-                                            issueId: issueId,
-                                            projectIdentifier: identifier,
-                                            states: const {},
-                                          ),
+                                  issue: issue,
+                                  state: fakeState,
+                                  identifier:
+                                      identifier.isNotEmpty ? identifier : null,
+                                  subtitle: activityText,
+                                  showId: identifier.isNotEmpty,
+                                  showPriority: true,
+                                  unread: !isRead,
+                                  timeAgo: createdAt != null
+                                      ? timeAgoShort(createdAt)
+                                      : null,
+                                  onTap: () {
+                                    if (projectId.isEmpty || issueId.isEmpty) {
+                                      return;
+                                    }
+                                    // Mark as read on tap
+                                    if (!isRead && notificationId.isNotEmpty) {
+                                      _markRead(notificationId);
+                                    }
+                                    Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (_) => IssueDetailScreen(
+                                          workspaceSlug: widget.workspaceSlug,
+                                          projectId: projectId,
+                                          issueId: issueId,
+                                          projectIdentifier: identifier,
+                                          states: const {},
                                         ),
-                                      );
-                                    },
-                                  ),
+                                      ),
+                                    );
+                                  },
                                 ),
                               ),
                               Padding(

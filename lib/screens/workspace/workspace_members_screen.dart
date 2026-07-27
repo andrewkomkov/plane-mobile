@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../utils/say.dart';
 import '../../models/member.dart';
 import '../../models/member_permissions.dart';
 import '../../services/workspace_service.dart';
@@ -88,8 +89,7 @@ class _WorkspaceMembersScreenState extends State<WorkspaceMembersScreen> {
 
   void _report(String message) {
     if (!mounted) return;
-    ScaffoldMessenger.of(context)
-        .showSnackBar(SnackBar(content: Text(message)));
+    say(context, message);
   }
 
   // ---------------------------------------------------------------------------

@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import '../../utils/say.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../widgets/app_navbar.dart';
 import '../../widgets/confirm_dialog.dart';
 import '../../widgets/m3e/icon_button.dart';
 import '../../widgets/m3e/text_field.dart';
@@ -14,7 +16,6 @@ import '../../widgets/loading_state.dart';
 import '../../widgets/plane_row.dart';
 import '../../widgets/skeleton_loader.dart';
 import '../../utils/time_ago.dart';
-import '../project/project_screen.dart' show kProjectListBottomInset;
 import 'view_detail_screen.dart';
 
 class ViewListScreen extends ConsumerStatefulWidget {
@@ -124,12 +125,8 @@ class ViewListScreenState extends ConsumerState<ViewListScreen>
         _load();
       } catch (e) {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(
-                  describeApiError(e, fallback: 'Could not create the view')),
-            ),
-          );
+          sayError(context,
+              describeApiError(e, fallback: 'Could not create the view'));
         }
       }
     }
@@ -149,12 +146,8 @@ class ViewListScreenState extends ConsumerState<ViewListScreen>
       _load();
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-                describeApiError(e, fallback: 'Could not delete the view')),
-          ),
-        );
+        sayError(context,
+            describeApiError(e, fallback: 'Could not delete the view'));
       }
     }
   }
@@ -197,35 +190,27 @@ class ViewListScreenState extends ConsumerState<ViewListScreen>
       return ErrorStateWidget(message: _error, onRetry: _load);
     }
     if (views.isEmpty) {
-      return ScrollableCenter(
-        padding: const EdgeInsets.only(bottom: kProjectListBottomInset),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            EmptyStateWidget(
-              message: 'No saved views',
-              icon: Icons.view_list_outlined,
-              subtitle: widget.canCreate
-                  ? 'A view saves a set of filters to come back to'
-                  : 'Views shared with the project appear here',
-            ),
-            if (widget.canCreate) ...[
-              const SizedBox(height: 16),
-              FilledButton.tonalIcon(
+      return ScrollableEmptyState(
+        padding: EdgeInsets.only(bottom: appNavBarClearance(context)),
+        message: 'No saved views',
+        icon: Icons.view_list_outlined,
+        subtitle: widget.canCreate
+            ? 'A view saves a set of filters to come back to'
+            : 'Views shared with the project appear here',
+        action: widget.canCreate
+            ? FilledButton.tonalIcon(
                 onPressed: startCreate,
                 icon: const Icon(Icons.add),
                 label: const Text('New view'),
-              ),
-            ],
-          ],
-        ),
+              )
+            : null,
       );
     }
     return ListView.builder(
       // Without this a list too short to scroll cannot be pulled, so the
       // RefreshIndicator wrapping it never fires.
       physics: const AlwaysScrollableScrollPhysics(),
-      padding: const EdgeInsets.only(bottom: kProjectListBottomInset),
+      padding: EdgeInsets.only(bottom: appNavBarClearance(context)),
       itemCount: views.length,
       itemBuilder: (ctx, i) => _viewRow(views[i]),
     );

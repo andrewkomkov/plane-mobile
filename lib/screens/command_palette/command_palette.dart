@@ -1,4 +1,7 @@
 import 'dart:async';
+import '../../widgets/loading_state.dart';
+import '../../widgets/section_header.dart';
+import '../../widgets/bottom_sheet_picker.dart';
 import 'package:flutter/material.dart';
 import '../../config/m3e/shapes.dart';
 import '../../widgets/m3e/loading_indicator.dart';
@@ -20,7 +23,9 @@ class CommandPalette extends ConsumerStatefulWidget {
     return showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      backgroundColor: Colors.transparent,
+      // No `backgroundColor: Colors.transparent` and no hand-rolled surface:
+      // this sheet and the intake sheet both did that and landed on two
+      // different colours, neither of them the themed one.
       builder: (ctx) => DraggableScrollableSheet(
         initialChildSize: 0.7,
         minChildSize: 0.4,
@@ -119,29 +124,20 @@ class _CommandPaletteBodyState extends ConsumerState<_CommandPaletteBody> {
   void _switchProject() async {
     Navigator.pop(context);
     if (_projects.isEmpty) return;
-    final selected = await showModalBottomSheet<Project>(
+    final id = await BottomSheetPicker.show<String>(
       context: context,
-      builder: (ctx) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Padding(
-              padding: const EdgeInsets.all(16),
-              child: Text('Switch Project',
-                  style: Theme.of(ctx).textTheme.titleMedium),
-            ),
-            ..._projects.map((p) => ListTile(
-                  leading: const Icon(Icons.bolt_outlined, size: 20),
-                  title:
-                      Text(p.name, style: Theme.of(ctx).textTheme.bodyMedium),
-                  subtitle: Text(p.identifier,
-                      style: Theme.of(ctx).textTheme.bodySmall),
-                  onTap: () => Navigator.pop(ctx, p),
-                )),
-          ],
-        ),
-      ),
+      title: 'Switch project',
+      items: [
+        for (final p in _projects)
+          BottomSheetPickerItem(
+            value: p.id,
+            label: p.name,
+            subtitle: p.identifier,
+            icon: Icons.bolt_outlined,
+          ),
+      ],
     );
+    final selected = _projects.where((p) => p.id == id).firstOrNull;
     if (selected != null && mounted) {
       Navigator.push(
         context,
@@ -257,26 +253,15 @@ class _CommandPaletteBodyState extends ConsumerState<_CommandPaletteBody> {
 
     return Container(
       decoration: BoxDecoration(
-        color: theme.scaffoldBackgroundColor,
+        color: theme.colorScheme.surfaceContainer,
         borderRadius: const BorderRadius.vertical(
             top: Radius.circular(M3EShape.extraLargeIncreased)),
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          // Drag handle
-          Center(
-            child: Container(
-              margin: const EdgeInsets.only(top: 8),
-              width: 36,
-              height: 4,
-              decoration: BoxDecoration(
-                color:
-                    theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.3),
-                borderRadius: BorderRadius.circular(M3EShape.full),
-              ),
-            ),
-          ),
+          // No drag handle here: `bottomSheetTheme` already draws one, and
+          // this was one of the four sheets painting a second underneath it.
           // Search field
           Padding(
             padding: const EdgeInsets.all(12),
@@ -296,45 +281,25 @@ class _CommandPaletteBodyState extends ConsumerState<_CommandPaletteBody> {
               child: Center(child: M3ELoadingIndicator(size: 20)),
             ),
           // Quick actions header
-          if (!showSearch)
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 4, 16, 4),
-              child: Align(
-                alignment: Alignment.centerLeft,
-                child: Text('Quick actions',
-                    style: theme.textTheme.labelMedium
-                        ?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
-              ),
-            ),
+          if (!showSearch) const SectionHeader(label: 'Quick actions'),
           // Items
           Expanded(
             child: ListView(
               controller: widget.scrollController,
               children: [
                 if (showSearch && filteredActions.isNotEmpty) ...[
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 4, 16, 4),
-                    child: Text('Actions',
-                        style: theme.textTheme.labelMedium?.copyWith(
-                            color: theme.colorScheme.onSurfaceVariant)),
-                  ),
-                  ...filteredActions.map((a) => _buildItem(a, theme)),
+                  const SectionHeader(label: 'Actions'),
+                  ...filteredActions.map(_buildItem),
                   if (items.isNotEmpty)
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
-                      child: Text('Results',
-                          style: theme.textTheme.labelMedium?.copyWith(
-                              color: theme.colorScheme.onSurfaceVariant)),
-                    ),
+                    SectionHeader(label: 'Results', count: items.length),
                 ],
-                ...items.map((item) => _buildItem(item, theme)),
+                ...items.map(_buildItem),
                 if (showSearch && items.isEmpty && !_loading)
-                  Padding(
-                    padding: const EdgeInsets.all(24),
-                    child: Center(
-                      child: Text('No results',
-                          style: TextStyle(
-                              color: theme.colorScheme.onSurfaceVariant)),
+                  const Padding(
+                    padding: EdgeInsets.all(24),
+                    child: EmptyStateWidget(
+                      message: 'No results',
+                      icon: Icons.search_off,
                     ),
                   ),
               ],
@@ -345,13 +310,15 @@ class _CommandPaletteBodyState extends ConsumerState<_CommandPaletteBody> {
     );
   }
 
-  Widget _buildItem(_CommandItem item, ThemeData theme) {
-    return ListTile(
-      leading: Icon(item.icon, size: 20),
-      title: Text(item.label, style: theme.textTheme.bodyMedium),
-      subtitle: item.subtitle != null
-          ? Text(item.subtitle!, style: theme.textTheme.bodySmall)
-          : null,
+  Widget _buildItem(_CommandItem item) {
+    return SheetOptionRow<String>(
+      item: BottomSheetPickerItem(
+        value: item.label,
+        label: item.label,
+        subtitle: item.subtitle,
+        icon: item.icon,
+      ),
+      selected: false,
       onTap: item.onTap,
     );
   }

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../utils/say.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../providers/data_providers.dart';
 import '../../providers/favorites_provider.dart';
@@ -6,14 +7,15 @@ import '../../models/favorite.dart';
 import '../../models/page.dart';
 import '../../services/page_service.dart';
 import '../../utils/api_error.dart';
+import '../../widgets/app_navbar.dart';
 import '../../widgets/archive_toggle.dart';
+import '../../widgets/confirm_dialog.dart';
 import '../../widgets/favorite_toggle.dart';
 import '../../widgets/list_count_header.dart';
 import '../../widgets/loading_state.dart';
 import '../../widgets/m3e/icon_button.dart';
 import '../../widgets/skeleton_loader.dart';
 import '../../widgets/plane_row.dart';
-import '../project/project_screen.dart' show kProjectListBottomInset;
 import 'page_detail_screen.dart';
 
 class PageListScreen extends ConsumerStatefulWidget {
@@ -122,39 +124,25 @@ class PageListScreenState extends ConsumerState<PageListScreen>
 
   Future<void> _confirmUnarchive(PlanePage page) async {
     final name = page.name.isEmpty ? 'Untitled' : page.name;
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Restore page'),
-        content: Text('Move "$name" back into the project pages?'),
-        actions: [
-          TextButton(
-              onPressed: () => Navigator.pop(ctx, false),
-              child: const Text('Cancel')),
-          TextButton(
-              onPressed: () => Navigator.pop(ctx, true),
-              child: const Text('Restore')),
-        ],
-      ),
+    final ok = await confirmAction(
+      context,
+      title: 'Restore page',
+      message: 'Move "$name" back into the project pages?',
+      confirmLabel: 'Restore',
     );
-    if (ok != true) return;
+    if (!ok) return;
     try {
       await PageService.unarchivePage(
           widget.workspaceSlug, widget.projectId, page.id);
       _cache.invalidatePages(widget.workspaceSlug, widget.projectId);
       await _load();
       if (mounted) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text('$name restored')));
+        say(context, '$name restored');
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-                describeApiError(e, fallback: 'Could not restore the page')),
-          ),
-        );
+        sayError(context,
+            describeApiError(e, fallback: 'Could not restore the page'));
       }
     }
   }
@@ -202,45 +190,37 @@ class PageListScreenState extends ConsumerState<PageListScreen>
         .favoritesFirst(FavoriteEntity.page, _pages, (p) => p.id);
     if (pages.isEmpty) {
       if (_showArchived) {
-        return const ScrollableEmptyState(
-          padding: EdgeInsets.only(bottom: kProjectListBottomInset),
+        return ScrollableEmptyState(
+          padding: EdgeInsets.only(bottom: appNavBarClearance(context)),
           message: 'No archived pages',
           icon: Icons.inventory_2_outlined,
           subtitle: 'Pages archived from here or from the web appear here',
         );
       }
-      return ScrollableCenter(
-        padding: const EdgeInsets.only(bottom: kProjectListBottomInset),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            EmptyStateWidget(
-              message: 'No pages',
-              icon: Icons.description_outlined,
-              // The old copy said "Create a page to get started" with nothing
-              // to tap. It now either has a button under it or, for a guest,
-              // says nothing it cannot back up.
-              subtitle: widget.canCreate
-                  ? 'Notes, specs and docs that live with the project'
-                  : 'Pages written by the team appear here',
-            ),
-            if (widget.canCreate) ...[
-              const SizedBox(height: 16),
-              FilledButton.tonalIcon(
+      return ScrollableEmptyState(
+        padding: EdgeInsets.only(bottom: appNavBarClearance(context)),
+        message: 'No pages',
+        icon: Icons.description_outlined,
+        // The old copy said "Create a page to get started" with nothing to
+        // tap. It now either has a button under it or, for a guest, says
+        // nothing it cannot back up.
+        subtitle: widget.canCreate
+            ? 'Notes, specs and docs that live with the project'
+            : 'Pages written by the team appear here',
+        action: widget.canCreate
+            ? FilledButton.tonalIcon(
                 onPressed: startCreate,
                 icon: const Icon(Icons.add),
                 label: const Text('New page'),
-              ),
-            ],
-          ],
-        ),
+              )
+            : null,
       );
     }
     return ListView.builder(
       // Without this a list too short to scroll cannot be pulled, so the
       // RefreshIndicator wrapping it never fires.
       physics: const AlwaysScrollableScrollPhysics(),
-      padding: const EdgeInsets.only(bottom: kProjectListBottomInset),
+      padding: EdgeInsets.only(bottom: appNavBarClearance(context)),
       itemCount: pages.length,
       itemBuilder: (ctx, i) => _pageRow(pages[i]),
     );

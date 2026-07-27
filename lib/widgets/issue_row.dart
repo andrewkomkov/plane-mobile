@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../config/m3e/shapes.dart';
+import 'label_pill.dart';
 import '../config/theme.dart';
 import '../models/issue.dart';
 import '../models/label.dart';
@@ -61,6 +61,13 @@ class IssueRow extends StatelessWidget {
   final List<String> semanticExtras;
 
   final VoidCallback? onTap;
+
+  /// Forwarded to [PlaneRow], which declares it on the row's own semantics
+  /// node. The notification feed used to wrap this widget in a
+  /// `GestureDetector` for the same thing — a nested gesture inside a labelled
+  /// control, which is the pattern that silently drops the action for
+  /// assistive tech.
+  final VoidCallback? onLongPress;
   final List<Label> allLabels;
   final List<Member> allMembers;
 
@@ -85,6 +92,7 @@ class IssueRow extends StatelessWidget {
     this.density = PlaneRowDensity.standard,
     this.semanticExtras = const [],
     this.onTap,
+    this.onLongPress,
     this.allLabels = const [],
     this.allMembers = const [],
   });
@@ -152,7 +160,7 @@ class IssueRow extends StatelessWidget {
       chips: [
         if (showLabels)
           for (final label in issueLabels.take(3))
-            _LabelPill(name: label.name, hex: label.color),
+            LabelPill(name: label.name, hex: label.color, dense: true),
       ],
       metadata: [
         if (showSubIssues && issue.subIssuesCount > 0)
@@ -185,6 +193,7 @@ class IssueRow extends StatelessWidget {
       highlighted: unread || highlighted,
       semanticLabel: _semanticLabel(issueMembers, issueLabels),
       onTap: onTap,
+      onLongPress: onLongPress,
     );
   }
 }
@@ -206,42 +215,3 @@ class _SequenceId extends StatelessWidget {
 /// as a text colour — a dark one vanishes on the dark theme, a pale one on the
 /// light. It carries in the fill and the dot instead, and the name stays on a
 /// role, which is what the detail screen already does.
-class _LabelPill extends StatelessWidget {
-  final String name;
-  final String hex;
-
-  const _LabelPill({required this.name, required this.hex});
-
-  static Color _parseColor(String hex) {
-    var value = hex.replaceFirst('#', '');
-    if (value.length == 6) value = 'FF$value';
-    return Color(int.tryParse(value, radix: 16) ?? 0xFF999999);
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final color = _parseColor(hex);
-
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.15),
-        borderRadius: BorderRadius.circular(M3EShape.full),
-        border: Border.all(color: color.withValues(alpha: 0.4), width: 0.8),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Container(
-            width: 6,
-            height: 6,
-            decoration: BoxDecoration(color: color, shape: BoxShape.circle),
-          ),
-          const SizedBox(width: 5),
-          Text(name, style: theme.textTheme.labelSmall),
-        ],
-      ),
-    );
-  }
-}

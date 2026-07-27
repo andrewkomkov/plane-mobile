@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../utils/say.dart';
 import '../../config/m3e/shapes.dart';
 import '../../config/m3e/motion.dart';
 import '../../config/m3e/typography.dart';
@@ -172,8 +173,7 @@ class _IssueCreateScreenState extends State<IssueCreateScreen> {
 
   void _report(String message) {
     if (!mounted) return;
-    ScaffoldMessenger.of(context)
-        .showSnackBar(SnackBar(content: Text(message)));
+    say(context, message);
   }
 
   Future<void> _run(

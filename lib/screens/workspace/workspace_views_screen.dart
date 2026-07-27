@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../utils/say.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../models/favorite.dart';
@@ -90,12 +91,9 @@ class _WorkspaceViewsScreenState extends ConsumerState<WorkspaceViewsScreen> {
       // The server answers 400, not 403, when the caller is neither the
       // workspace admin nor the view's owner, so a refusal reaches here as an
       // ordinary error and has to be shown rather than swallowed.
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            describeApiError(e, fallback: 'Could not delete view'),
-          ),
-        ),
+      sayError(
+        context,
+        describeApiError(e, fallback: 'Could not delete view'),
       );
     }
   }

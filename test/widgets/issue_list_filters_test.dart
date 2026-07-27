@@ -5,7 +5,7 @@ import 'package:plane_mobile/screens/issues/issue_list_screen.dart';
 import 'package:plane_mobile/widgets/filter_bar.dart';
 
 import '../test_helpers.dart';
-import 'issue_display_options_test.dart' show cycleGrouping, iconButton;
+import 'issue_display_options_test.dart' show chooseGrouping, iconButton;
 
 /// The filter bar, which had no call site anywhere in the app.
 ///
@@ -90,7 +90,7 @@ void main() {
 
     await tester.tap(iconButton('Display options'));
     await tester.pumpAndSettle();
-    await cycleGrouping(tester, 1);
+    await chooseGrouping(tester, 'Priority');
     expect(find.text('URGENT'), findsOneWidget);
 
     await filterByPriority(tester, 'Urgent');

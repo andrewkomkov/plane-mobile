@@ -1,4 +1,8 @@
 import 'package:flutter/material.dart';
+import '../../utils/api_error.dart';
+import '../../widgets/bottom_sheet_picker.dart';
+import '../../utils/say.dart';
+import '../../widgets/confirm_dialog.dart';
 import '../../widgets/m3e/app_bar.dart';
 import '../../widgets/m3e/icon_button.dart';
 import '../../widgets/m3e/loading_indicator.dart';
@@ -80,24 +84,16 @@ class _PageDetailScreenState extends ConsumerState<PageDetailScreen> {
 
   Future<void> _archivePage() async {
     if (_page == null) return;
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Archive page'),
-        content: Text('Move "$_pageLabel" out of the project pages? Any page '
-            'nested under it is archived too. It can be restored from the '
-            'Archived list.'),
-        actions: [
-          TextButton(
-              onPressed: () => Navigator.pop(ctx, false),
-              child: const Text('Cancel')),
-          TextButton(
-              onPressed: () => Navigator.pop(ctx, true),
-              child: const Text('Archive')),
-        ],
-      ),
+    // Reversible from the Archived list, so not the error role.
+    final ok = await confirmAction(
+      context,
+      title: 'Archive page',
+      message: 'Move "$_pageLabel" out of the project pages? Any page '
+          'nested under it is archived too. It can be restored from the '
+          'Archived list.',
+      confirmLabel: 'Archive',
     );
-    if (ok != true) return;
+    if (!ok) return;
     try {
       await PageService.archivePage(
           widget.workspaceSlug, widget.projectId, widget.pageId);
@@ -106,8 +102,7 @@ class _PageDetailScreenState extends ConsumerState<PageDetailScreen> {
       if (mounted) Navigator.pop(context);
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text('Failed to archive: $e')));
+        sayError(context, describeApiError(e, fallback: 'Failed to archive'));
       }
     }
   }
@@ -120,8 +115,7 @@ class _PageDetailScreenState extends ConsumerState<PageDetailScreen> {
       if (mounted) Navigator.pop(context);
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text('Failed to restore: $e')));
+        sayError(context, describeApiError(e, fallback: 'Failed to restore'));
       }
     }
   }
@@ -134,23 +128,15 @@ class _PageDetailScreenState extends ConsumerState<PageDetailScreen> {
   /// second, and the wording says so.
   Future<void> _deletePage() async {
     if (_page == null) return;
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Delete page'),
-        content: Text('Delete "$_pageLabel" permanently? This cannot be '
-            'undone.'),
-        actions: [
-          TextButton(
-              onPressed: () => Navigator.pop(ctx, false),
-              child: const Text('Cancel')),
-          TextButton(
-              onPressed: () => Navigator.pop(ctx, true),
-              child: const Text('Delete')),
-        ],
-      ),
+    // This one was the audit's example of the worst case: an irreversible
+    // delete whose button was painted exactly like Cancel.
+    final ok = await confirmDestructive(
+      context,
+      title: 'Delete page',
+      message: 'Delete "$_pageLabel" permanently? This cannot be undone.',
+      confirmLabel: 'Delete',
     );
-    if (ok != true) return;
+    if (!ok) return;
     try {
       await PageService.deletePage(
           widget.workspaceSlug, widget.projectId, widget.pageId);
@@ -159,9 +145,54 @@ class _PageDetailScreenState extends ConsumerState<PageDetailScreen> {
       if (mounted) Navigator.pop(context);
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text('Error: $e')));
+        sayError(context, 'Error: $e');
       }
+    }
+  }
+
+  /// Archive, restore and delete, in one surface.
+  ///
+  /// Delete is only offered once the page is archived, because that is the
+  /// only state Plane will delete from — and it is shown disabled rather than
+  /// hidden on a live page, so the two-step flow is visible before it is
+  /// needed. Archive stays available on a locked page: the lock is Plane's
+  /// guard against concurrent edits to the body and the server enforces it on
+  /// PATCH only, while archiving is gated by ownership or project admin.
+  Future<void> _showMoreMenu() async {
+    final archived = _page?.archivedAt != null;
+    final chosen = await BottomSheetPicker.show<String>(
+      context: context,
+      title: _pageLabel,
+      items: [
+        if (archived)
+          const BottomSheetPickerItem(
+            value: 'restore',
+            label: 'Restore page',
+            icon: Icons.unarchive_outlined,
+          )
+        else
+          const BottomSheetPickerItem(
+            value: 'archive',
+            label: 'Archive page',
+            icon: Icons.inventory_2_outlined,
+          ),
+        BottomSheetPickerItem(
+          value: 'delete',
+          label: 'Delete page',
+          icon: Icons.delete_outline,
+          destructive: true,
+          enabled: archived,
+          subtitle: archived ? null : 'Archive the page first',
+        ),
+      ],
+    );
+    switch (chosen) {
+      case 'restore':
+        await _unarchivePage();
+      case 'archive':
+        await _archivePage();
+      case 'delete':
+        await _deletePage();
     }
   }
 
@@ -173,28 +204,10 @@ class _PageDetailScreenState extends ConsumerState<PageDetailScreen> {
       appBar: M3EAppBar(
         title: _page?.name ?? widget.pageName,
         actions: [
-          // Delete is only offered once the page is archived, because that is
-          // the only state Plane will delete from. On a live page the archive
-          // action takes its place.
-          if (_page != null && archived)
-            M3EAppBarAction(
-              icon: Icons.delete_outline,
-              tooltip: 'Delete page',
-              color: theme.colorScheme.error,
-              onPressed: _deletePage,
-            ),
-          // Archive stays available on a locked page: the lock is Plane's
-          // guard against concurrent edits to the body, and the server
-          // enforces it on PATCH only — archiving is gated by ownership or
-          // project admin instead.
-          if (_page != null)
-            M3EAppBarAction(
-              icon: archived
-                  ? Icons.unarchive_outlined
-                  : Icons.inventory_2_outlined,
-              tooltip: archived ? 'Restore page' : 'Archive page',
-              onPressed: archived ? _unarchivePage : _archivePage,
-            ),
+          // Edit stays on the bar: it is the primary thing a reader does to a
+          // page, and the cycle and module screens keep their primary action
+          // out of the menu for the same reason.
+          //
           // `pages/{id}/` PATCH would in fact accept an edit to an archived
           // page — only the binary-description endpoint refuses one — but an
           // archive a user can still type into is not an archive. Restore
@@ -205,6 +218,15 @@ class _PageDetailScreenState extends ConsumerState<PageDetailScreen> {
                 tooltip: 'Edit page',
                 emphasized: true,
                 onPressed: _editPage),
+          // Everything else behind one `more_horiz`, which is the shape the
+          // cycle and module detail screens use for the same three actions.
+          // Three separate icons here made one screen out of three.
+          if (_page != null)
+            M3EAppBarAction(
+              icon: Icons.more_horiz,
+              tooltip: 'Page actions',
+              onPressed: _showMoreMenu,
+            ),
         ],
       ),
       body: _loading
@@ -355,8 +377,7 @@ class _PageEditScreenState extends State<PageEditScreen> {
     } catch (e) {
       setState(() => _saving = false);
       if (mounted) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text('Error: $e')));
+        sayError(context, 'Error: $e');
       }
     }
   }

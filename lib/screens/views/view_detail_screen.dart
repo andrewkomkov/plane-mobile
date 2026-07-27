@@ -1,4 +1,10 @@
 import 'package:flutter/material.dart';
+import '../../widgets/m3e/text_field.dart';
+import '../../widgets/confirm_dialog.dart';
+import '../../widgets/bottom_sheet_picker.dart';
+import '../../utils/say.dart';
+import '../../utils/api_error.dart';
+import '../../services/view_service.dart';
 import '../../widgets/m3e/app_bar.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../services/issue_service.dart';
@@ -36,6 +42,9 @@ class _ViewDetailScreenState extends ConsumerState<ViewDetailScreen> {
   List<Member> _members = [];
   bool _loading = true;
   String? _error;
+
+  /// The view's name, which this screen can now change.
+  late String _name = widget.view.name;
 
   @override
   void initState() {
@@ -110,10 +119,102 @@ class _ViewDetailScreenState extends ConsumerState<ViewDetailScreen> {
     }
   }
 
+  /// The same three-action surface the cycle and module detail screens carry.
+  ///
+  /// A view could be deleted from its row in the list and from nowhere else,
+  /// and could not be renamed anywhere at all — the one detail screen in the
+  /// app whose app bar had no actions on it.
+  Future<void> _showMoreMenu() async {
+    final chosen = await BottomSheetPicker.show<String>(
+      context: context,
+      title: _name,
+      items: const [
+        BottomSheetPickerItem(
+            value: 'rename', label: 'Rename view', icon: Icons.edit_outlined),
+        BottomSheetPickerItem(
+          value: 'delete',
+          label: 'Delete view',
+          icon: Icons.delete_outline,
+          destructive: true,
+        ),
+      ],
+    );
+    if (chosen == 'rename') await _rename();
+    if (chosen == 'delete') await _delete();
+  }
+
+  Future<void> _rename() async {
+    final controller = TextEditingController(text: _name);
+    final name = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Rename view'),
+        content: M3ETextField(
+          label: 'Name',
+          controller: controller,
+          autofocus: true,
+        ),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+          TextButton(
+              onPressed: () => Navigator.pop(ctx, controller.text.trim()),
+              child: const Text('Save')),
+        ],
+      ),
+    );
+    controller.dispose();
+    if (name == null || name.isEmpty || name == _name) return;
+    try {
+      await ViewService.updateView(widget.workspaceSlug, widget.projectId,
+          widget.view.id, {'name': name});
+      if (mounted) {
+        setState(() => _name = name);
+        say(context, 'View renamed');
+      }
+    } catch (e) {
+      if (mounted) {
+        sayError(context,
+            describeApiError(e, fallback: 'Could not rename the view'));
+      }
+    }
+  }
+
+  Future<void> _delete() async {
+    final ok = await confirmDestructive(
+      context,
+      title: 'Delete view',
+      message: 'Delete "$_name"? The filters it saves are lost.',
+      confirmLabel: 'Delete',
+    );
+    if (!ok) return;
+    try {
+      await ViewService.deleteView(
+          widget.workspaceSlug, widget.projectId, widget.view.id);
+      // The list screen reloads on every return from here, so popping is what
+      // makes the row disappear.
+      if (mounted) Navigator.pop(context);
+    } catch (e) {
+      if (mounted) {
+        sayError(context,
+            describeApiError(e, fallback: 'Could not delete the view'));
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: M3EAppBar(title: widget.view.name),
+      appBar: M3EAppBar(
+        title: _name,
+        actions: [
+          M3EAppBarAction(
+            icon: Icons.more_horiz,
+            tooltip: 'View actions',
+            onPressed: _showMoreMenu,
+          ),
+        ],
+      ),
       body: _loading
           ? const LoadingStateWidget()
           : _error != null
@@ -122,16 +223,10 @@ class _ViewDetailScreenState extends ConsumerState<ViewDetailScreen> {
               : RefreshIndicator(
                   onRefresh: _load,
                   child: _issues.isEmpty
-                      ? ListView(children: [
-                          SizedBox(
-                              height: MediaQuery.of(context).size.height * 0.3),
-                          const Center(
-                            child: EmptyStateWidget(
-                              message: 'No issues match this view',
-                              icon: Icons.view_list_outlined,
-                            ),
-                          ),
-                        ])
+                      ? const ScrollableEmptyState(
+                          message: 'No issues match this view',
+                          icon: Icons.view_list_outlined,
+                        )
                       // No separators: the rows are cards with a gap between
                       // them, and a divider inside that gap read as a second,
                       // competing grouping.

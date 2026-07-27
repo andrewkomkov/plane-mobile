@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'sheet_header.dart';
 
 import '../config/m3e/motion.dart';
 import '../config/m3e/shapes.dart';
@@ -281,46 +282,37 @@ Future<String?> showReactionPicker(
   return showModalBottomSheet<String>(
     context: context,
     builder: (ctx) => SafeArea(
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'React to $targetDescription',
-              style: Theme.of(ctx).textTheme.titleMedium,
-            ),
-            const SizedBox(height: 8),
-            Wrap(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SheetHeader(title: 'React to $targetDescription'),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+            child: Wrap(
               children: kReactionEmojiCodes.map((code) {
-                return Semantics(
-                  label: 'React with ${reactionName(code)}',
-                  button: true,
-                  container: true,
-                  excludeSemantics: true,
-                  // As above: excluding the subtree would leave a button with
-                  // no action on it.
+                // M3EPressable, not InkWell: this grid was the last ripple
+                // left in the sheet layer.
+                return M3EPressable(
+                  pressedScale: 0.9,
                   onTap: () => Navigator.pop(ctx, code),
-                  child: InkWell(
-                    onTap: () => Navigator.pop(ctx, code),
-                    borderRadius: BorderRadius.circular(M3EShape.full),
-                    child: SizedBox(
-                      width: 56,
-                      height: 56,
-                      child: Center(
-                        child: Text(
-                          Reaction.codeToEmoji(code),
-                          style: Theme.of(ctx).textTheme.headlineSmall,
-                        ),
+                  semanticLabel: 'React with ${reactionName(code)}',
+                  borderRadius: BorderRadius.circular(M3EShape.full),
+                  child: SizedBox(
+                    width: 56,
+                    height: 56,
+                    child: Center(
+                      child: Text(
+                        Reaction.codeToEmoji(code),
+                        style: Theme.of(ctx).textTheme.headlineSmall,
                       ),
                     ),
                   ),
                 );
               }).toList(),
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     ),
   );

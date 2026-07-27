@@ -82,11 +82,15 @@ Finder iconButton(String tooltip) =>
 
 /// Taps the "Grouping" row of the open display sheet [times] times, then
 /// dismisses it. The row cycles state → priority → assignee → label.
-Future<void> cycleGrouping(WidgetTester tester, int times) async {
-  for (var i = 0; i < times; i++) {
-    await tester.tap(find.text('Grouping'));
-    await tester.pumpAndSettle();
-  }
+Future<void> chooseGrouping(WidgetTester tester, String option) async {
+  // The row opens the shared picker rather than cycling to the next value,
+  // so the option is chosen by name.
+  await tester.tap(find.text('Grouping'));
+  await tester.pumpAndSettle();
+  // The word can also be the caption of another row behind the picker, and
+  // the picker is the topmost route, so its row is the last match.
+  await tester.tap(find.text(option).last);
+  await tester.pumpAndSettle();
   Navigator.of(tester.element(find.text('Grouping'))).pop();
   await tester.pumpAndSettle();
 }
@@ -115,7 +119,7 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text('Display options'));
     await tester.pumpAndSettle();
-    await cycleGrouping(tester, 1);
+    await chooseGrouping(tester, 'Priority');
 
     // The headers are the priorities now, and the state groups are gone.
     expect(find.text('URGENT'), findsOneWidget);
@@ -148,7 +152,7 @@ void main() {
 
     await tester.tap(iconButton('Display options'));
     await tester.pumpAndSettle();
-    await cycleGrouping(tester, 1);
+    await chooseGrouping(tester, 'Priority');
 
     expect(find.text('URGENT'), findsOneWidget);
     expect(find.text('TODO'), findsNothing);

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
-import '../../config/m3e/shapes.dart';
+import 'auth_button_styles.dart';
+import '../../config/theme.dart';
 import '../../widgets/m3e/app_bar.dart';
 import '../../widgets/m3e/icon_button.dart';
 import '../../widgets/m3e/text_field.dart';
@@ -152,7 +153,7 @@ class _BrowserLoginScreenState extends State<BrowserLoginScreen>
           onPressed: _openBrowser,
           icon: const Icon(Icons.open_in_browser),
           label: const Text('Open Plane in Browser'),
-          style: _filledStyle(scheme),
+          style: authFilledStyle(scheme),
         ),
         const SizedBox(height: 16),
         TextButton(
@@ -172,24 +173,6 @@ class _BrowserLoginScreenState extends State<BrowserLoginScreen>
       ],
     );
   }
-
-  /// Filled actions take the container roles rather than primary/onPrimary:
-  /// in the dark scheme `primary` is the pale tone meant to sit *on* a dark
-  /// surface, so using it as a fill paints a near-white slab.
-  ButtonStyle _filledStyle(ColorScheme scheme) => FilledButton.styleFrom(
-        backgroundColor: scheme.primaryContainer,
-        foregroundColor: scheme.onPrimaryContainer,
-        padding: const EdgeInsets.symmetric(vertical: 16),
-        shape: M3EShape.border(M3EShape.large),
-      );
-
-  /// Same corner token and border weight as [M3ETextField], so a field and a
-  /// button stacked on this screen read as one control family.
-  ButtonStyle _outlinedStyle(ColorScheme scheme) => OutlinedButton.styleFrom(
-        padding: const EdgeInsets.symmetric(vertical: 16),
-        side: BorderSide(color: scheme.outlineVariant, width: 0.8),
-        shape: M3EShape.border(M3EShape.large),
-      );
 
   Widget _buildTokenEntryStep(ThemeData theme) {
     final scheme = theme.colorScheme;
@@ -215,9 +198,9 @@ class _BrowserLoginScreenState extends State<BrowserLoginScreen>
         const SizedBox(height: 24),
         OutlinedButton.icon(
           onPressed: _openApiTokenPage,
-          icon: const Icon(Icons.open_in_browser, size: 18),
+          icon: const Icon(Icons.open_in_browser, size: PlaneTheme.iconLarge),
           label: const Text('Open API Tokens Page'),
-          style: _outlinedStyle(scheme),
+          style: authOutlinedStyle(scheme),
         ),
         const SizedBox(height: 24),
         M3ETextField(
@@ -238,7 +221,7 @@ class _BrowserLoginScreenState extends State<BrowserLoginScreen>
         const SizedBox(height: 24),
         FilledButton(
           onPressed: _submitToken,
-          style: _filledStyle(scheme),
+          style: authFilledStyle(scheme),
           child: const Text('Connect'),
         ),
         const SizedBox(height: 16),

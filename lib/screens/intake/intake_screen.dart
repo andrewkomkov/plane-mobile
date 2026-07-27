@@ -199,21 +199,14 @@ class _IntakeScreenState extends State<IntakeScreen> {
     }
     if (_entries.isEmpty) {
       // Scrollable so the pull-to-refresh still works on an empty queue.
-      return ListView(
-        children: [
-          SizedBox(height: MediaQuery.of(context).size.height * 0.25),
-          Center(
-            child: EmptyStateWidget(
-              message: _tab == _IntakeTab.open
-                  ? 'Nothing waiting to be triaged'
-                  : 'Nothing has been triaged yet',
-              icon: IntakeStatusLook.icon(IntakeStatus.pending),
-              subtitle: _tab == _IntakeTab.open
-                  ? 'Submissions to this project land here first'
-                  : 'Accepted, declined and duplicate entries collect here',
-            ),
-          ),
-        ],
+      return ScrollableEmptyState(
+        message: _tab == _IntakeTab.open
+            ? 'Nothing waiting to be triaged'
+            : 'Nothing has been triaged yet',
+        icon: IntakeStatusLook.icon(IntakeStatus.pending),
+        subtitle: _tab == _IntakeTab.open
+            ? 'Submissions to this project land here first'
+            : 'Accepted, declined and duplicate entries collect here',
       );
     }
 

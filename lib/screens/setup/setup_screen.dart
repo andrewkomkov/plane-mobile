@@ -1,6 +1,9 @@
 import 'package:dio/dio.dart';
+import 'auth_button_styles.dart';
+import '../../config/theme.dart';
+import '../../widgets/m3e/button_group.dart';
+import '../../widgets/bottom_sheet_picker.dart';
 import 'package:flutter/material.dart';
-import '../../config/m3e/shapes.dart';
 import '../../widgets/m3e/loading_indicator.dart';
 import '../../widgets/m3e/text_field.dart';
 import 'package:google_sign_in/google_sign_in.dart';
@@ -247,45 +250,31 @@ class _SetupScreenState extends State<SetupScreen> {
     }
   }
 
-  Future<String?> _showWorkspacePicker(List<Map<String, dynamic>> workspaces) {
-    return showModalBottomSheet<String>(
+  Future<String?> _showWorkspacePicker(
+      List<Map<String, dynamic>> workspaces) async {
+    final scheme = Theme.of(context).colorScheme;
+    final titleMedium = Theme.of(context).textTheme.titleMedium;
+    return BottomSheetPicker.show<String>(
       context: context,
-      builder: (ctx) {
-        final theme = Theme.of(ctx);
-        final scheme = theme.colorScheme;
-        return SafeArea(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Padding(
-                padding: const EdgeInsets.all(16),
-                child:
-                    Text('Select Workspace', style: theme.textTheme.titleLarge),
+      title: 'Select workspace',
+      items: [
+        for (final ws in workspaces)
+          BottomSheetPickerItem(
+            value: ws['slug'] as String? ?? '',
+            label: ws['name'] as String? ?? '',
+            subtitle: ws['slug'] as String?,
+            leading: CircleAvatar(
+              radius: 18,
+              backgroundColor: scheme.primary.withValues(alpha: 0.15),
+              child: Text(
+                (ws['name'] as String? ?? '').isNotEmpty
+                    ? (ws['name'] as String)[0].toUpperCase()
+                    : '?',
+                style: titleMedium?.copyWith(color: scheme.primary),
               ),
-              const Divider(height: 1, thickness: 0.5),
-              ...workspaces.map((ws) {
-                final name = ws['name'] as String? ?? '';
-                final slug = ws['slug'] as String? ?? '';
-                return ListTile(
-                  leading: CircleAvatar(
-                    radius: 18,
-                    backgroundColor: scheme.primary.withValues(alpha: 0.15),
-                    child: Text(name.isNotEmpty ? name[0].toUpperCase() : '?',
-                        style: theme.textTheme.titleMedium
-                            ?.copyWith(color: scheme.primary)),
-                  ),
-                  title: Text(name, style: theme.textTheme.titleMedium),
-                  subtitle: Text(slug,
-                      style: theme.textTheme.bodySmall
-                          ?.copyWith(color: scheme.onSurfaceVariant)),
-                  onTap: () => Navigator.pop(ctx, slug),
-                );
-              }),
-              const SizedBox(height: 8),
-            ],
+            ),
           ),
-        );
-      },
+      ],
     );
   }
 
@@ -294,42 +283,31 @@ class _SetupScreenState extends State<SetupScreen> {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
 
-    // One corner token and one border weight for every control on this screen.
+    // One corner token and one border weight for every control on this screen
+    // and on the browser-login screen beside it — see auth_button_styles.dart.
     // The URL field and the Google button used to disagree on both, which is
     // what made the form read as two unrelated pieces of UI.
-    final controlShape = M3EShape.border(M3EShape.large);
-    final controlSide = BorderSide(color: scheme.outlineVariant, width: 0.8);
+    final ButtonStyle filledStyle = authFilledStyle(scheme);
+    final ButtonStyle outlinedStyle = authOutlinedStyle(scheme);
 
-    // Filled actions take the container roles, not primary/onPrimary. In the
-    // dark scheme `primary` is the pale tone meant to be drawn *on* a dark
-    // surface — using it as a fill painted a near-white slab across the screen.
-    final ButtonStyle filledStyle = FilledButton.styleFrom(
-      backgroundColor: scheme.primaryContainer,
-      foregroundColor: scheme.onPrimaryContainer,
-      padding: const EdgeInsets.symmetric(vertical: 16),
-      shape: controlShape,
-    );
-
-    final ButtonStyle outlinedStyle = OutlinedButton.styleFrom(
-      padding: const EdgeInsets.symmetric(vertical: 16),
-      side: controlSide,
-      shape: controlShape,
-    );
-
-    Widget modeSwitch(List<(String, _AuthMode)> options) => Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            for (var i = 0; i < options.length; i++) ...[
-              if (i > 0)
-                Text('  |  ', style: TextStyle(color: scheme.onSurfaceVariant)),
-              TextButton(
-                onPressed: () => setState(() {
-                  _mode = options[i].$2;
-                  _error = null;
-                }),
-                child: Text(options[i].$1),
-              ),
-            ],
+    // Every mode, with the current one marked — not two text links to the
+    // modes you are not in. The old control expressed the selected state
+    // nowhere: which mode you were in could only be inferred from which
+    // fields happened to be on screen, and it was the one selection in the app
+    // that `M3EButtonGroup` was built for and did not use.
+    const modes = [
+      (_AuthMode.google, 'Google'),
+      (_AuthMode.emailPassword, 'Email'),
+      (_AuthMode.apiKey, 'API key'),
+    ];
+    Widget modeSwitch() => M3EButtonGroup(
+          selectedIndex: modes.indexWhere((m) => m.$1 == _mode),
+          onSelected: (i) => setState(() {
+            _mode = modes[i].$1;
+            _error = null;
+          }),
+          items: [
+            for (final m in modes) M3EButtonGroupItem(label: m.$2),
           ],
         );
 
@@ -369,7 +347,8 @@ class _SetupScreenState extends State<SetupScreen> {
                   onPressed: _loading ? null : _signInWithGoogle,
                   icon: _loading
                       ? const M3ELoadingIndicator(size: 18)
-                      : const Icon(Icons.g_mobiledata, size: 24),
+                      : const Icon(Icons.g_mobiledata,
+                          size: PlaneTheme.iconLarge),
                   label:
                       Text(_loading ? 'Signing in...' : 'Sign in with Google'),
                   style: outlinedStyle,
@@ -377,21 +356,18 @@ class _SetupScreenState extends State<SetupScreen> {
                 const SizedBox(height: 12),
                 Row(
                   children: [
-                    const Expanded(child: Divider(height: 1, thickness: 0.5)),
+                    const Expanded(child: Divider()),
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 16),
                       child: Text('or',
                           style: theme.textTheme.bodySmall
                               ?.copyWith(color: scheme.onSurfaceVariant)),
                     ),
-                    const Expanded(child: Divider(height: 1, thickness: 0.5)),
+                    const Expanded(child: Divider()),
                   ],
                 ),
                 const SizedBox(height: 12),
-                modeSwitch(const [
-                  ('Email / Password', _AuthMode.emailPassword),
-                  ('API Key', _AuthMode.apiKey),
-                ]),
+                modeSwitch(),
               ],
 
               // Email/Password
@@ -415,14 +391,12 @@ class _SetupScreenState extends State<SetupScreen> {
                   style: filledStyle,
                   child: _loading
                       ? M3ELoadingIndicator(
-                          size: 20, color: scheme.onPrimaryContainer)
+                          size: PlaneTheme.iconLarge,
+                          color: scheme.onPrimaryContainer)
                       : const Text('Sign In'),
                 ),
                 const SizedBox(height: 12),
-                modeSwitch(const [
-                  ('Google', _AuthMode.google),
-                  ('API Key', _AuthMode.apiKey),
-                ]),
+                modeSwitch(),
               ],
 
               // API Key
@@ -447,14 +421,12 @@ class _SetupScreenState extends State<SetupScreen> {
                   style: filledStyle,
                   child: _loading
                       ? M3ELoadingIndicator(
-                          size: 20, color: scheme.onPrimaryContainer)
+                          size: PlaneTheme.iconLarge,
+                          color: scheme.onPrimaryContainer)
                       : const Text('Connect'),
                 ),
                 const SizedBox(height: 12),
-                modeSwitch(const [
-                  ('Google', _AuthMode.google),
-                  ('Email / Password', _AuthMode.emailPassword),
-                ]),
+                modeSwitch(),
               ],
 
               if (_error != null) ...[

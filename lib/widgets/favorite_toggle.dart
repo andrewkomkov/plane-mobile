@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../utils/say.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../models/favorite.dart';
@@ -62,7 +63,6 @@ class FavoriteToggle extends ConsumerWidget {
   }
 
   Future<void> _toggle(BuildContext context, WidgetRef ref) async {
-    final messenger = ScaffoldMessenger.of(context);
     final ok = await ref.read(favoritesProvider.notifier).toggle(
           workspaceSlug,
           entity: entity,
@@ -72,8 +72,8 @@ class FavoriteToggle extends ConsumerWidget {
     if (ok) return;
     // The star has already snapped back by the time this runs, so the message
     // says what failed rather than what to do about it.
-    messenger.showSnackBar(
-      SnackBar(content: Text('Could not update favorites for $entityName')),
-    );
+    if (context.mounted) {
+      sayError(context, 'Could not update favorites for $entityName');
+    }
   }
 }

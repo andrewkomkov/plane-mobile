@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../utils/say.dart';
 import '../../widgets/m3e/app_bar.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 
@@ -166,10 +167,7 @@ class _WebViewLoginScreenState extends State<WebViewLoginScreen> {
       _extracting = false;
       if (mounted) {
         setState(() => _loading = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-              content: Text('Logged in! Tap the checkmark to continue.')),
-        );
+        say(context, 'Logged in! Tap the checkmark to continue.');
       }
     } catch (e) {
       _extracting = false;

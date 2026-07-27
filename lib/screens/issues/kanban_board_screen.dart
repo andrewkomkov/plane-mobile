@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import '../../utils/api_error.dart';
+import '../../utils/say.dart';
 import '../../config/m3e/motion.dart';
 import '../../config/m3e/shapes.dart';
 import '../../config/theme.dart';
@@ -63,8 +65,8 @@ class _KanbanBoardScreenState extends State<KanbanBoardScreen> {
       widget.onRefresh();
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text('Error: $e')));
+        sayError(context,
+            describeApiError(e, fallback: 'Could not move the work item'));
       }
     }
   }

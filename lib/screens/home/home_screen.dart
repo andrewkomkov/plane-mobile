@@ -113,6 +113,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           _searchAutoFocus = false;
         }),
         showSearch: true,
+        // Tab 4 is the search screen; the bar's own indicator only covers the
+        // four destinations inside the pill.
+        searchSelected: _currentTab == 4,
         onSearchTap: () => setState(() {
           _currentTab = 4;
           _searchAutoFocus = false;

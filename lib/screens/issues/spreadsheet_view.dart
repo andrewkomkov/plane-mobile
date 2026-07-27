@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import '../../utils/api_error.dart';
+import '../../utils/say.dart';
 import '../../config/m3e/motion.dart';
 import '../../config/theme.dart';
 import '../../models/issue.dart';
@@ -250,7 +252,6 @@ class SpreadsheetView extends StatelessWidget {
   }
 
   Future<void> _showStatePicker(BuildContext context, Issue issue) async {
-    final messenger = ScaffoldMessenger.of(context);
     final chosen = await BottomSheetPicker.show<String>(
       context: context,
       title: 'State',
@@ -273,13 +274,14 @@ class SpreadsheetView extends StatelessWidget {
           workspaceSlug, projectId, issue.id, {'state': chosen});
       onRefresh();
     } catch (e) {
-      messenger
-          .showSnackBar(SnackBar(content: Text('Failed to change state: $e')));
+      if (context.mounted) {
+        sayError(
+            context, describeApiError(e, fallback: 'Failed to change state'));
+      }
     }
   }
 
   Future<void> _showPriorityPicker(BuildContext context, Issue issue) async {
-    final messenger = ScaffoldMessenger.of(context);
     final chosen = await BottomSheetPicker.show<String>(
       context: context,
       title: 'Priority',
@@ -300,8 +302,10 @@ class SpreadsheetView extends StatelessWidget {
           workspaceSlug, projectId, issue.id, {'priority': chosen});
       onRefresh();
     } catch (e) {
-      messenger.showSnackBar(
-          SnackBar(content: Text('Failed to change priority: $e')));
+      if (context.mounted) {
+        sayError(context,
+            describeApiError(e, fallback: 'Failed to change priority'));
+      }
     }
   }
 }

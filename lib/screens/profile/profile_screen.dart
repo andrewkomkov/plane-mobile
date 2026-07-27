@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import '../../utils/api_error.dart';
+import '../../utils/say.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../config/m3e/shapes.dart';
@@ -57,13 +59,12 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     try {
       await AuthService.updateProfile({'display_name': name});
       if (mounted) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(const SnackBar(content: Text('Profile updated')));
+        say(context, 'Profile updated');
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text('Error: $e')));
+        sayError(context,
+            describeApiError(e, fallback: 'Could not update your profile'));
       }
     }
     setState(() => _saving = false);

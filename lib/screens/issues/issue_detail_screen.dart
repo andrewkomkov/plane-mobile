@@ -1,4 +1,7 @@
 import 'dart:io';
+import '../../utils/api_error.dart';
+import '../../widgets/label_pill.dart';
+import '../../utils/say.dart';
 
 import 'package:dio/dio.dart';
 import 'package:file_picker/file_picker.dart';
@@ -37,7 +40,11 @@ import '../../models/module.dart';
 import '../../services/cycle_service.dart';
 import '../../utils/html_to_markdown.dart';
 import '../../utils/time_ago.dart';
+import '../../widgets/bottom_sheet_picker.dart';
+import '../../widgets/confirm_dialog.dart';
+import '../../widgets/m3e/loading_indicator.dart';
 import '../../widgets/property_chip.dart';
+import '../../widgets/sheet_header.dart';
 import '../../widgets/loading_state.dart';
 import '../../widgets/reaction_bar.dart';
 import '../../widgets/skeleton_loader.dart';
@@ -452,33 +459,19 @@ class _IssueDetailScreenState extends ConsumerState<IssueDetailScreen> {
       });
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Could not save the comment: $e')),
-      );
+      sayError(context, 'Could not save the comment: $e');
     }
   }
 
   Future<void> _deleteComment(Comment comment) async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Delete comment'),
-        content: const Text(
-            'Are you sure you want to delete this comment? This cannot be undone.'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            child: Text('Delete',
-                style: TextStyle(color: Theme.of(ctx).colorScheme.error)),
-          ),
-        ],
-      ),
+    final confirmed = await confirmDestructive(
+      context,
+      title: 'Delete comment',
+      message:
+          'Are you sure you want to delete this comment? This cannot be undone.',
+      confirmLabel: 'Delete',
     );
-    if (confirmed != true) return;
+    if (!confirmed) return;
 
     try {
       await CommentService.deleteComment(
@@ -491,9 +484,7 @@ class _IssueDetailScreenState extends ConsumerState<IssueDetailScreen> {
       setState(() => _comments.removeWhere((c) => c.id == comment.id));
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Could not delete the comment: $e')),
-      );
+      sayError(context, 'Could not delete the comment: $e');
     }
   }
 
@@ -538,9 +529,7 @@ class _IssueDetailScreenState extends ConsumerState<IssueDetailScreen> {
       _load();
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Could not attach $name: $e')),
-      );
+      sayError(context, 'Could not attach $name: $e');
     } finally {
       if (mounted) setState(() => _uploadingAttachment = null);
     }
@@ -553,9 +542,7 @@ class _IssueDetailScreenState extends ConsumerState<IssueDetailScreen> {
       if (mounted) Navigator.pop(context);
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to delete: $e')),
-        );
+        sayError(context, describeApiError(e, fallback: 'Failed to delete'));
       }
     }
   }
@@ -619,9 +606,7 @@ class _IssueDetailScreenState extends ConsumerState<IssueDetailScreen> {
 
   void _complain(String what, Object e) {
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('$what: $e')),
-    );
+    say(context, '$what: $e');
   }
 
   // --- Reactions (#7) ---
@@ -740,13 +725,11 @@ class _IssueDetailScreenState extends ConsumerState<IssueDetailScreen> {
             widget.workspaceSlug, widget.projectId, widget.issueId);
       }
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(subscribed
+        say(
+            context,
+            subscribed
                 ? 'Unsubscribed from this work item'
-                : 'Subscribed to this work item'),
-          ),
-        );
+                : 'Subscribed to this work item');
       }
     } catch (e) {
       if (mounted) setState(() => _issue = issue);
@@ -803,9 +786,7 @@ class _IssueDetailScreenState extends ConsumerState<IssueDetailScreen> {
       await IssueService.archiveIssue(
           widget.workspaceSlug, widget.projectId, widget.issueId);
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Work item archived')),
-      );
+      say(context, 'Work item archived');
       _load();
     } catch (e) {
       _complain('Could not archive the work item', e);
@@ -817,9 +798,7 @@ class _IssueDetailScreenState extends ConsumerState<IssueDetailScreen> {
       await IssueService.unarchiveIssue(
           widget.workspaceSlug, widget.projectId, widget.issueId);
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Work item restored')),
-      );
+      say(context, 'Work item restored');
       _load();
     } catch (e) {
       _complain('Could not restore the work item', e);
@@ -829,27 +808,17 @@ class _IssueDetailScreenState extends ConsumerState<IssueDetailScreen> {
   // --- Relations (#14) ---
 
   Future<void> _addRelation() async {
-    final kind = await showModalBottomSheet<String>(
+    final kind = await BottomSheetPicker.show<String>(
       context: context,
-      builder: (ctx) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Padding(
-              padding: const EdgeInsets.all(16),
-              child: Text('Relation type',
-                  style: Theme.of(ctx).textTheme.titleMedium),
-            ),
-            ...IssueService.relationKinds.entries.map(
-              (e) => ListTile(
-                leading: Icon(_RelationChip.iconFor(e.key), size: 20),
-                title: Text(e.value, style: Theme.of(ctx).textTheme.bodyMedium),
-                onTap: () => Navigator.pop(ctx, e.key),
-              ),
-            ),
-          ],
-        ),
-      ),
+      title: 'Relation type',
+      items: [
+        for (final e in IssueService.relationKinds.entries)
+          BottomSheetPickerItem(
+            value: e.key,
+            label: e.value,
+            icon: _RelationChip.iconFor(e.key),
+          ),
+      ],
     );
     if (kind == null || !mounted) return;
 
@@ -893,103 +862,64 @@ class _IssueDetailScreenState extends ConsumerState<IssueDetailScreen> {
 
   // --- Estimate, cycle and module (#11) ---
 
-  void _showEstimatePicker() {
-    final current = _issue?.estimatePoint;
-    showModalBottomSheet(
+  /// The "unset" row in a picker whose real values are all server ids.
+  ///
+  /// [BottomSheetPicker] compares with `==`, so an explicit "None" needs a
+  /// value of its own — null would make it indistinguishable from "nothing is
+  /// selected", which is the state it represents and must be able to mark.
+  static const _noValue = '';
+
+  Future<void> _showEstimatePicker() async {
+    final current = _issue?.estimatePoint ?? _noValue;
+    final chosen = await BottomSheetPicker.show<String>(
       context: context,
-      builder: (ctx) => SafeArea(
-        child: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Padding(
-                padding: const EdgeInsets.all(16),
-                child: Text('Estimate',
-                    style: Theme.of(ctx).textTheme.titleMedium),
-              ),
-              ..._estimatePoints.map((p) => ListTile(
-                    title: Text(p.value,
-                        style: Theme.of(ctx).textTheme.bodyMedium),
-                    subtitle: (p.description ?? '').isNotEmpty
-                        ? Text(p.description!,
-                            style: Theme.of(ctx).textTheme.bodySmall)
-                        : null,
-                    trailing: p.id == current
-                        ? const Icon(Icons.check, size: 18)
-                        : null,
-                    onTap: () {
-                      Navigator.pop(ctx);
-                      _updateField({'estimate_point': p.id});
-                    },
-                  )),
-              if (current != null) ...[
-                const Divider(),
-                ListTile(
-                  leading: const Icon(Icons.clear, size: 20),
-                  title: Text('Clear estimate',
-                      style: Theme.of(ctx).textTheme.bodyMedium),
-                  onTap: () {
-                    Navigator.pop(ctx);
-                    _updateField({'estimate_point': null});
-                  },
-                ),
-              ],
-            ],
+      title: 'Estimate',
+      subtitle:
+          _estimatePoints.isEmpty ? 'This project has no estimate scale' : null,
+      selectedValue: current,
+      items: [
+        for (final p in _estimatePoints)
+          BottomSheetPickerItem(
+            value: p.id,
+            label: p.value,
+            subtitle: (p.description ?? '').isNotEmpty ? p.description : null,
           ),
+        // Always offered, not only when something is set: an unestimated work
+        // item should be able to see that "No estimate" is what it is.
+        const BottomSheetPickerItem(
+          value: _noValue,
+          label: 'No estimate',
+          icon: Icons.clear,
         ),
-      ),
+      ],
     );
+    if (chosen == null || chosen == current) return;
+    await _updateField({'estimate_point': chosen == _noValue ? null : chosen});
   }
 
-  void _showCyclePicker() {
-    final current = _issue?.cycleId;
-    showModalBottomSheet(
+  Future<void> _showCyclePicker() async {
+    final current = _issue?.cycleId ?? _noValue;
+    final chosen = await BottomSheetPicker.show<String>(
       context: context,
-      builder: (ctx) => SafeArea(
-        child: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Padding(
-                padding: const EdgeInsets.all(16),
-                child:
-                    Text('Cycle', style: Theme.of(ctx).textTheme.titleMedium),
-              ),
-              if (_cycles.isEmpty)
-                Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Text('No cycles in this project',
-                      style: Theme.of(ctx).textTheme.bodySmall),
-                ),
-              ..._cycles.map((c) => ListTile(
-                    leading: const Icon(Icons.replay_outlined, size: 20),
-                    title:
-                        Text(c.name, style: Theme.of(ctx).textTheme.bodyMedium),
-                    trailing: c.id == current
-                        ? const Icon(Icons.check, size: 18)
-                        : null,
-                    onTap: () {
-                      Navigator.pop(ctx);
-                      _setCycle(c.id);
-                    },
-                  )),
-              if (current != null) ...[
-                const Divider(),
-                ListTile(
-                  leading: const Icon(Icons.clear, size: 20),
-                  title: Text('Remove from cycle',
-                      style: Theme.of(ctx).textTheme.bodyMedium),
-                  onTap: () {
-                    Navigator.pop(ctx);
-                    _setCycle(null);
-                  },
-                ),
-              ],
-            ],
+      title: 'Cycle',
+      subtitle: _cycles.isEmpty ? 'No cycles in this project' : null,
+      selectedValue: current,
+      items: [
+        for (final c in _cycles)
+          BottomSheetPickerItem(
+            value: c.id,
+            label: c.name,
+            icon: Icons.replay_outlined,
           ),
+        const BottomSheetPickerItem(
+          value: _noValue,
+          label: 'No cycle',
+          icon: Icons.clear,
         ),
-      ),
+      ],
     );
+    if (chosen == null || chosen == current) return;
+    await _setCycle(chosen == _noValue ? null : chosen);
   }
 
   /// Moves the work item to [cycleId], or out of its cycle when null.
@@ -1015,63 +945,24 @@ class _IssueDetailScreenState extends ConsumerState<IssueDetailScreen> {
     }
   }
 
-  void _showModulePicker() {
-    final selected = Set<String>.from(_issue?.moduleIds ?? const <String>[]);
-    final original = Set<String>.from(selected);
-    showModalBottomSheet(
+  Future<void> _showModulePicker() async {
+    final original = Set<String>.from(_issue?.moduleIds ?? const <String>[]);
+    final chosen = await MultiSelectSheet.show<String>(
       context: context,
-      builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setSheetState) => SafeArea(
-          child: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Padding(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                  child: Row(
-                    children: [
-                      Text('Modules',
-                          style: Theme.of(ctx).textTheme.titleMedium),
-                      const Spacer(),
-                      TextButton(
-                        onPressed: () {
-                          Navigator.pop(ctx);
-                          _setModules(original, selected);
-                        },
-                        child: const Text('Done'),
-                      ),
-                    ],
-                  ),
-                ),
-                if (_modules.isEmpty)
-                  Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Text('No modules in this project',
-                        style: Theme.of(ctx).textTheme.bodySmall),
-                  ),
-                ..._modules.map((m) => CheckboxListTile(
-                      value: selected.contains(m.id),
-                      onChanged: (v) => setSheetState(() {
-                        if (v == true) {
-                          selected.add(m.id);
-                        } else {
-                          selected.remove(m.id);
-                        }
-                      }),
-                      secondary:
-                          const Icon(Icons.view_module_outlined, size: 20),
-                      title: Text(m.name,
-                          style: Theme.of(ctx).textTheme.bodyMedium),
-                      controlAffinity: ListTileControlAffinity.trailing,
-                      dense: true,
-                    )),
-              ],
-            ),
+      title: 'Modules',
+      selected: original,
+      emptyMessage: 'No modules in this project',
+      items: [
+        for (final m in _modules)
+          BottomSheetPickerItem(
+            value: m.id,
+            label: m.name,
+            icon: Icons.view_module_outlined,
           ),
-        ),
-      ),
+      ],
     );
+    if (chosen == null) return;
+    await _setModules(original, chosen);
   }
 
   /// Sends the module change as the difference between the two sets.
@@ -1150,7 +1041,13 @@ class _IssueDetailScreenState extends ConsumerState<IssueDetailScreen> {
     // so the editor follows whichever half the pills are in.
     final labelled = issueLabels.isNotEmpty;
     for (final l in issueLabels) {
-      add(true, _LabelPill(label: l, onTap: _showLabelPicker));
+      add(
+          true,
+          LabelPill(
+            name: l.name,
+            hex: l.color,
+            onTap: _showLabelPicker,
+          ));
     }
     add(
       labelled,
@@ -1567,7 +1464,8 @@ class _IssueDetailScreenState extends ConsumerState<IssueDetailScreen> {
                     // comment bar carried a dark disc with a grey glyph on it.
                     backgroundColor: theme.colorScheme.surfaceContainerHighest,
                     child: Icon(Icons.person,
-                        size: 14, color: theme.colorScheme.onSurfaceVariant),
+                        size: PlaneTheme.iconSmall,
+                        color: theme.colorScheme.onSurfaceVariant),
                   ),
                   const SizedBox(width: 10),
                   Expanded(
@@ -1607,35 +1505,24 @@ class _IssueDetailScreenState extends ConsumerState<IssueDetailScreen> {
 
   /// Offers both ways to gain a sub-issue: make a new one, or adopt one that
   /// already exists.
-  void _showAddSubIssueMenu() {
-    showModalBottomSheet(
+  Future<void> _showAddSubIssueMenu() async {
+    final chosen = await BottomSheetPicker.show<String>(
       context: context,
-      builder: (ctx) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ListTile(
-              leading: const Icon(Icons.add, size: 20),
-              title: Text('Create new sub-issue',
-                  style: Theme.of(ctx).textTheme.bodyMedium),
-              onTap: () {
-                Navigator.pop(ctx);
-                _addSubIssue();
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.playlist_add, size: 20),
-              title: Text('Add existing work item',
-                  style: Theme.of(ctx).textTheme.bodyMedium),
-              onTap: () {
-                Navigator.pop(ctx);
-                _linkExistingSubIssue();
-              },
-            ),
-          ],
-        ),
-      ),
+      title: 'Add sub-issue',
+      items: const [
+        BottomSheetPickerItem(
+            value: 'new', label: 'Create new sub-issue', icon: Icons.add),
+        BottomSheetPickerItem(
+            value: 'existing',
+            label: 'Add existing work item',
+            icon: Icons.playlist_add),
+      ],
     );
+    if (chosen == 'new') {
+      await _addSubIssue();
+    } else if (chosen == 'existing') {
+      await _linkExistingSubIssue();
+    }
   }
 
   // --- Sub-issues section ---
@@ -1660,7 +1547,14 @@ class _IssueDetailScreenState extends ConsumerState<IssueDetailScreen> {
           else
             ..._subIssues.map((sub) {
               final subState = _states[sub.state];
-              return InkWell(
+              return M3EPressable(
+                pressedScale: 0.98,
+                // The row draws a state icon, a priority icon and a title, and
+                // M3EPressable replaces its subtree's node, so all three have
+                // to be said here. The remove button keeps its own node.
+                semanticLabel: '${sub.name}, '
+                    '${subState?.name ?? 'no state'}, '
+                    '${sub.priority} priority',
                 onTap: () async {
                   await Navigator.push(
                     context,
@@ -1685,14 +1579,14 @@ class _IssueDetailScreenState extends ConsumerState<IssueDetailScreen> {
                     children: [
                       Icon(
                         PlaneTheme.stateIcon(subState?.group ?? 'backlog'),
-                        size: 16,
+                        size: PlaneTheme.iconMedium,
                         color: PlaneTheme.stateGroupColor(
                             context, subState?.group ?? 'backlog'),
                       ),
                       const SizedBox(width: 8),
                       Icon(
                         PlaneTheme.priorityIcon(sub.priority),
-                        size: 14,
+                        size: PlaneTheme.iconSmall,
                         color: PlaneTheme.priorityColor(context, sub.priority),
                       ),
                       const SizedBox(width: 8),
@@ -1760,30 +1654,19 @@ class _IssueDetailScreenState extends ConsumerState<IssueDetailScreen> {
     );
   }
 
-  void _confirmRemoveRelation(Map<String, dynamic> relation, String name) {
-    showModalBottomSheet(
-      context: context,
-      builder: (ctx) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ListTile(
-              leading: Icon(Icons.link_off,
-                  color: Theme.of(ctx).colorScheme.error, size: 20),
-              title: Text('Remove relation to $name',
-                  style: Theme.of(ctx)
-                      .textTheme
-                      .bodyMedium
-                      ?.copyWith(color: Theme.of(ctx).colorScheme.error)),
-              onTap: () {
-                Navigator.pop(ctx);
-                _removeRelation(relation);
-              },
-            ),
-          ],
-        ),
-      ),
+  /// A sheet with one destructive row was a confirmation wearing a menu's
+  /// clothes — it asked the question but offered no visible way to answer no
+  /// beyond dismissing it. This is the app's confirm dialog, which has both
+  /// answers and paints the dangerous one in the error role.
+  Future<void> _confirmRemoveRelation(
+      Map<String, dynamic> relation, String name) async {
+    final ok = await confirmDestructive(
+      context,
+      title: 'Remove relation',
+      message: 'Remove the relation to $name? The work item itself stays.',
+      confirmLabel: 'Remove',
     );
+    if (ok) await _removeRelation(relation);
   }
 
   // --- Attachments section ---
@@ -1804,14 +1687,10 @@ class _IssueDetailScreenState extends ConsumerState<IssueDetailScreen> {
               padding: const EdgeInsets.symmetric(vertical: 4),
               child: Row(
                 children: [
-                  SizedBox(
-                    width: 16,
-                    height: 16,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      color: secondary,
-                    ),
-                  ),
+                  // The app's indicator, not Material's — this was the last
+                  // constant-rate spinner left in `lib/`.
+                  M3ELoadingIndicator(
+                      size: PlaneTheme.iconMedium, color: secondary),
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
@@ -1831,7 +1710,8 @@ class _IssueDetailScreenState extends ConsumerState<IssueDetailScreen> {
                   padding: const EdgeInsets.symmetric(vertical: 4),
                   child: Row(
                     children: [
-                      Icon(Icons.attach_file, size: 16, color: secondary),
+                      Icon(Icons.attach_file,
+                          size: PlaneTheme.iconMedium, color: secondary),
                       const SizedBox(width: 8),
                       Expanded(
                         child: Text(
@@ -1873,19 +1753,20 @@ class _IssueDetailScreenState extends ConsumerState<IssueDetailScreen> {
           if (_links.isEmpty)
             Text('No links', style: theme.textTheme.bodySmall)
           else
-            ..._links.map((link) => InkWell(
+            ..._links.map((link) => M3EPressable(
+                  pressedScale: 0.98,
+                  semanticLabel: '${link.title ?? link.url}, link',
                   onTap: () {
                     // Show URL in a snackbar since url_launcher is not available
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text(link.url)),
-                    );
+                    say(context, link.url);
                   },
                   child: Padding(
                     padding: const EdgeInsets.symmetric(vertical: 4),
                     child: Row(
                       children: [
                         Icon(Icons.link,
-                            size: 16, color: theme.colorScheme.primary),
+                            size: PlaneTheme.iconMedium,
+                            color: theme.colorScheme.primary),
                         const SizedBox(width: 8),
                         Expanded(
                           child: Column(
@@ -1967,9 +1848,8 @@ class _IssueDetailScreenState extends ConsumerState<IssueDetailScreen> {
                 _load();
               } catch (e) {
                 if (mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('Failed to add link: $e')),
-                  );
+                  sayError(context,
+                      describeApiError(e, fallback: 'Failed to add link'));
                 }
               }
             },
@@ -2056,136 +1936,97 @@ class _IssueDetailScreenState extends ConsumerState<IssueDetailScreen> {
   }
 
   // --- More menu with delete ---
-  void _showMoreMenu() {
+  Future<void> _showMoreMenu() async {
     final archived = _issue?.isArchived ?? false;
-    showModalBottomSheet(
+    final chosen = await BottomSheetPicker.show<String>(
       context: context,
-      builder: (ctx) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            if (archived)
-              ListTile(
-                leading: const Icon(Icons.unarchive_outlined, size: 20),
-                title: Text('Restore from archive',
-                    style: Theme.of(ctx).textTheme.bodyMedium),
-                onTap: () {
-                  Navigator.pop(ctx);
-                  _unarchiveIssue();
-                },
-              )
-            else
-              ListTile(
-                enabled: _canArchive,
-                leading: Icon(Icons.archive_outlined,
-                    size: 20,
-                    color: _canArchive ? null : Theme.of(ctx).disabledColor),
-                title: Text('Archive work item',
-                    style: Theme.of(ctx).textTheme.bodyMedium),
-                // The server refuses to archive anything that is not finished,
-                // so say that here rather than letting the tap fail.
-                subtitle: _canArchive
-                    ? null
-                    : Text(
-                        'Only completed or cancelled work items can be archived',
-                        style: Theme.of(ctx).textTheme.bodySmall),
-                onTap: _canArchive
-                    ? () {
-                        Navigator.pop(ctx);
-                        _archiveIssue();
-                      }
-                    : null,
-              ),
-            ListTile(
-              leading: Icon(Icons.delete_outline,
-                  color: Theme.of(ctx).colorScheme.error, size: 20),
-              title: Text('Delete issue',
-                  style: Theme.of(ctx)
-                      .textTheme
-                      .bodyMedium
-                      ?.copyWith(color: Theme.of(ctx).colorScheme.error)),
-              onTap: () {
-                Navigator.pop(ctx);
-                _confirmDelete();
-              },
-            ),
-          ],
+      title: 'Work item',
+      items: [
+        if (archived)
+          const BottomSheetPickerItem(
+            value: 'unarchive',
+            label: 'Restore from archive',
+            icon: Icons.unarchive_outlined,
+          )
+        else
+          BottomSheetPickerItem(
+            value: 'archive',
+            label: 'Archive work item',
+            icon: Icons.archive_outlined,
+            // The server refuses to archive anything that is not finished, so
+            // the row says so and dims rather than failing on tap.
+            enabled: _canArchive,
+            subtitle: _canArchive
+                ? null
+                : 'Only completed or cancelled work items can be archived',
+          ),
+        const BottomSheetPickerItem(
+          value: 'delete',
+          label: 'Delete issue',
+          icon: Icons.delete_outline,
+          destructive: true,
         ),
-      ),
+      ],
     );
+    switch (chosen) {
+      case 'unarchive':
+        await _unarchiveIssue();
+      case 'archive':
+        await _archiveIssue();
+      case 'delete':
+        await _confirmDelete();
+    }
   }
 
-  void _confirmDelete() {
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Delete issue'),
-        content: const Text('Are you sure you want to delete this issue?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () {
-              Navigator.pop(ctx);
-              _deleteIssue();
-            },
-            child: Text('Delete',
-                style: TextStyle(color: Theme.of(ctx).colorScheme.error)),
-          ),
-        ],
-      ),
+  Future<void> _confirmDelete() async {
+    final ok = await confirmDestructive(
+      context,
+      title: 'Delete issue',
+      message: 'Are you sure you want to delete this issue?',
+      confirmLabel: 'Delete',
     );
+    if (ok) await _deleteIssue();
   }
 
   // --- State picker ---
-  void _showStatePicker() {
-    showModalBottomSheet(
+  Future<void> _showStatePicker() async {
+    final chosen = await BottomSheetPicker.show<String>(
       context: context,
-      builder: (ctx) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: _states.values
-              .map((s) => ListTile(
-                    leading: Icon(PlaneTheme.stateIcon(s.group),
-                        color: PlaneTheme.stateGroupColor(context, s.group),
-                        size: 18),
-                    title:
-                        Text(s.name, style: Theme.of(ctx).textTheme.bodyMedium),
-                    onTap: () {
-                      Navigator.pop(ctx);
-                      _updateField({'state': s.id});
-                    },
-                  ))
-              .toList(),
-        ),
-      ),
+      title: 'State',
+      selectedValue: _issue?.state,
+      items: [
+        for (final s in _states.values)
+          BottomSheetPickerItem(
+            value: s.id,
+            label: s.name,
+            icon: PlaneTheme.stateIcon(s.group),
+            iconColor: PlaneTheme.stateGroupColor(context, s.group),
+          ),
+      ],
     );
+    if (chosen == null || chosen == _issue?.state) return;
+    await _updateField({'state': chosen});
   }
 
   // --- Priority picker ---
-  void _showPriorityPicker() {
-    showModalBottomSheet(
+  Future<void> _showPriorityPicker() async {
+    const priorities = ['urgent', 'high', 'medium', 'low', 'none'];
+    final chosen = await BottomSheetPicker.show<String>(
       context: context,
-      builder: (ctx) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: ['urgent', 'high', 'medium', 'low', 'none']
-              .map((p) => ListTile(
-                    leading: Icon(PlaneTheme.priorityIcon(p),
-                        color: PlaneTheme.priorityColor(context, p), size: 18),
-                    title: Text(p[0].toUpperCase() + p.substring(1),
-                        style: Theme.of(ctx).textTheme.bodyMedium),
-                    onTap: () {
-                      Navigator.pop(ctx);
-                      _updateField({'priority': p});
-                    },
-                  ))
-              .toList(),
-        ),
-      ),
+      title: 'Priority',
+      selectedValue: _issue?.priority,
+      items: [
+        for (final p in priorities)
+          BottomSheetPickerItem(
+            value: p,
+            label: p[0].toUpperCase() + p.substring(1),
+            icon: PlaneTheme.priorityIcon(p),
+            iconColor: PlaneTheme.priorityColor(context, p),
+          ),
+      ],
     );
+    if (chosen == null || chosen == _issue?.priority) return;
+    await _updateField({'priority': chosen});
   }
 
   // --- Label picker (multi-select) ---
@@ -2240,7 +2081,9 @@ class _IssueDetailScreenState extends ConsumerState<IssueDetailScreen> {
                           button: true,
                           selected: selectedColor == c,
                           container: true,
-                          child: GestureDetector(
+                          child: M3EPressable(
+                            pressedScale: 0.88,
+                            selected: selectedColor == c,
                             onTap: () =>
                                 setDialogState(() => selectedColor = c),
                             // 28dp circle, 48dp target: a swatch is still a control.
@@ -2252,7 +2095,10 @@ class _IssueDetailScreenState extends ConsumerState<IssueDetailScreen> {
                                   width: 28,
                                   height: 28,
                                   decoration: BoxDecoration(
-                                    color: _parseColor(c),
+                                    color: parseHexColor(c,
+                                        fallback: Theme.of(context)
+                                            .colorScheme
+                                            .outline),
                                     shape: BoxShape.circle,
                                     border: selectedColor == c
                                         ? Border.all(
@@ -2304,147 +2150,62 @@ class _IssueDetailScreenState extends ConsumerState<IssueDetailScreen> {
         }
       } catch (e) {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Error creating label: $e')),
-          );
+          sayError(context, 'Error creating label: $e');
         }
       }
     }
   }
 
-  void _showLabelPicker() {
-    final selected = Set<String>.from(_issue?.labels ?? []);
-    showModalBottomSheet(
+  Future<void> _showLabelPicker() async {
+    final current = Set<String>.from(_issue?.labels ?? const <String>[]);
+    final chosen = await MultiSelectSheet.show<String>(
       context: context,
-      builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setSheetState) => SafeArea(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Padding(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                child: Row(
-                  children: [
-                    Text('Labels', style: Theme.of(ctx).textTheme.titleMedium),
-                    const Spacer(),
-                    TextButton(
-                      onPressed: () {
-                        Navigator.pop(ctx);
-                        _updateField({'labels': selected.toList()});
-                      },
-                      child: const Text('Done'),
-                    ),
-                  ],
-                ),
+      title: 'Labels',
+      selected: current,
+      emptyMessage: 'No labels yet',
+      createLabel: 'Create new label',
+      onCreate: _createLabel,
+      items: [
+        for (final l in _allLabels)
+          BottomSheetPickerItem(
+            value: l.id,
+            label: l.name,
+            leading: Container(
+              width: 14,
+              height: 14,
+              decoration: BoxDecoration(
+                color: parseHexColor(l.color,
+                    fallback: Theme.of(context).colorScheme.outline),
+                shape: BoxShape.circle,
               ),
-              if (_allLabels.isEmpty)
-                Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Text('No labels yet',
-                      style: Theme.of(ctx).textTheme.bodySmall),
-                ),
-              ..._allLabels.map((l) => CheckboxListTile(
-                    value: selected.contains(l.id),
-                    onChanged: (v) {
-                      setSheetState(() {
-                        if (v == true) {
-                          selected.add(l.id);
-                        } else {
-                          selected.remove(l.id);
-                        }
-                      });
-                    },
-                    secondary: Container(
-                      width: 14,
-                      height: 14,
-                      decoration: BoxDecoration(
-                        color: _parseColor(l.color),
-                        shape: BoxShape.circle,
-                      ),
-                    ),
-                    title:
-                        Text(l.name, style: Theme.of(ctx).textTheme.bodyMedium),
-                    controlAffinity: ListTileControlAffinity.trailing,
-                    dense: true,
-                  )),
-              const Divider(),
-              ListTile(
-                leading: const Icon(Icons.add, size: 20),
-                title: Text('Create new label',
-                    style: Theme.of(ctx).textTheme.bodyMedium),
-                onTap: () async {
-                  Navigator.pop(ctx);
-                  await _createLabel();
-                },
-              ),
-            ],
+            ),
           ),
-        ),
-      ),
+      ],
     );
+    if (chosen == null) return;
+    await _updateField({'labels': chosen.toList()});
   }
 
   // --- Assignee picker (multi-select) ---
-  void _showAssigneePicker() {
-    final selected = Set<String>.from(_issue?.assignees ?? []);
-    showModalBottomSheet(
+  Future<void> _showAssigneePicker() async {
+    final current = Set<String>.from(_issue?.assignees ?? const <String>[]);
+    final chosen = await MultiSelectSheet.show<String>(
       context: context,
-      builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setSheetState) => SafeArea(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Padding(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                child: Row(
-                  children: [
-                    Text('Assignees',
-                        style: Theme.of(ctx).textTheme.titleMedium),
-                    const Spacer(),
-                    TextButton(
-                      onPressed: () {
-                        Navigator.pop(ctx);
-                        _updateField({'assignees': selected.toList()});
-                      },
-                      child: const Text('Done'),
-                    ),
-                  ],
-                ),
-              ),
-              if (_allMembers.isEmpty)
-                Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Text('No members found',
-                      style: Theme.of(ctx).textTheme.bodySmall),
-                ),
-              ..._allMembers.map((m) => CheckboxListTile(
-                    value: selected.contains(m.id),
-                    onChanged: (v) {
-                      setSheetState(() {
-                        if (v == true) {
-                          selected.add(m.id);
-                        } else {
-                          selected.remove(m.id);
-                        }
-                      });
-                    },
-                    secondary: _buildMemberAvatar(m),
-                    title: Text(m.displayName,
-                        style: Theme.of(ctx).textTheme.bodyMedium),
-                    subtitle: m.email.isNotEmpty
-                        ? Text(m.email,
-                            style: Theme.of(ctx).textTheme.bodySmall)
-                        : null,
-                    controlAffinity: ListTileControlAffinity.trailing,
-                    dense: true,
-                  )),
-            ],
+      title: 'Assignees',
+      selected: current,
+      emptyMessage: 'No members found',
+      items: [
+        for (final m in _allMembers)
+          BottomSheetPickerItem(
+            value: m.id,
+            label: m.displayName,
+            subtitle: m.email.isNotEmpty ? m.email : null,
+            leading: _buildMemberAvatar(m),
           ),
-        ),
-      ),
+      ],
     );
+    if (chosen == null) return;
+    await _updateField({'assignees': chosen.toList()});
   }
 
   Widget _buildMemberAvatar(Member m) {
@@ -2486,12 +2247,6 @@ class _IssueDetailScreenState extends ConsumerState<IssueDetailScreen> {
           '${picked.year}-${picked.month.toString().padLeft(2, '0')}-${picked.day.toString().padLeft(2, '0')}';
       _updateField({field: formatted});
     }
-  }
-
-  Color _parseColor(String hex) {
-    hex = hex.replaceFirst('#', '');
-    if (hex.length == 6) hex = 'FF$hex';
-    return Color(int.tryParse(hex, radix: 16) ?? 0xFF999999);
   }
 }
 
@@ -2664,7 +2419,7 @@ class _RelationChip extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(iconFor(type), size: 13, color: color),
+          Icon(iconFor(type), size: PlaneTheme.iconSmall, color: color),
           const SizedBox(width: 4),
           Text('$label: ',
               style: theme.textTheme.labelSmall?.copyWith(color: color)),
@@ -2684,7 +2439,8 @@ class _RelationChip extends StatelessWidget {
       button: true,
       container: true,
       excludeSemantics: true,
-      child: InkWell(
+      child: M3EPressable(
+        pressedScale: 0.94,
         onTap: onRemove,
         borderRadius: BorderRadius.circular(M3EShape.full),
         child: chip,
@@ -2771,7 +2527,7 @@ class _ActivityCard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Icon(_icon,
-              size: 16,
+              size: PlaneTheme.iconMedium,
               color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.6)),
           const SizedBox(width: 8),
           Expanded(
@@ -2799,70 +2555,6 @@ class _ActivityCard extends StatelessWidget {
 }
 
 // --- Label pill widget ---
-class _LabelPill extends StatelessWidget {
-  final Label label;
-  final VoidCallback? onTap;
-  const _LabelPill({required this.label, this.onTap});
-
-  @override
-  Widget build(BuildContext context) {
-    final color = _parseColor(label.color);
-    final pill = Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.15),
-        borderRadius: BorderRadius.circular(M3EShape.full),
-        border: Border.all(color: color.withValues(alpha: 0.4), width: 0.8),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Container(
-            width: 8,
-            height: 8,
-            decoration: BoxDecoration(
-              color: color,
-              shape: BoxShape.circle,
-            ),
-          ),
-          const SizedBox(width: 5),
-          Text(label.name, style: Theme.of(context).textTheme.labelMedium),
-        ],
-      ),
-    );
-
-    if (onTap == null) return pill;
-
-    return Semantics(
-      // The pill renders only the label's name, which says nothing about the
-      // fact that touching it opens the label picker. Several of these sit in
-      // one row, so the name has to stay in the composed label to keep them
-      // distinguishable to anything driving the app by label.
-      label: 'Label ${label.name}. Tap to edit labels',
-      button: true,
-      container: true,
-      excludeSemantics: true,
-      onTap: onTap,
-      child: M3EPressable(
-        pressedScale: 0.94,
-        onTap: onTap,
-        // Matches PropertyChip exactly: a 48dp target with the pill centred in
-        // it. These share a Wrap with the property chips, and a 22dp pill
-        // beside a 48dp one is what made those rows look ragged.
-        child: SizedBox(
-          height: 48,
-          child: Center(widthFactor: 1.0, child: pill),
-        ),
-      ),
-    );
-  }
-
-  static Color _parseColor(String hex) {
-    hex = hex.replaceFirst('#', '');
-    if (hex.length == 6) hex = 'FF$hex';
-    return Color(int.tryParse(hex, radix: 16) ?? 0xFF999999);
-  }
-}
 
 // --- Assignee chip widget ---
 class _AssigneeChip extends StatelessWidget {
@@ -2925,41 +2617,25 @@ class _CommentCard extends StatelessWidget {
     this.onDelete,
   });
 
-  void _showActions(BuildContext context) {
-    showModalBottomSheet(
+  Future<void> _showActions(BuildContext context) async {
+    final chosen = await BottomSheetPicker.show<String>(
       context: context,
-      builder: (ctx) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            if (onEdit != null)
-              ListTile(
-                leading: const Icon(Icons.edit_outlined, size: 20),
-                title: Text('Edit comment',
-                    style: Theme.of(ctx).textTheme.bodyMedium),
-                onTap: () {
-                  Navigator.pop(ctx);
-                  onEdit!();
-                },
-              ),
-            if (onDelete != null)
-              ListTile(
-                leading: Icon(Icons.delete_outline,
-                    color: Theme.of(ctx).colorScheme.error, size: 20),
-                title: Text('Delete comment',
-                    style: Theme.of(ctx)
-                        .textTheme
-                        .bodyMedium
-                        ?.copyWith(color: Theme.of(ctx).colorScheme.error)),
-                onTap: () {
-                  Navigator.pop(ctx);
-                  onDelete!();
-                },
-              ),
-          ],
-        ),
-      ),
+      title: 'Comment',
+      items: [
+        if (onEdit != null)
+          const BottomSheetPickerItem(
+              value: 'edit', label: 'Edit comment', icon: Icons.edit_outlined),
+        if (onDelete != null)
+          const BottomSheetPickerItem(
+            value: 'delete',
+            label: 'Delete comment',
+            icon: Icons.delete_outline,
+            destructive: true,
+          ),
+      ],
     );
+    if (chosen == 'edit') onEdit!();
+    if (chosen == 'delete') onDelete!();
   }
 
   @override
@@ -3121,7 +2797,6 @@ class _IssuePickerSheetState extends State<_IssuePickerSheet> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     final results = _filtered;
 
     return SafeArea(
@@ -3133,22 +2808,13 @@ class _IssuePickerSheetState extends State<_IssuePickerSheet> {
           height: MediaQuery.of(context).size.height * 0.7,
           child: Column(
             children: [
-              Padding(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: Text(widget.title,
-                          style: theme.textTheme.titleMedium),
-                    ),
-                    M3EIconButton(
-                      icon: Icons.close,
-                      tooltip: 'Cancel',
-                      size: M3EIconButtonSize.small,
-                      onPressed: () => Navigator.pop(context),
-                    ),
-                  ],
+              SheetHeader(
+                title: widget.title,
+                trailing: M3EIconButton(
+                  icon: Icons.close,
+                  tooltip: 'Cancel',
+                  size: M3EIconButtonSize.small,
+                  onPressed: () => Navigator.pop(context),
                 ),
               ),
               Padding(
@@ -3164,39 +2830,31 @@ class _IssuePickerSheetState extends State<_IssuePickerSheet> {
               const SizedBox(height: 8),
               Expanded(
                 child: _loading
-                    ? const Center(child: CircularProgressIndicator())
+                    // The app's indicator, not Material's: this was the last
+                    // spinner in the app still turning at a constant rate.
+                    ? const LoadingStateWidget()
                     : _error != null
-                        ? Center(
-                            child: Padding(
-                              padding: const EdgeInsets.all(16),
-                              child: Text(_error!,
-                                  style: theme.textTheme.bodySmall),
-                            ),
-                          )
+                        ? ErrorStateWidget(message: _error, onRetry: _load)
                         : results.isEmpty
-                            ? Center(
-                                child: Text('No matching work items',
-                                    style: theme.textTheme.bodySmall),
+                            ? const EmptyStateWidget(
+                                message: 'No matching work items',
+                                icon: Icons.search_off,
                               )
                             : ListView.builder(
                                 itemCount: results.length,
                                 itemBuilder: (ctx, i) {
                                   final issue = results[i];
                                   final state = widget.states[issue.state];
-                                  return ListTile(
-                                    leading: Icon(
-                                      PlaneTheme.stateIcon(
-                                          state?.group ?? 'backlog'),
-                                      size: 18,
-                                      color: PlaneTheme.stateGroupColor(
-                                          ctx, state?.group ?? 'backlog'),
+                                  final group = state?.group ?? 'backlog';
+                                  return SheetOptionRow<String>(
+                                    item: BottomSheetPickerItem(
+                                      value: issue.id,
+                                      label: issue.name,
+                                      icon: PlaneTheme.stateIcon(group),
+                                      iconColor: PlaneTheme.stateGroupColor(
+                                          ctx, group),
                                     ),
-                                    title: Text(
-                                      issue.name,
-                                      maxLines: 2,
-                                      overflow: TextOverflow.ellipsis,
-                                      style: theme.textTheme.bodyMedium,
-                                    ),
+                                    selected: false,
                                     onTap: () => Navigator.pop(context, issue),
                                   );
                                 },

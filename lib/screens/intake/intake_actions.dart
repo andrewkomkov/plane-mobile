@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
+import '../../utils/say.dart';
+import '../../widgets/bottom_sheet_picker.dart';
+import '../../widgets/confirm_dialog.dart';
 
-import '../../config/m3e/motion.dart';
-import '../../config/m3e/shapes.dart';
 import '../../config/theme.dart';
 import '../../models/intake_issue.dart';
 import '../../services/intake_service.dart';
@@ -60,13 +61,13 @@ Future<bool> runIntakeAction(
 
   switch (action) {
     case IntakeAction.accept:
-      final ok = await _confirm(
+      final ok = await confirmAction(
         context,
         title: 'Accept $label?',
         // Naming the state change matters: accepting is not just a label on
         // the queue entry, it moves the work item out of Triage and into the
         // project's default state, where everyone else will see it.
-        body: 'It leaves Triage for the project’s default state and '
+        message: 'It leaves Triage for the project’s default state and '
             'becomes normal work.',
         confirmLabel: 'Accept',
       );
@@ -74,13 +75,12 @@ Future<bool> runIntakeAction(
       status = IntakeStatus.accepted;
 
     case IntakeAction.decline:
-      final ok = await _confirm(
+      final ok = await confirmDestructive(
         context,
         title: 'Decline $label?',
-        body: 'It leaves the open queue. The work item itself stays in '
+        message: 'It leaves the open queue. The work item itself stays in '
             'Triage, and there is no way to take this back.',
         confirmLabel: 'Decline',
-        destructive: true,
       );
       if (!ok) return false;
       status = IntakeStatus.declined;
@@ -163,46 +163,8 @@ String _pastTense(IntakeAction action) {
   }
 }
 
-void _say(BuildContext context, String message, {bool error = false}) {
-  final scheme = Theme.of(context).colorScheme;
-  ScaffoldMessenger.of(context).showSnackBar(
-    SnackBar(
-      content: Text(message),
-      backgroundColor: error ? scheme.errorContainer : null,
-    ),
-  );
-}
-
-Future<bool> _confirm(
-  BuildContext context, {
-  required String title,
-  required String body,
-  required String confirmLabel,
-  bool destructive = false,
-}) async {
-  final scheme = Theme.of(context).colorScheme;
-  final result = await showDialog<bool>(
-    context: context,
-    builder: (ctx) => AlertDialog(
-      title: Text(title),
-      content: Text(body),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(ctx, false),
-          child: const Text('Cancel'),
-        ),
-        TextButton(
-          onPressed: () => Navigator.pop(ctx, true),
-          style: destructive
-              ? TextButton.styleFrom(foregroundColor: scheme.error)
-              : null,
-          child: Text(confirmLabel),
-        ),
-      ],
-    ),
-  );
-  return result ?? false;
-}
+void _say(BuildContext context, String message, {bool error = false}) =>
+    error ? sayError(context, message) : say(context, message);
 
 /// Asks for the day an entry should come back.
 ///
@@ -245,75 +207,45 @@ Future<bool> showIntakeActionSheet(
   final label = intakeEntryLabel(entry, projectIdentifier);
   final snoozed = entry.status == IntakeStatus.snoozed;
 
-  final chosen = await showModalBottomSheet<IntakeAction>(
+  final chosen = await BottomSheetPicker.show<IntakeAction>(
     context: context,
-    backgroundColor: Colors.transparent,
-    builder: (ctx) {
-      final scheme = Theme.of(ctx).colorScheme;
-      return Container(
-        decoration: BoxDecoration(
-          color: scheme.surfaceContainer,
-          borderRadius: const BorderRadius.vertical(
-            top: Radius.circular(M3EShape.extraLargeIncreased),
-          ),
-          border: Border(
-            top: BorderSide(color: scheme.outlineVariant, width: 0.5),
-          ),
+    title: 'Triage $label',
+    items: [
+      BottomSheetPickerItem(
+        value: IntakeAction.accept,
+        label: 'Accept',
+        subtitle: 'Move it out of Triage into the project',
+        icon: Icons.check_circle_outline,
+        iconColor: PlaneTheme.stateGroupColor(context, 'completed'),
+      ),
+      if (snoozed)
+        const BottomSheetPickerItem(
+          value: IntakeAction.unsnooze,
+          label: 'Un-snooze',
+          subtitle: 'Put it back in the pending queue now',
+          icon: Icons.alarm_on_outlined,
+        )
+      else
+        const BottomSheetPickerItem(
+          value: IntakeAction.snooze,
+          label: 'Snooze',
+          subtitle: 'Hide it until a date you pick',
+          icon: Icons.snooze,
         ),
-        child: SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(12, 12, 12, 12),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(12, 4, 12, 12),
-                  child: Text(
-                    'Triage $label',
-                    style: Theme.of(ctx).textTheme.titleMedium,
-                  ),
-                ),
-                _ActionTile(
-                  icon: Icons.check_circle_outline,
-                  label: 'Accept',
-                  detail: 'Move it out of Triage into the project',
-                  color: PlaneTheme.stateGroupColor(ctx, 'completed'),
-                  onTap: () => Navigator.pop(ctx, IntakeAction.accept),
-                ),
-                if (snoozed)
-                  _ActionTile(
-                    icon: Icons.alarm_on_outlined,
-                    label: 'Un-snooze',
-                    detail: 'Put it back in the pending queue now',
-                    onTap: () => Navigator.pop(ctx, IntakeAction.unsnooze),
-                  )
-                else
-                  _ActionTile(
-                    icon: Icons.snooze,
-                    label: 'Snooze',
-                    detail: 'Hide it until a date you pick',
-                    onTap: () => Navigator.pop(ctx, IntakeAction.snooze),
-                  ),
-                _ActionTile(
-                  icon: Icons.copy_all_outlined,
-                  label: 'Mark duplicate',
-                  detail: 'Point it at the work item it repeats',
-                  onTap: () => Navigator.pop(ctx, IntakeAction.duplicate),
-                ),
-                _ActionTile(
-                  icon: Icons.cancel_outlined,
-                  label: 'Decline',
-                  detail: 'Reject it. This cannot be undone',
-                  color: scheme.error,
-                  onTap: () => Navigator.pop(ctx, IntakeAction.decline),
-                ),
-              ],
-            ),
-          ),
-        ),
-      );
-    },
+      const BottomSheetPickerItem(
+        value: IntakeAction.duplicate,
+        label: 'Mark duplicate',
+        subtitle: 'Point it at the work item it repeats',
+        icon: Icons.copy_all_outlined,
+      ),
+      const BottomSheetPickerItem(
+        value: IntakeAction.decline,
+        label: 'Decline',
+        subtitle: 'Reject it. This cannot be undone',
+        icon: Icons.cancel_outlined,
+        destructive: true,
+      ),
+    ],
   );
 
   if (chosen == null || !context.mounted) return false;
@@ -325,60 +257,4 @@ Future<bool> showIntakeActionSheet(
     entry: entry,
     action: chosen,
   );
-}
-
-class _ActionTile extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final String detail;
-  final Color? color;
-  final VoidCallback onTap;
-
-  const _ActionTile({
-    required this.icon,
-    required this.label,
-    required this.detail,
-    required this.onTap,
-    this.color,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final tint = color ?? theme.colorScheme.onSurfaceVariant;
-
-    return M3EPressable(
-      pressedScale: 0.97,
-      onTap: onTap,
-      // The visible text is two strings in two roles; without this the node
-      // announces neither in a useful order, and `tool/adb_drive.py` locates
-      // the tile by exactly this name.
-      semanticLabel: '$label. $detail',
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-        margin: const EdgeInsets.only(bottom: 4),
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(M3EShape.large),
-        ),
-        child: Row(
-          children: [
-            Icon(icon, size: PlaneTheme.iconLarge, color: tint),
-            const SizedBox(width: 16),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(label,
-                      style:
-                          theme.textTheme.titleMedium?.copyWith(color: tint)),
-                  const SizedBox(height: 2),
-                  Text(detail, style: theme.textTheme.bodySmall),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
 }

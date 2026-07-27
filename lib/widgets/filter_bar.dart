@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import '../widgets/label_pill.dart';
 import 'm3e/chip.dart';
+import 'bottom_sheet_picker.dart';
 import '../models/state.dart';
 import '../models/label.dart';
 import '../models/member.dart';
@@ -157,13 +159,13 @@ class FilterBar extends StatelessWidget {
               // chip's own text if the subtree is excluded.
               container: true,
               excludeSemantics: true,
-              onTap: () => onFilterChanged(const FilterState()),
+              onTap: () => onFilterChanged(_cleared),
               child: M3EChip(
                 label: 'Clear',
                 dense: true,
                 selected: true,
                 accentColor: theme.colorScheme.error,
-                onTap: () => onFilterChanged(const FilterState()),
+                onTap: () => onFilterChanged(_cleared),
               ),
             ),
           ],
@@ -171,6 +173,20 @@ class FilterBar extends StatelessWidget {
       ),
     );
   }
+
+  /// The four filter sets emptied, and nothing else touched.
+  ///
+  /// Clear used to hand back `const FilterState()`, which also put sorting
+  /// back to "Created at, descending" and grouping back to State. The chip
+  /// says "Clear" beside four filter chips, appears only when a filter is on,
+  /// and is labelled "Clear all filters" — three statements that it clears
+  /// filters. Ordering is not a filter.
+  FilterState get _cleared => filterState.copyWith(
+        selectedStates: const {},
+        selectedPriorities: const {},
+        selectedAssignees: const {},
+        selectedLabels: const {},
+      );
 
   Widget _buildFilterChip({
     required BuildContext context,
@@ -257,342 +273,166 @@ class FilterBar extends StatelessWidget {
     }
   }
 
-  void _showStateFilter(BuildContext context) {
-    final selected = Set<String>.from(filterState.selectedStates);
-    showModalBottomSheet(
+  Future<void> _showStateFilter(BuildContext context) async {
+    final chosen = await MultiSelectSheet.show<String>(
       context: context,
-      builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setSheetState) => SafeArea(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              _sheetHeader(ctx, 'Filter by State', () {
-                Navigator.pop(ctx);
-                onFilterChanged(
-                    filterState.copyWith(selectedStates: selected));
-              }),
-              ...states.values.map((s) => CheckboxListTile(
-                    value: selected.contains(s.id),
-                    onChanged: (v) {
-                      setSheetState(() {
-                        if (v == true) {
-                          selected.add(s.id);
-                        } else {
-                          selected.remove(s.id);
-                        }
-                      });
-                    },
-                    secondary: Icon(PlaneTheme.stateIcon(s.group),
-                        color: PlaneTheme.stateGroupColor(context, s.group), size: PlaneTheme.iconLarge),
-                    title: Text(s.name,
-                        style: Theme.of(ctx).textTheme.bodyLarge),
-                    controlAffinity: ListTileControlAffinity.trailing,
-                    dense: true,
-                  )),
-            ],
+      title: 'Filter by State',
+      selected: filterState.selectedStates,
+      emptyMessage: 'This project has no states',
+      items: [
+        for (final s in states.values)
+          BottomSheetPickerItem(
+            value: s.id,
+            label: s.name,
+            icon: PlaneTheme.stateIcon(s.group),
+            iconColor: PlaneTheme.stateGroupColor(context, s.group),
           ),
-        ),
-      ),
+      ],
     );
+    if (chosen != null) {
+      onFilterChanged(filterState.copyWith(selectedStates: chosen));
+    }
   }
 
-  void _showPriorityFilter(BuildContext context) {
-    final selected = Set<String>.from(filterState.selectedPriorities);
-    final priorities = ['urgent', 'high', 'medium', 'low', 'none'];
-    showModalBottomSheet(
+  Future<void> _showPriorityFilter(BuildContext context) async {
+    const priorities = ['urgent', 'high', 'medium', 'low', 'none'];
+    final chosen = await MultiSelectSheet.show<String>(
       context: context,
-      builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setSheetState) => SafeArea(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              _sheetHeader(ctx, 'Filter by Priority', () {
-                Navigator.pop(ctx);
-                onFilterChanged(
-                    filterState.copyWith(selectedPriorities: selected));
-              }),
-              ...priorities.map((p) => CheckboxListTile(
-                    value: selected.contains(p),
-                    onChanged: (v) {
-                      setSheetState(() {
-                        if (v == true) {
-                          selected.add(p);
-                        } else {
-                          selected.remove(p);
-                        }
-                      });
-                    },
-                    secondary: Icon(PlaneTheme.priorityIcon(p),
-                        color: PlaneTheme.priorityColor(context, p), size: PlaneTheme.iconLarge),
-                    title: Text(p[0].toUpperCase() + p.substring(1),
-                        style: Theme.of(ctx).textTheme.bodyLarge),
-                    controlAffinity: ListTileControlAffinity.trailing,
-                    dense: true,
-                  )),
-            ],
+      title: 'Filter by Priority',
+      selected: filterState.selectedPriorities,
+      items: [
+        for (final p in priorities)
+          BottomSheetPickerItem(
+            value: p,
+            label: p[0].toUpperCase() + p.substring(1),
+            icon: PlaneTheme.priorityIcon(p),
+            iconColor: PlaneTheme.priorityColor(context, p),
           ),
-        ),
-      ),
+      ],
     );
+    if (chosen != null) {
+      onFilterChanged(filterState.copyWith(selectedPriorities: chosen));
+    }
   }
 
-  void _showAssigneeFilter(BuildContext context) {
-    final selected = Set<String>.from(filterState.selectedAssignees);
-    showModalBottomSheet(
+  Future<void> _showAssigneeFilter(BuildContext context) async {
+    final scheme = Theme.of(context).colorScheme;
+    final labelSmall = Theme.of(context).textTheme.labelSmall;
+    final chosen = await MultiSelectSheet.show<String>(
       context: context,
-      builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setSheetState) => SafeArea(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              _sheetHeader(ctx, 'Filter by Assignee', () {
-                Navigator.pop(ctx);
-                onFilterChanged(
-                    filterState.copyWith(selectedAssignees: selected));
-              }),
-              if (members.isEmpty)
-                Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Text('No members',
-                      style: Theme.of(ctx).textTheme.bodySmall),
-                ),
-              ...members.map((m) => CheckboxListTile(
-                    value: selected.contains(m.id),
-                    onChanged: (v) {
-                      setSheetState(() {
-                        if (v == true) {
-                          selected.add(m.id);
-                        } else {
-                          selected.remove(m.id);
-                        }
-                      });
-                    },
-                    secondary: CircleAvatar(
-                      radius: 14,
-                      backgroundColor: Theme.of(ctx)
-                          .colorScheme
-                          .primary
-                          .withValues(alpha: 0.2),
-                      child: Text(
-                        (m.displayName.isNotEmpty ? m.displayName : '?')[0]
-                            .toUpperCase(),
-                        style: Theme.of(ctx).textTheme.labelSmall?.copyWith(
-                            color: Theme.of(ctx).colorScheme.primary),
-                      ),
-                    ),
-                    title: Text(m.displayName,
-                        style: Theme.of(ctx).textTheme.bodyLarge),
-                    controlAffinity: ListTileControlAffinity.trailing,
-                    dense: true,
-                  )),
-            ],
+      title: 'Filter by Assignee',
+      selected: filterState.selectedAssignees,
+      emptyMessage: 'No members',
+      items: [
+        for (final m in members)
+          BottomSheetPickerItem(
+            value: m.id,
+            label: m.displayName,
+            leading: CircleAvatar(
+              radius: 14,
+              backgroundColor: scheme.primary.withValues(alpha: 0.2),
+              child: Text(
+                (m.displayName.isNotEmpty ? m.displayName : '?')[0]
+                    .toUpperCase(),
+                style: labelSmall?.copyWith(color: scheme.primary),
+              ),
+            ),
           ),
-        ),
-      ),
+      ],
     );
+    if (chosen != null) {
+      onFilterChanged(filterState.copyWith(selectedAssignees: chosen));
+    }
   }
 
-  void _showLabelFilter(BuildContext context) {
-    final selected = Set<String>.from(filterState.selectedLabels);
-    showModalBottomSheet(
+  Future<void> _showLabelFilter(BuildContext context) async {
+    final chosen = await MultiSelectSheet.show<String>(
       context: context,
-      builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setSheetState) => SafeArea(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              _sheetHeader(ctx, 'Filter by Label', () {
-                Navigator.pop(ctx);
-                onFilterChanged(
-                    filterState.copyWith(selectedLabels: selected));
-              }),
-              if (labels.isEmpty)
-                Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Text('No labels',
-                      style: Theme.of(ctx).textTheme.bodySmall),
-                ),
-              ...labels.map((l) => CheckboxListTile(
-                    value: selected.contains(l.id),
-                    onChanged: (v) {
-                      setSheetState(() {
-                        if (v == true) {
-                          selected.add(l.id);
-                        } else {
-                          selected.remove(l.id);
-                        }
-                      });
-                    },
-                    secondary: Container(
-                      width: 14,
-                      height: 14,
-                      decoration: BoxDecoration(
-                        color: _parseColor(l.color),
-                        shape: BoxShape.circle,
-                      ),
-                    ),
-                    title: Text(l.name,
-                        style: Theme.of(ctx).textTheme.bodyLarge),
-                    controlAffinity: ListTileControlAffinity.trailing,
-                    dense: true,
-                  )),
-            ],
+      title: 'Filter by Label',
+      selected: filterState.selectedLabels,
+      emptyMessage: 'No labels',
+      items: [
+        for (final l in labels)
+          BottomSheetPickerItem(
+            value: l.id,
+            label: l.name,
+            leading: Container(
+              width: 14,
+              height: 14,
+              decoration: BoxDecoration(
+                color: parseHexColor(l.color,
+                    fallback: Theme.of(context).colorScheme.outline),
+                shape: BoxShape.circle,
+              ),
+            ),
           ),
-        ),
-      ),
+      ],
     );
+    if (chosen != null) {
+      onFilterChanged(filterState.copyWith(selectedLabels: chosen));
+    }
   }
 
-  void _showSortOptions(BuildContext context) {
-    showModalBottomSheet(
+  Future<void> _showSortOptions(BuildContext context) async {
+    final chosen = await BottomSheetPicker.show<SortField>(
       context: context,
-      builder: (ctx) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Padding(
-              padding: const EdgeInsets.all(16),
-              child:
-                  Text('Sort by', style: Theme.of(ctx).textTheme.titleMedium),
-            ),
-            ListTile(
-              leading: const Icon(Icons.calendar_today, size: PlaneTheme.iconLarge),
-              title: Text('Created at',
-                  style: Theme.of(ctx).textTheme.bodyLarge),
-              trailing: filterState.sortField == SortField.createdAt
-                  ? const Icon(Icons.check, size: PlaneTheme.iconLarge)
-                  : null,
-              onTap: () {
-                Navigator.pop(ctx);
-                final asc = filterState.sortField == SortField.createdAt
-                    ? !filterState.sortAscending
-                    : false;
-                onFilterChanged(filterState.copyWith(
-                    sortField: SortField.createdAt, sortAscending: asc));
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.update, size: PlaneTheme.iconLarge),
-              title: Text('Updated at',
-                  style: Theme.of(ctx).textTheme.bodyLarge),
-              trailing: filterState.sortField == SortField.updatedAt
-                  ? const Icon(Icons.check, size: PlaneTheme.iconLarge)
-                  : null,
-              onTap: () {
-                Navigator.pop(ctx);
-                final asc = filterState.sortField == SortField.updatedAt
-                    ? !filterState.sortAscending
-                    : false;
-                onFilterChanged(filterState.copyWith(
-                    sortField: SortField.updatedAt, sortAscending: asc));
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.flag_outlined, size: PlaneTheme.iconLarge),
-              title: Text('Priority',
-                  style: Theme.of(ctx).textTheme.bodyLarge),
-              trailing: filterState.sortField == SortField.priority
-                  ? const Icon(Icons.check, size: PlaneTheme.iconLarge)
-                  : null,
-              onTap: () {
-                Navigator.pop(ctx);
-                final asc = filterState.sortField == SortField.priority
-                    ? !filterState.sortAscending
-                    : false;
-                onFilterChanged(filterState.copyWith(
-                    sortField: SortField.priority, sortAscending: asc));
-              },
-            ),
-          ],
-        ),
-      ),
+      title: 'Sort by',
+      // The one thing the old sheet never said: choosing the field you are
+      // already sorted by reverses it. Three rows with a check and no
+      // explanation left that a discovery.
+      subtitle: filterState.sortAscending
+          ? 'Ascending — choose $_sortLabel again to reverse'
+          : 'Descending — choose $_sortLabel again to reverse',
+      selectedValue: filterState.sortField,
+      items: const [
+        BottomSheetPickerItem(
+            value: SortField.createdAt,
+            label: 'Created at',
+            icon: Icons.calendar_today),
+        BottomSheetPickerItem(
+            value: SortField.updatedAt,
+            label: 'Updated at',
+            icon: Icons.update),
+        BottomSheetPickerItem(
+            value: SortField.priority,
+            label: 'Priority',
+            icon: Icons.flag_outlined),
+      ],
     );
+    if (chosen == null) return;
+    onFilterChanged(filterState.copyWith(
+      sortField: chosen,
+      sortAscending:
+          chosen == filterState.sortField ? !filterState.sortAscending : false,
+    ));
   }
 
-  void _showGroupByOptions(BuildContext context) {
-    showModalBottomSheet(
+  Future<void> _showGroupByOptions(BuildContext context) async {
+    final chosen = await BottomSheetPicker.show<GroupByField>(
       context: context,
-      builder: (ctx) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Padding(
-              padding: const EdgeInsets.all(16),
-              child:
-                  Text('Group by', style: Theme.of(ctx).textTheme.titleMedium),
-            ),
-            ListTile(
-              leading: const Icon(Icons.circle_outlined, size: PlaneTheme.iconLarge),
-              title: Text('State', style: Theme.of(ctx).textTheme.bodyLarge),
-              trailing: filterState.groupBy == GroupByField.state
-                  ? const Icon(Icons.check, size: PlaneTheme.iconLarge)
-                  : null,
-              onTap: () {
-                Navigator.pop(ctx);
-                onFilterChanged(
-                    filterState.copyWith(groupBy: GroupByField.state));
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.flag_outlined, size: PlaneTheme.iconLarge),
-              title:
-                  Text('Priority', style: Theme.of(ctx).textTheme.bodyLarge),
-              trailing: filterState.groupBy == GroupByField.priority
-                  ? const Icon(Icons.check, size: PlaneTheme.iconLarge)
-                  : null,
-              onTap: () {
-                Navigator.pop(ctx);
-                onFilterChanged(
-                    filterState.copyWith(groupBy: GroupByField.priority));
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.person_outline, size: PlaneTheme.iconLarge),
-              title:
-                  Text('Assignee', style: Theme.of(ctx).textTheme.bodyLarge),
-              trailing: filterState.groupBy == GroupByField.assignee
-                  ? const Icon(Icons.check, size: PlaneTheme.iconLarge)
-                  : null,
-              onTap: () {
-                Navigator.pop(ctx);
-                onFilterChanged(
-                    filterState.copyWith(groupBy: GroupByField.assignee));
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.label_outline, size: PlaneTheme.iconLarge),
-              title: Text('Label', style: Theme.of(ctx).textTheme.bodyLarge),
-              trailing: filterState.groupBy == GroupByField.label
-                  ? const Icon(Icons.check, size: PlaneTheme.iconLarge)
-                  : null,
-              onTap: () {
-                Navigator.pop(ctx);
-                onFilterChanged(
-                    filterState.copyWith(groupBy: GroupByField.label));
-              },
-            ),
-          ],
-        ),
-      ),
+      title: 'Group by',
+      selectedValue: filterState.groupBy,
+      items: const [
+        BottomSheetPickerItem(
+            value: GroupByField.state,
+            label: 'State',
+            icon: Icons.circle_outlined),
+        BottomSheetPickerItem(
+            value: GroupByField.priority,
+            label: 'Priority',
+            icon: Icons.flag_outlined),
+        BottomSheetPickerItem(
+            value: GroupByField.assignee,
+            label: 'Assignee',
+            icon: Icons.person_outline),
+        BottomSheetPickerItem(
+            value: GroupByField.label,
+            label: 'Label',
+            icon: Icons.label_outline),
+      ],
     );
-  }
-
-  Widget _sheetHeader(BuildContext ctx, String title, VoidCallback onDone) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      child: Row(
-        children: [
-          Text(title, style: Theme.of(ctx).textTheme.titleMedium),
-          const Spacer(),
-          TextButton(onPressed: onDone, child: const Text('Done')),
-        ],
-      ),
-    );
-  }
-
-  static Color _parseColor(String hex) {
-    hex = hex.replaceFirst('#', '');
-    if (hex.length == 6) hex = 'FF$hex';
-    return Color(int.tryParse(hex, radix: 16) ?? 0xFF999999);
+    if (chosen != null) {
+      onFilterChanged(filterState.copyWith(groupBy: chosen));
+    }
   }
 }

@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import '../utils/say.dart';
+import '../widgets/bottom_sheet_picker.dart';
 
 import '../models/project.dart';
 import '../providers/data_providers.dart';
@@ -28,9 +30,7 @@ Future<void> startNewIssue(
 
   if (!context.mounted) return;
   if (projects.isEmpty) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('No projects available')),
-    );
+    say(context, 'No projects available');
     return;
   }
 
@@ -59,31 +59,19 @@ Future<void> startNewIssue(
 Future<Project?> _pickProject(
   BuildContext context,
   List<Project> projects,
-) {
-  return showModalBottomSheet<Project>(
+) async {
+  final id = await BottomSheetPicker.show<String>(
     context: context,
-    builder: (ctx) => SafeArea(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Padding(
-            padding: const EdgeInsets.all(16),
-            child: Text(
-              'Select project',
-              style: Theme.of(ctx).textTheme.titleMedium,
-            ),
-          ),
-          ...projects.map((p) => ListTile(
-                leading: const Icon(Icons.folder_outlined, size: 20),
-                title: Text(
-                  '${p.identifier} - ${p.name}',
-                  style: Theme.of(ctx).textTheme.bodyMedium,
-                ),
-                onTap: () => Navigator.pop(ctx, p),
-              )),
-          const SizedBox(height: 8),
-        ],
-      ),
-    ),
+    title: 'Select project',
+    items: [
+      for (final p in projects)
+        BottomSheetPickerItem(
+          value: p.id,
+          label: '${p.identifier} - ${p.name}',
+          icon: Icons.folder_outlined,
+        ),
+    ],
   );
+  if (id == null) return null;
+  return projects.where((p) => p.id == id).firstOrNull;
 }

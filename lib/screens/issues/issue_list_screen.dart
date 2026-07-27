@@ -1,5 +1,5 @@
-import 'package:flutter/foundation.dart' show setEquals;
 import 'package:flutter/material.dart';
+import '../../utils/say.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../widgets/m3e/icon_button.dart';
 import '../../widgets/m3e/text_field.dart';
@@ -204,26 +204,18 @@ class _IssueListScreenState extends ConsumerState<IssueListScreen>
 
   /// Takes what the bar changed, and keeps the two controls in step.
   ///
-  /// The bar can produce three kinds of change, and only one of them is about
-  /// ordering: its four filter sheets keep the ordering they were handed, its
-  /// sort and group sheets keep the selections they were handed, and its
-  /// "Clear" chip resets both at once. Adopting the incoming ordering only when
-  /// the selections did not move is what tells the third case from the second —
-  /// otherwise clearing a filter would silently throw away a grouping the user
-  /// chose in the display sheet.
+  /// Every state the bar hands back was built from [_barState], so the
+  /// ordering and grouping in it are either untouched — in which case writing
+  /// them back to [_display] is a no-op — or are the thing the user just
+  /// chose. This used to compare the four selections first, to tell a sort
+  /// change from a "Clear" that reset the ordering behind the user's back.
+  /// Clear no longer does that, so there is nothing left to tell apart.
   void _onFilterChanged(FilterState next) {
-    final sameSelection = setEquals(
-            next.selectedStates, _filterState.selectedStates) &&
-        setEquals(next.selectedPriorities, _filterState.selectedPriorities) &&
-        setEquals(next.selectedAssignees, _filterState.selectedAssignees) &&
-        setEquals(next.selectedLabels, _filterState.selectedLabels);
     setState(() {
       _filterState = next;
-      if (sameSelection) {
-        _display.grouping = _groupingKeys[next.groupBy]!;
-        _display.ordering = _orderingKeys[next.sortField]!;
-        _display.sortNewest = !next.sortAscending;
-      }
+      _display.grouping = _groupingKeys[next.groupBy]!;
+      _display.ordering = _orderingKeys[next.sortField]!;
+      _display.sortNewest = !next.sortAscending;
     });
   }
 
@@ -267,7 +259,6 @@ class _IssueListScreenState extends ConsumerState<IssueListScreen>
     controller.dispose();
     if (name == null || name.isEmpty || !mounted) return;
 
-    final messenger = ScaffoldMessenger.of(context);
     final queryData = <String, dynamic>{};
     if (_filterState.selectedStates.isNotEmpty) {
       queryData['state'] = _filterState.selectedStates.toList();
@@ -287,11 +278,12 @@ class _IssueListScreenState extends ConsumerState<IssueListScreen>
         widget.projectId,
         {'name': name, 'query_data': queryData},
       );
-      messenger.showSnackBar(SnackBar(content: Text('Saved view "$name"')));
+      if (mounted) say(context, 'Saved view "$name"');
     } catch (e) {
       // The exception used to be dumped at the user verbatim.
-      messenger.showSnackBar(SnackBar(
-          content: Text(describeApiError(e, fallback: 'Could not save view'))));
+      if (mounted) {
+        sayError(context, describeApiError(e, fallback: 'Could not save view'));
+      }
     }
   }
 

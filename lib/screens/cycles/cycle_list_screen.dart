@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import '../../utils/say.dart';
 import '../../config/m3e/typography.dart';
+import '../../widgets/app_navbar.dart';
 import '../../widgets/m3e/text_field.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../config/theme.dart';
@@ -10,6 +12,7 @@ import '../../models/favorite.dart';
 import '../../providers/favorites_provider.dart';
 import '../../utils/api_error.dart';
 import '../../widgets/archive_toggle.dart';
+import '../../widgets/confirm_dialog.dart';
 import '../../widgets/favorite_toggle.dart';
 import '../../widgets/list_count_header.dart';
 import '../../widgets/loading_state.dart';
@@ -17,7 +20,6 @@ import '../../widgets/m3e/icon_button.dart';
 import '../../widgets/plane_row.dart';
 import '../../widgets/skeleton_loader.dart';
 import '../../widgets/section_header.dart';
-import '../project/project_screen.dart' show kProjectListBottomInset;
 import 'cycle_detail_screen.dart';
 
 class CycleListScreen extends ConsumerStatefulWidget {
@@ -139,18 +141,12 @@ class CycleListScreenState extends ConsumerState<CycleListScreen>
       _cache.invalidateCycles(widget.workspaceSlug, widget.projectId);
       await _loadArchived();
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('${cycle.name} restored')),
-        );
+        say(context, '${cycle.name} restored');
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-                describeApiError(e, fallback: 'Could not restore the cycle')),
-          ),
-        );
+        sayError(context,
+            describeApiError(e, fallback: 'Could not restore the cycle'));
       }
     }
   }
@@ -328,12 +324,10 @@ class CycleListScreenState extends ConsumerState<CycleListScreen>
                   _load();
                 } catch (e) {
                   if (mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text(describeApiError(e,
-                            fallback: 'Could not create the cycle')),
-                      ),
-                    );
+                    sayError(
+                        context,
+                        describeApiError(e,
+                            fallback: 'Could not create the cycle'));
                   }
                 }
               },
@@ -396,26 +390,18 @@ class CycleListScreenState extends ConsumerState<CycleListScreen>
       return ErrorStateWidget(message: 'Failed to load cycles', onRetry: _load);
     }
     if (_cycles.isEmpty) {
-      return ScrollableCenter(
-        padding: const EdgeInsets.only(bottom: kProjectListBottomInset),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const EmptyStateWidget(
-              message: 'No cycles',
-              icon: Icons.loop,
-              subtitle: 'A cycle is a time box the team works an iteration in',
-            ),
-            if (widget.canCreate) ...[
-              const SizedBox(height: 16),
-              FilledButton.tonalIcon(
+      return ScrollableEmptyState(
+        padding: EdgeInsets.only(bottom: appNavBarClearance(context)),
+        message: 'No cycles',
+        icon: Icons.loop,
+        subtitle: 'A cycle is a time box the team works an iteration in',
+        action: widget.canCreate
+            ? FilledButton.tonalIcon(
                 onPressed: startCreate,
                 icon: const Icon(Icons.add),
                 label: const Text('New cycle'),
-              ),
-            ],
-          ],
-        ),
+              )
+            : null,
       );
     }
 
@@ -424,7 +410,7 @@ class CycleListScreenState extends ConsumerState<CycleListScreen>
       // Without this a list too short to scroll cannot be pulled, so the
       // RefreshIndicator wrapping it never fires.
       physics: const AlwaysScrollableScrollPhysics(),
-      padding: const EdgeInsets.only(bottom: kProjectListBottomInset),
+      padding: EdgeInsets.only(bottom: appNavBarClearance(context)),
       itemCount: entries.fold<int>(0, (sum, e) => sum + 1 + e.value.length),
       itemBuilder: (ctx, index) {
         int current = 0;
@@ -458,8 +444,8 @@ class CycleListScreenState extends ConsumerState<CycleListScreen>
       return const ProjectListSkeleton();
     }
     if (archived.isEmpty) {
-      return const ScrollableEmptyState(
-        padding: EdgeInsets.only(bottom: kProjectListBottomInset),
+      return ScrollableEmptyState(
+        padding: EdgeInsets.only(bottom: appNavBarClearance(context)),
         message: 'No archived cycles',
         icon: Icons.inventory_2_outlined,
         subtitle: 'Cycles archived from here or from the web appear here',
@@ -469,7 +455,7 @@ class CycleListScreenState extends ConsumerState<CycleListScreen>
         favorites.favoritesFirst(FavoriteEntity.cycle, archived, (c) => c.id);
     return ListView.builder(
       physics: const AlwaysScrollableScrollPhysics(),
-      padding: const EdgeInsets.only(bottom: kProjectListBottomInset),
+      padding: EdgeInsets.only(bottom: appNavBarClearance(context)),
       itemCount: ordered.length,
       itemBuilder: (ctx, i) => _cycleRow(cycle: ordered[i]),
     );
@@ -557,21 +543,12 @@ class CycleListScreenState extends ConsumerState<CycleListScreen>
   /// Restoring puts a cycle back into everyone's list, so it is confirmed even
   /// though nothing is destroyed by it.
   Future<void> _confirmUnarchive(Cycle cycle) async {
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Restore cycle'),
-        content: Text('Move "${cycle.name}" back into the active cycles?'),
-        actions: [
-          TextButton(
-              onPressed: () => Navigator.pop(ctx, false),
-              child: const Text('Cancel')),
-          TextButton(
-              onPressed: () => Navigator.pop(ctx, true),
-              child: const Text('Restore')),
-        ],
-      ),
+    final ok = await confirmAction(
+      context,
+      title: 'Restore cycle',
+      message: 'Move "${cycle.name}" back into the active cycles?',
+      confirmLabel: 'Restore',
     );
-    if (ok == true) await _unarchive(cycle);
+    if (ok) await _unarchive(cycle);
   }
 }

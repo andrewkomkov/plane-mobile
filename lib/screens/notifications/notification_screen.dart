@@ -1,4 +1,9 @@
 import 'package:flutter/material.dart';
+import '../../utils/api_error.dart';
+import '../../widgets/skeleton_loader.dart';
+import '../../utils/say.dart';
+import '../../config/theme.dart';
+import '../../widgets/bottom_sheet_picker.dart';
 import '../../config/m3e/motion.dart';
 import '../../widgets/m3e/app_bar.dart';
 import '../../widgets/m3e/icon_button.dart';
@@ -60,8 +65,8 @@ class _NotificationScreenState extends ConsumerState<NotificationScreen> {
       _load();
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text('Error: $e')));
+        sayError(context,
+            describeApiError(e, fallback: 'Could not reach notifications'));
       }
     }
   }
@@ -72,8 +77,8 @@ class _NotificationScreenState extends ConsumerState<NotificationScreen> {
       _load();
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text('Error: $e')));
+        sayError(context,
+            describeApiError(e, fallback: 'Could not reach notifications'));
       }
     }
   }
@@ -115,100 +120,62 @@ class _NotificationScreenState extends ConsumerState<NotificationScreen> {
   }
 
   Future<void> _showNotificationSettings() async {
-    final theme = Theme.of(context);
-
     Map<String, dynamic> prefs;
     try {
       prefs = await NotificationService.getNotificationPreferences();
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Failed to load preferences: $e')));
+        sayError(context,
+            describeApiError(e, fallback: 'Failed to load preferences'));
       }
       return;
     }
     if (!mounted) return;
 
-    bool propertyChange = prefs['property_change'] as bool? ?? true;
-    bool stateChange = prefs['state_change'] as bool? ?? true;
-    bool comment = prefs['comment'] as bool? ?? true;
-    bool mention = prefs['mention'] as bool? ?? true;
-
-    await showModalBottomSheet(
-      context: context,
-      builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setSheetState) {
-          Future<void> update(String key, bool value) async {
-            try {
-              await NotificationService.updateNotificationPreferences(
-                  {key: value});
-            } catch (e) {
-              if (mounted) {
-                ScaffoldMessenger.of(context)
-                    .showSnackBar(SnackBar(content: Text('Error: $e')));
-              }
-            }
-          }
-
-          return SafeArea(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Text('Email notification preferences',
-                      style: theme.textTheme.titleMedium),
-                ),
-                SwitchListTile(
-                  title: Text('Property changes',
-                      style: theme.textTheme.bodyLarge),
-                  subtitle: Text('Issue priority, assignee, label changes',
-                      style: theme.textTheme.bodySmall),
-                  value: propertyChange,
-                  onChanged: (v) {
-                    setSheetState(() => propertyChange = v);
-                    update('property_change', v);
-                  },
-                ),
-                SwitchListTile(
-                  title:
-                      Text('State changes', style: theme.textTheme.bodyLarge),
-                  subtitle: Text('Issue state transitions',
-                      style: theme.textTheme.bodySmall),
-                  value: stateChange,
-                  onChanged: (v) {
-                    setSheetState(() => stateChange = v);
-                    update('state_change', v);
-                  },
-                ),
-                SwitchListTile(
-                  title: Text('Comments', style: theme.textTheme.bodyLarge),
-                  subtitle: Text('New comments on your issues',
-                      style: theme.textTheme.bodySmall),
-                  value: comment,
-                  onChanged: (v) {
-                    setSheetState(() => comment = v);
-                    update('comment', v);
-                  },
-                ),
-                SwitchListTile(
-                  title: Text('Mentions', style: theme.textTheme.bodyLarge),
-                  subtitle: Text('When someone mentions you',
-                      style: theme.textTheme.bodySmall),
-                  value: mention,
-                  onChanged: (v) {
-                    setSheetState(() => mention = v);
-                    update('mention', v);
-                  },
-                ),
-                const SizedBox(height: 8),
-              ],
-            ),
-          );
-        },
+    // One sheet, one write. Four `SwitchListTile`s each fired their own PATCH
+    // as they were flicked, so turning three off was three round trips and a
+    // half-applied state if the second failed.
+    const options = [
+      (
+        'property_change',
+        'Property changes',
+        'Issue priority, assignee, label changes'
       ),
+      ('state_change', 'State changes', 'Issue state transitions'),
+      ('comment', 'Comments', 'New comments on your issues'),
+      ('mention', 'Mentions', 'When someone mentions you'),
+    ];
+    final before = {
+      for (final o in options)
+        if (prefs[o.$1] as bool? ?? true) o.$1,
+    };
+
+    final after = await MultiSelectSheet.show<String>(
+      context: context,
+      title: 'Email notification preferences',
+      subtitle: 'Email me about',
+      selected: before,
+      items: [
+        for (final o in options)
+          BottomSheetPickerItem(value: o.$1, label: o.$2, subtitle: o.$3),
+      ],
     );
+    if (after == null) return;
+
+    final changed = {
+      for (final o in options)
+        if (before.contains(o.$1) != after.contains(o.$1))
+          o.$1: after.contains(o.$1),
+    };
+    if (changed.isEmpty) return;
+    try {
+      await NotificationService.updateNotificationPreferences(changed);
+    } catch (e) {
+      if (mounted) {
+        sayError(context,
+            describeApiError(e, fallback: 'Could not reach notifications'));
+      }
+    }
   }
 
   @override
@@ -232,24 +199,24 @@ class _NotificationScreenState extends ConsumerState<NotificationScreen> {
         ],
       ),
       body: _loading
-          ? const LoadingStateWidget()
+          // The same skeleton the home inbox uses for the same feed. This was
+          // a spinner while its twin two taps away shimmered rows.
+          ? const InboxSkeleton()
           : _error != null
               ? ErrorStateWidget(
                   message: 'Failed to load notifications', onRetry: _load)
               : RefreshIndicator(
                   onRefresh: _load,
                   child: _notifications.isEmpty
-                      ? ListView(children: [
-                          SizedBox(
-                              height: MediaQuery.of(context).size.height * 0.3),
-                          const Center(
-                            child: EmptyStateWidget(
-                              message: 'No notifications',
-                              icon: Icons.notifications_none,
-                              subtitle: 'You\'re all caught up',
-                            ),
-                          ),
-                        ])
+                      // The last spacer-and-ListView empty state in the app.
+                      // The 0.3 was never about spacing: it was there to make
+                      // the list tall enough to pull, which is what
+                      // ScrollableEmptyState says properly.
+                      ? const ScrollableEmptyState(
+                          message: 'No notifications',
+                          icon: Icons.notifications_none,
+                          subtitle: 'You\'re all caught up',
+                        )
                       : _buildGroupedList(theme),
                 ),
     );
@@ -299,7 +266,8 @@ class _NotificationScreenState extends ConsumerState<NotificationScreen> {
         color: theme.colorScheme.error.withValues(alpha: 0.15),
         alignment: Alignment.centerRight,
         padding: const EdgeInsets.only(right: 20),
-        child: Icon(Icons.archive, color: theme.colorScheme.error, size: 22),
+        child: Icon(Icons.archive,
+            color: theme.colorScheme.error, size: PlaneTheme.iconLarge),
       ),
       onDismissed: (_) => _archive(notification),
       child: DecoratedBox(
