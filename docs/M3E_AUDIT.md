@@ -21,23 +21,88 @@ Part 6 — the four create flows are reachable, `FilterBar` is rendered and
 spreadsheet scrolls as one table.
 
 **Consequence worth stating:** `flutter analyze` reports **nothing**, down from
-30, and the suite is 655 green with no failures. The fourteen warnings that
-survived the first cleanup were all unreferenced declarations for the flows
-nobody could reach — the analyzer was, for a while, the only thing in the repo
-reporting that the app could not create a cycle.
+30; the unit suite is **685 green**; and the seven integration tests pass on a
+Galaxy S20 FE against the live instance. The fourteen warnings that survived
+the first cleanup were all unreferenced declarations for the flows nobody could
+reach — the analyzer was, for a while, the only thing in the repo reporting
+that the app could not create a cycle.
+
+**Two things the device found that no amount of reading would have.** Both
+were on the way to verifying the work above, and both are worse than anything
+in the audit below:
+
+* **Every integration test failed on the device, all seven, at boot.**
+  `projects_tab` reaches `_load` from `didUpdateWidget` — the home screen
+  rebuilds the tab once it has resolved a workspace slug — and `_load` fired
+  `favoritesProvider.notifier.load(...)` synchronously. Riverpod refuses a
+  provider write inside a widget lifecycle and threw *"Tried to modify a
+  provider while the widget tree was building"* on the first frame after
+  sign-in. Deferred by one turn of the event loop; the suite went 0/7 → 7/7.
+* **`ProjectSettingsScreen` had no call site anywhere in the app.** General,
+  members, states, labels, integrations and the Features section — written,
+  compiled, and unreachable from the running app. `flutter analyze` does not
+  report an unused *public* class, which is exactly how the four create flows
+  stayed dead through two earlier rounds. It is now a `settings_outlined`
+  action on the project screen's app bar, and the Features section was
+  photographed on the device reading the real flags.
 
 **Not done, and deliberately:** `main.dart` still installs no `textScaler`
 clamp. Screens that clipped at large text scales were fixed individually
 instead. A global clamp overrides a user's accessibility setting, which is a
 product decision rather than a refactor.
 
-**Raised by the fixers, still open:** `confirm_dialog` needs a non-destructive
-variant (three restore dialogs are hand-rolled because painting "Restore" in
-the error role would be a lie); `ScrollableEmptyState` needs an action slot;
-`SectionHeader` needs a trailing slot; `app_navbar` should export its occupied
-height instead of callers guessing it; `FilterBar`'s Clear resets ordering as
-well as filters; `Project` carries no feature flags, so the project settings
-Features section was removed rather than fixed.
+**Raised by the fixers, since done:** the four requests against the shared
+widgets. `confirm_dialog` gained `confirmAction`, the non-destructive variant,
+and the three hand-rolled restore dialogs now call it rather than paint
+"Restore" in the error role or invent a third `AlertDialog` shape.
+`EmptyStateWidget` and `ScrollableEmptyState` gained an action slot, which the
+cycle, module, view and page lists were each wrapping in their own `Column` to
+fake — all four now pass a button and use the scrollable widget they could not
+use before. `SectionHeader` gained a trailing slot, and project settings' local
+`_headerRow` is gone. `app_navbar` exports `appNavBarHeight` and
+`appNavBarClearance`; `kProjectListBottomInset` and the five other literals
+guessing that number are gone with it. The exported height reads the bar's
+measured height where the Scaffold has one and falls back to the bar's own
+geometry elsewhere, and a test asserts it against `getSize` of the bar under a
+gesture inset and at 2x text.
+
+**Raised by the fixers, also done:** `FilterBar`'s Clear now empties the four
+filter sets and touches nothing else, and `issue_list_screen`'s guard against
+the old behaviour — adopt the incoming ordering only if the selections did not
+move — is gone with it. `Project` reads `cycle_view`, `module_view`,
+`issue_views_view` and `page_view`, and the project settings Features section
+is back, showing the real answers; a flag the payload does not carry reports
+*on*, because a cached project claiming a user's cycles are switched off is the
+worse failure.
+
+**The sheet, dialog and row layer — §3.1, §3.2, the audit's largest finding.**
+Done, and the counts are the check:
+
+| | Audit | Now |
+|---|---|---|
+| Raw `showModalBottomSheet` | 45 | **7** — two are the shared widgets; five are bespoke sheets that cannot be a picker (the work-item picker, the command palette, display options, the emoji grid, the nav overflow) |
+| Raw `AlertDialog` | 31 | **15** — every one a *form*; the fourteen confirmations are gone |
+| Raw `ListTile` / `CheckboxListTile` / `SwitchListTile` | ~70 | **0** |
+| `InkWell` | 10 | **0** |
+| `CircularProgressIndicator` | 2 | **0** |
+| `BottomSheetPicker` call sites | 0 | **33** |
+| `confirmDestructive` / `confirmAction` call sites | 6 | **23** |
+
+Three widgets carried it: `MultiSelectSheet` (the multi-choice sibling, with
+`Clear`, a count, and a bottom action that can require a selection),
+`SheetOptionRow` (exported so the bespoke sheets draw the same row), and
+`BottomSheetPickerItem.enabled` for the rows the server would refuse — shown
+dimmed with the reason rather than hidden, which is what the work-item, cycle,
+module and page menus all needed.
+
+Also retired along the way: 71 undifferentiated snackbars, now `say` and
+`sayError` with the error container and an icon; two `_LabelPill`s and five
+`_parseColor`s, now `LabelPill` and `parseHexColor`; the display sheet's
+cycling rows, which advanced to the next value and never showed the range;
+the auth-mode text links, now an `M3EButtonGroup` that marks the current mode;
+the search destination, which was on screen while nothing in the nav bar was
+selected; the last three spacer-and-`ListView` empty states; and the two
+duplicated sign-in button styles.
 
 ---
 
