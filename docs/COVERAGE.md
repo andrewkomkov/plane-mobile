@@ -15,22 +15,28 @@ real Plane session and proxies through, so the internal surface — and Plane's
 own permission classes — apply. See `lib/config/api_client.dart`.
 
 **Method:** every path literal in `lib/` extracted and matched against the
-server routes. 50 client paths; exactly one has no internal route
-(`github-repositories/`). Behaviour marked *verified* was exercised on a
-Galaxy S20 FE against the live instance; *wired* means the code exists and
-compiles but no one has watched it work.
+server routes; exactly one has no internal route (`github-repositories/`).
+What "covered" is worth, and what backs it, is set out at the end of this
+document — read that before trusting a row. Behaviour marked *verified* was
+exercised on a Galaxy S20 FE against the live instance, which is worth less
+than a test and is labelled separately for that reason.
 
 ## Summary
 
 | | Areas |
 |---|---|
-| Covered | 20 |
-| Partial | 6 |
-| Missing | 5 |
+| Covered | 25 |
+| Partial | 1 |
+| Missing | 0 |
 
-Everything that was structurally unreachable is now reachable. What remains
-missing is missing because nobody has built it, not because the transport
-forbids it — which was not true of this document's first two versions.
+Everything that was structurally unreachable is now reachable, and the five
+areas this document listed as missing are built. One area is still partial and
+is named as such below.
+
+The app no longer reaches Plane's data any way but through the proxy. The
+three routes still served by `plane-mobile-api` are the ones that cannot be
+proxied — two that mint the token and one that registers a device for push —
+and none of them reads Plane's tables on the caller's behalf.
 
 ## Covered
 
@@ -56,19 +62,62 @@ forbids it — which was not true of this document's first two versions.
 | Notifications | list, read/unread, archive, mark-all-read, preferences |
 | Workspace rollups | cross-project work items (paginated), workspace saved views incl. delete, cycles, modules — from the More menu. `workspaces/{}/states/` and `.../labels/` resolve the ids, which the project-scoped calls cannot |
 | Favorites | projects, cycles, modules, views and pages, starred from their list rows — *verified*, a star round-trips and unstars. On `user-favorites/`, not the per-entity routes; see below |
+| Inbox | Plane's notification feed merged with the caller's own activity, both through the proxy. Read and archive on a notification are Plane's; the marks on an activity row are this device's, because the server has nowhere to keep them. See *Architectural risk* for why both feeds are needed |
+| Intake | Open/Closed tabs, the server's whole action set — accept, decline, snooze, un-snooze, mark duplicate — plus submitting into the queue and deleting an entry |
+| Search | workspace-wide on `workspaces/{slug}/search/`, and project-scoped work items on `search-issues/` for the parent, relation and duplicate pickers — *verified* |
+| Draft work items | list, edit, promote, discard, and "Save draft" on the create screen, carrying every field a work item has |
+| Estimates | a work item's point, and the scales those points come from — create and delete |
+| Projects | list, detail, members, settings, archive and unarchive, leave; cycles, modules, pages and views can be created, gated on the caller's role — *verified* |
+| Description history | `work-items/{id}/description-versions/`, with restore |
+| Exports | `export-issues/` and `export-analytics/`, both queued server-side |
+| Home widgets | stickies and quick links, both per-user |
+| Webhooks & API tokens | list, create, revoke; webhook pause, secret roll and delete |
+| Bulk operations | archive and delete a selection from the work-item list |
+| Self-update | checks this repository's GitHub releases, verifies the download against its published SHA-256 and hands it to Android's package installer |
 
 ## Partial
 
 | Area | Has | Missing | Pri |
 |---|---|---|---|
-| Analytics | every figure is now server-computed — `advance-analytics/`, `advance-analytics-charts/`, `advance-analytics-stats/`, and `default-analytics/` for the overdue count. Five requests where the sweep took up to 45. A panel the server does not answer for is named as missing rather than drawn as a zero | the date-range and per-dimension filters Plane's own analytics page offers (assignee, label, cycle, estimate); `export-analytics/` | P3 |
-| Intake | the triage queue has a screen: Open/Closed tabs, and the server's whole action set — accept, decline, snooze, un-snooze, mark duplicate. Reached from a badged app-bar action on the project screen, shown only where `intake_view` is on. Note the "Inbox" tab is the notification feed, not this queue | submitting *into* intake from the app (`POST intake-issues/`), deleting an entry, and the per-property filters Plane's own intake sidebar offers | P3 |
-| Search | on Plane's own `workspaces/{slug}/search/` through the proxy, so `GlobalSearchEndpoint` filters every entity on project membership — *verified* | `entity-search/` and the per-project `search-issues/` are not used | P3 |
-| Estimates | a work item's estimate point can be set | estimate *scales* cannot be created or managed | P3 |
-| Projects | list, detail, members; **cycles, modules, pages and views can be created**, gated on the caller's role. **Settings is reachable** — the screen existed with no call site anywhere in the app, and is now a `settings_outlined` action on the project app bar: name, description, network, members, states, labels, integrations, and a Features section reading the project's real `cycle_view` / `module_view` / `issue_views_view` / `page_view` / `intake_view` — *verified* | project **create** itself (deliberate — projects are made on the web), archive, join, leave; the feature flags are read-only, because switching one off also decides what happens to the cycles and modules that already exist | P3 |
-| Draft work items | list, edit, promote to a work item, discard, and "Save draft" on the create screen. Reached from the work-item list's listing switcher | the draft editor carries the same fields the create screen does — title, description, state, priority — so assignees, labels, dates, cycle and module can be read off a web-made draft but not changed. Description is plain text, and the editor says so before it flattens a rich one. Workspace-level drafts with no project are not listed: the listing is project-scoped, and Plane refuses to promote a project-less draft anyway | P2 |
+| Analytics | every figure is server-computed — `advance-analytics/`, `advance-analytics-charts/`, `advance-analytics-stats/`, and `default-analytics/` for the overdue count. Five requests where the sweep took up to 45. A panel the server does not answer for is named as missing rather than drawn as a zero. **`export-analytics/` is wired** to an action on the screen | the date-range picker and the per-dimension filters Plane's own analytics page offers (assignee, label, cycle, estimate) | P3 |
 
-Two things about drafts that the route names do not tell you. They are
+That is the whole of what is partial. Everything else this table used to hold
+is now in *Covered* above:
+
+- **Intake** gained submitting into the queue and deleting an entry. Two
+  things the routes do not advertise, both commented where they live:
+  `IntakeIssueViewSet.create` reads the work item **nested under `issue`** and
+  overwrites whatever state is sent with the project's triage state; and
+  `destroy` deletes the **work item as well** for anything not yet accepted,
+  so deleting a submission is not the same as declining it.
+- **Search** gained the project-scoped `search-issues/`, which is a different
+  endpoint from global search rather than a filtered call to it: it exists to
+  feed the pickers that need work items and nothing else, and takes the flags
+  that make parent and relation pickers correct. It answers with a bare list
+  of `.values()` rows, so the keys are `project__identifier`-style rather than
+  serialised.
+- **Estimates** gained scale management. The app could put a point on a work
+  item but not create the scale those points come from, so a project never set
+  up on the web had no estimates and no way to gain them.
+- **Projects** gained archive and unarchive. Archiving deletes every
+  `UserFavorite` pointing at the project, and unarchiving does not bring them
+  back — for anyone — so the confirmation says so. Leaving was already covered.
+  Project *create* stays deliberately absent; projects are made on the web.
+- **Draft work items** gained the rest of a work item's fields. The editor
+  carried title, description, state and priority, which meant a draft written
+  on the web showed its assignees and labels on the screen and lost them the
+  moment it was saved. It now carries assignees, labels, both dates, the cycle
+  and the modules, and sends all of them on every write — empty included,
+  because an omitted key leaves the previous value standing.
+
+A draft keeps its cycle and modules on the row and a work item does not:
+`IssueCreateSerializer` has no cycle or module field at all, so those are
+written afterwards against collections that need an id the create has to
+return first. `cycle_id` on a draft has to be under that exact name — the view
+lifts it out of `request.data` into the serializer context, and the usual
+rename would be dropped in silence.
+
+Two more things about drafts that the route names do not tell you. They are
 **workspace-scoped and single-user**: `workspaces/{slug}/draft-issues/` has no
 project segment, a draft's project is a nullable column, and the list filters
 on `created_by=request.user` with no parameter that widens it — nobody can see
@@ -81,13 +130,15 @@ render as `PLM-123`.
 
 ## Missing
 
-| Area | What it is | Pri |
-|---|---|---|
-| **Description history** | `issues/{}/versions/`, `work-items/{}/description-versions/`. The activity feed is covered; description history is not | P3 |
-| **Exports** | `export-issues/`, `export-analytics/`, `user-activity/{}/export/` | P3 |
-| **Home widgets** | stickies, quick links, the workspace home dashboard | P3 |
-| **Webhooks & API tokens** | management UI. The app mints a token for its own auth and exposes nothing | P3 |
-| **Bulk operations** | `bulk-archive-issues/`, `bulk-delete-issues/`, `bulk-create-labels/` | P3 |
+Nothing. The five areas this section listed are built:
+
+| Was missing | Where it is now |
+|---|---|
+| **Description history** | An action on the work-item menu, on `work-items/{id}/description-versions/`. Note the route says `work-items`, not `issues` — one of the few places Plane's newer naming reached the internal API. The sibling `issues/{id}/versions/` is a different thing. The listing omits the body and only the detail carries it, so opening a version is a second request. Restoring goes through the normal update path, so it becomes the newest version in turn |
+| **Exports** | `export-issues/` from the workspace menu and `export-analytics/` from the analytics screen. Both queue a background job and answer immediately; nothing is downloaded and nothing arrives on the device, which is what the confirmation says |
+| **Home widgets** | Stickies and quick links, on one screen. Both are per-user server-side — the views filter on the caller and set the owner themselves — so there is no request shape that reaches anyone else's, and the screen says so. The workspace home *dashboard* is still not drawn: `users/me/workspaces/{}/dashboard/` is a stats endpoint, and the app's analytics screen already answers what it would say |
+| **Webhooks & API tokens** | One settings screen. This was the gap with the sharpest edge: the app mints a token for its own sign-in and had no way to show you that it had, let alone revoke it. A secret is shown once with a copy button, because Plane hashes an API token immediately and never sends it again. Webhooks are workspace-admin only, so a member is told that rather than shown an empty list |
+| **Bulk operations** | Long-press a row in the work-item list to select; a bar offers archive and delete. Archiving filters the selection first — Plane refuses anything not completed or cancelled and answers 400 naming the first offender rather than archiving the rest. `bulk-create-labels/` has a service and no screen: it is not something a selection of work items can ask for |
 
 Also absent, reasonably: **Gantt** (the fifth view type), **AI assistant**,
 **Unsplash** covers, and GitHub integration beyond a read-only repo list —
@@ -155,43 +206,85 @@ workaround is commented where it lives.
 | Every per-entity favorites `list` action 500s | `CycleFavoriteViewSet` and friends are `BaseViewSet`s with `model = UserFavorite` and no `serializer_class`, so DRF's `get_serializer_class` assertion fires. There is no working read on that side of the feature at all, which is why the app uses the generic `user-favorites/` collection for everything |
 | `projects/` drops the `is_favorite` annotation | `ProjectViewSet.get_queryset` annotates it and `ProjectViewSet.list` then builds its own `.values(...)` projection without it. Only `projects/details/` keeps it, so the project list cannot tell which projects are starred and the app reads that from `user-favorites/` like everything else |
 | `views/` create takes `filters`, not `query_data` | there is no `query_data` field on `IssueView`; the serializer discards the unknown key without complaining, so a view created with it silently saves no filters |
+| `notification_task` never notifies the actor | line 286 excludes `actor_id` from the subscriber set and line 309 subtracts it again. On a deployment where one person does the work, no `Notification` row is ever written and `users/notifications/` correctly returns nothing. Not a bug — but it is the reason the Inbox merges Plane's notifications with `user-activity/{me}/` rather than reading notifications alone |
+| v1 `CycleSerializer.validate` reads `project_id` from the request body | its sibling `ModuleSerializer` reads the same value from the serializer context the view fills in from the URL. Post a cycle the way the route documents and Plane answers 400 "Project ID is required". `tool/seed_demo.py` repeats the id in the body |
+| A cycle whose end date has passed refuses new work items | `CYCLE_COMPLETED`, with no way to add retrospectively. A finished sprint has to be populated first and closed afterwards, which is what the seeder does |
+| `DraftIssueCreateSerializer.create` pops `module_ids` and then overwrites it | `validated_data.pop("module_ids")` on one line, `self.initial_data.get("module_ids")` two lines later. Harmless — the second wins and is the one that was wanted — but the first is dead |
 
-## Architectural risk
+## Architectural risk: closed
 
-Two capabilities still route through `plane-mobile-api`'s own SQL handlers
-rather than the proxy: the **Inbox notification feed** and `issue-info`, plus
-auth and device registration.
+Two capabilities used to route through `plane-mobile-api`'s own SQL handlers
+rather than the proxy — the Inbox notification feed and `issue-info` — and
+this section used to say so as an open problem. It is closed.
 
-Those handlers authenticated but did not authorise. This was demonstrated, not
-suspected: the page handlers filtered by `project_id` with no membership check,
-and `get_page` filtered on page id alone, so any valid token in the instance
-could read or rewrite any page in any workspace. The notification feed selected
-activity rows by workspace slug alone, with the same result.
+Those handlers authenticated but did not authorise. That was demonstrated, not
+suspected: the page handlers filtered by `project_id` with no membership
+check, and `get_page` filtered on page id alone, so any valid token in the
+instance could read or rewrite any page in any workspace. The notification
+feed selected activity rows by workspace slug alone, with the same result.
 
-Pages and search were moved onto Plane's own API and their handlers deleted.
-The notification feed could not follow — Plane's own notifications table is
-empty on this instance while the derived feed has entries, so pointing the
-Inbox at it would empty a feed in use. It is authorised properly instead: the
-caller must be a workspace member, and the query joins `project_members` so it
-only returns activity from projects that caller belongs to. Worth revisiting
-once it is known why Plane is not populating its own table.
+The membership checks added afterwards were correct. They were also ours to
+get wrong, which is the class of bug the proxy exists to make impossible. So
+they are gone, along with the handlers:
 
-The rest were audited rather than assumed clean. Every handler that resolves a
-user from an API key now also proves membership before returning anything:
-`issue-info` checks project membership, `workspaces` selects on the caller's
-own membership row, `check-notifications` joins `project_members`, and device
-registration only ever writes the caller's own record. `_is_project_member`
-also pins the workspace when given a slug, so a caller cannot pair their own
-slug with someone else's project id. A scan of every `/auth/mobile/` route for
-"authenticates but does not authorise" now returns nothing.
+| Handler | What replaced it |
+|---|---|
+| The derived notification feed and its five action routes | Plane's `workspaces/{slug}/users/notifications/` merged with `workspaces/{slug}/user-activity/{me}/`. The second carries `WorkspaceEntityPermission` and filters `project__project_projectmember__member=request.user` — the same scoping the hand-rolled join reached for, but Plane's to get wrong |
+| One JSON file holding every user's read and dismissed ids, rewritten whole per request | Notification read and archive state is Plane's, where it already lived. Activity rows have no per-user state anywhere on the server, so those marks are this device's, in SQLite. That is a narrower blast radius than a shared file two concurrent writes could lose an update from |
+| `issue-info` | `IssueViewSet` already annotates `cycle_id` and `module_ids`, and `IssueSerializer` already sends them |
+| The workspace list | `users/me/workspaces/` |
+| The pages handlers | Nothing — they had no call site and had not had one since pages moved to Plane. They were still live, and still reachable by any valid token |
+| `check-notifications` | Nothing — no caller, and its FCM path was a second copy of the push loop's |
 
-The proxy is still the pattern to prefer for anything new: it cannot have this
-class of bug at all, because the authorisation is not ours to get wrong.
+`plane-mobile-api` went from 1537 lines to 923. What is left cannot be reached
+any other way: minting a token from a Google or a password sign-in, and
+registering a device for push, which writes only the caller's own row.
 
-## Known gaps in this document
+**Why the Inbox needs two feeds.** Plane's notifications table is empty on this
+instance, and that is correct behaviour rather than a fault:
+`notification_task` drops the actor from the subscriber set twice over, so
+Plane never notifies you about what you did. On a workspace where one person
+does the work, no notification row is ever written. Reading only that endpoint
+would leave the screen permanently blank, which is why the caller's own
+activity is merged in — and why a notification and the activity row it was
+raised for are deduplicated by the `issue_activity` id Plane puts in the
+notification's `data`.
 
-Coverage here is *capability*, established by reading routes and by exercising
-the app on a device. It is not a test suite. An area marked covered can still
-be wrong in ways only a user will find — which is exactly how the process-killing
-ButtonGroup crash and the dead work-item screen survived earlier rounds of
-"verified on device".
+## What "covered" means here, and what it does not
+
+Coverage in the tables above is **capability**: the route exists, the app calls
+it, and the call is shaped the way the server's own serialiser and view
+require. That was established by reading Plane's route table and source, not
+its public documentation.
+
+Two earlier versions of this document ended by disqualifying themselves —
+coverage was established by reading routes and by exercising the app on a
+device, which is not a test suite, and "verified on device" had twice missed a
+real defect: the ButtonGroup crash that killed the process, and the dead
+work-item screen. Both survived rounds of manual checking.
+
+That is no longer the whole of the method:
+
+- **732 unit and widget tests** run on every push and every pull request,
+  alongside `flutter analyze --fatal-infos --fatal-warnings` and a formatting
+  check. All three must be clean; there is no "zero new findings" allowance.
+- **The seams are the services.** Each exposes a `debugClient`, and the tests
+  answer it from a routing table, so what a test asserts is the thing that
+  matters about a service: which path, which parameters, what it does with the
+  answer. `test/services/inbox_service_test.dart` is the pattern.
+- **Where a claim rests on a fact about Plane, the fact is cited** — file and
+  line, in a comment next to the code that depends on it. Every row in the
+  defect table above was read out of the source, and several were then
+  reproduced against a live instance by `tool/seed_demo.py`.
+
+What this still does not give you is a guarantee that a screen behaves. The
+tests cover models, services and widgets; `integration_test/` drives the real
+app against a real instance but needs credentials and does not run in CI. An
+area marked covered can still be wrong in a way only a user will find. The
+honest claim is narrower than "it works": **every capability listed as covered
+is one the server will accept, and most of them are one a test will catch
+breaking.**
+
+Where a row above says *verified*, it means someone exercised it on a Galaxy
+S20 FE against the live instance. That is worth less than a test and is
+labelled separately for that reason.
