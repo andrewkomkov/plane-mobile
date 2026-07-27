@@ -24,6 +24,10 @@ ktlint_standard_function-naming = disabled
 # The Flutter-generated package name carries an underscore and has to match
 # the Android applicationId, so it is not ours to rename.
 ktlint_standard_package-name = disabled
+# M3ExpressiveViews.kt holds the factory and the three views it builds. The
+# rule wants one class per file, named after it; splitting four small classes
+# that only exist together would make them harder to read, not easier.
+ktlint_standard_filename = disabled
 
 [*.py]
 indent_size = 4

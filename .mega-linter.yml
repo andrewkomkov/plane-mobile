@@ -58,6 +58,10 @@ FILTER_REGEX_EXCLUDE: '(^|/)(build|\.dart_tool|ios/Pods|android/\.gradle|\.git|m
 
 MARKDOWN_MARKDOWNLINT_CONFIG_FILE: .markdownlint.yml
 
+# gitleaks runs over the whole repository rather than a file list, so
+# FILTER_REGEX_EXCLUDE does not reach it. The allowlist is in .gitleaks.toml.
+REPOSITORY_GITLEAKS_CONFIG_FILE: .gitleaks.toml
+
 SPELL_CSPELL_CONFIG_FILE: .cspell.json
 SPELL_CSPELL_FILE_EXTENSIONS:
   - .md

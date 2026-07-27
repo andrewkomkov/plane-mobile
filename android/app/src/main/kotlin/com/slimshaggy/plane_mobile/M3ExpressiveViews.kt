@@ -3,7 +3,6 @@
 package com.slimshaggy.plane_mobile
 
 import android.content.Context
-import android.graphics.Color as AndroidColor
 import android.view.View
 import androidx.activity.ComponentActivity
 import androidx.compose.foundation.layout.Box
@@ -38,6 +37,7 @@ import io.flutter.plugin.common.MethodChannel
 import io.flutter.plugin.common.StandardMessageCodec
 import io.flutter.plugin.platform.PlatformView
 import io.flutter.plugin.platform.PlatformViewFactory
+import android.graphics.Color as AndroidColor
 
 /**
  * Hosts genuine Material 3 Expressive components from
@@ -147,7 +147,10 @@ private data class HostColors(
  * when it lowers the ComposableSingletons holder to an invokedynamic lambda.
  */
 @Composable
+@Suppress("EmptyFunctionBlock")
 private fun NoOverflow(@Suppress("UNUSED_PARAMETER") state: ButtonGroupMenuState) {
+    // Deliberately empty — see the note above. detekt cannot tell this from an
+    // oversight, so it is suppressed rather than filled with a no-op.
 }
 
 /**
@@ -175,12 +178,7 @@ private fun ExpressiveHost(colors: HostColors, content: @Composable () -> Unit) 
  * interaction where the held button expands and its neighbours give way —
  * driven here by the library's own `animateWidth` modifier.
  */
-private class ButtonGroupView(
-    context: Context,
-    id: Int,
-    args: Map<*, *>,
-    messenger: BinaryMessenger,
-) : PlatformView {
+private class ButtonGroupView(context: Context, id: Int, args: Map<*, *>, messenger: BinaryMessenger) : PlatformView {
 
     // These are properties rather than locals in `init` on purpose: the Kotlin
     // 2.1 backend crashes ("No mapping for symbol") when a composable lambda
@@ -265,10 +263,7 @@ private class ButtonGroupView(
  * The real `androidx.compose.material3.LoadingIndicator` — the expressive
  * shape-morphing indicator, animating through the library's own polygon set.
  */
-private class LoadingIndicatorView(
-    context: Context,
-    args: Map<*, *>,
-) : PlatformView {
+private class LoadingIndicatorView(context: Context, args: Map<*, *>) : PlatformView {
 
     private val indicatorSize: Float = (args["size"] as? Number)?.toFloat() ?: 48f
     private val colors: HostColors = HostColors.from(args)

@@ -25,10 +25,8 @@ import java.io.File
  * the one that signed what is already installed. That refusal is the check
  * that matters, and it is not ours.
  */
-class UpdateInstaller(
-    private val activity: () -> Activity?,
-    private val context: Context,
-) : MethodChannel.MethodCallHandler {
+class UpdateInstaller(private val activity: () -> Activity?, private val context: Context) :
+    MethodChannel.MethodCallHandler {
 
     companion object {
         const val CHANNEL = "plane_mobile/updater"
@@ -39,10 +37,7 @@ class UpdateInstaller(
         }
     }
 
-    override fun onMethodCall(
-        call: io.flutter.plugin.common.MethodCall,
-        result: MethodChannel.Result,
-    ) {
+    override fun onMethodCall(call: io.flutter.plugin.common.MethodCall, result: MethodChannel.Result) {
         when (call.method) {
             "canInstall" -> result.success(canRequestInstalls())
 
@@ -83,12 +78,11 @@ class UpdateInstaller(
         }
     }
 
-    private fun canRequestInstalls(): Boolean =
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            context.packageManager.canRequestPackageInstalls()
-        } else {
-            true
-        }
+    private fun canRequestInstalls(): Boolean = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+        context.packageManager.canRequestPackageInstalls()
+    } else {
+        true
+    }
 
     private fun commit(apk: File) {
         require(apk.isFile && apk.length() > 0) { "The downloaded file is not there" }
