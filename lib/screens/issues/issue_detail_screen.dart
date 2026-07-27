@@ -487,12 +487,14 @@ class _IssueDetailScreenState extends ConsumerState<IssueDetailScreen> {
   }
 
   Future<void> _attachFile() async {
-    final picked = await FilePicker.platform.pickFiles();
-    final path = picked?.files.single.path;
+    // pickFile rather than pickFiles: file_picker 12 flipped allowMultiple to
+    // default true, and this attaches one file.
+    final picked = await FilePicker.pickFile();
+    final path = picked?.path;
     if (path == null || !mounted) return;
 
     final file = File(path);
-    final name = picked!.files.single.name;
+    final name = picked!.name;
 
     setState(() => _uploadingAttachment = name);
     try {
