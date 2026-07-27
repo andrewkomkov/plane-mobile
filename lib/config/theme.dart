@@ -11,30 +11,23 @@ class PlaneTheme {
   // ─── Design system colors (from mockup CSS) ───
   static const background = Color(0xFF0A0A0A);
   static const surface = Color(0xFF131313);
-  static const surfaceDim = Color(0xFF131313);
   static const surfaceContainer = Color(0xFF201F1F);
   static const surfaceContainerLow = Color(0xFF1C1B1B);
   static const surfaceContainerHigh = Color(0xFF2A2A2A);
   static const surfaceContainerHighest = Color(0xFF353534);
   static const surfaceContainerLowest = Color(0xFF0E0E0E);
-  static const surfaceBright = Color(0xFF3A3939);
-  static const surfaceVariant = Color(0xFF353534);
 
   static const onSurface = Color(0xFFE5E2E1);
   static const onSurfaceVariant = Color(0xFFC6C5D5);
-  static const onBackground = Color(0xFFE5E2E1);
   static const outline = Color(0xFF908F9E);
   static const outlineVariant = Color(0xFF454652);
 
   static const primaryContainer = Color(0xFF5E6AD2);
   static const onPrimaryContainer = Color(0xFFFDFAFF);
   static const primary = Color(0xFFBDC2FF);
-  static const inversePrimary = Color(0xFF4854BB);
 
   static const errorColor = Color(0xFFFFB4AB);
   static const errorContainer = Color(0xFF93000A);
-  static const tertiaryColor = Color(0xFFFFB867);
-  static const tertiaryContainer = Color(0xFFA56500);
 
   static const secondaryColor = Color(0xFFC0C3F2);
   static const secondaryContainer = Color(0xFF42466E);
@@ -528,6 +521,14 @@ class PlaneTheme {
           borderRadius: BorderRadius.circular(M3EShape.large),
           side: BorderSide(color: scheme.outlineVariant, width: 0.5),
         ),
+      ),
+      // Twenty-three `RefreshIndicator`s, all of them Material's raised puck
+      // with its own arrow, in an app that sets `elevation: 0` on every other
+      // surface. The colours at least belong to the app now; the shape is
+      // Flutter's and cannot be themed away without replacing the widget.
+      progressIndicatorTheme: ProgressIndicatorThemeData(
+        color: scheme.primary,
+        refreshBackgroundColor: scheme.surfaceContainerHigh,
       ),
       popupMenuTheme: PopupMenuThemeData(
         color: scheme.surfaceContainerHigh,

@@ -53,6 +53,12 @@ class _PlaneAppState extends ConsumerState<PlaneApp> {
       theme: PlaneTheme.light(),
       darkTheme: PlaneTheme.dark(),
       themeMode: themeMode,
+      // The theme crossfade is the one animation in the app that was still
+      // Material's: 200ms of `Curves.linear`, against a switch the user makes
+      // deliberately and watches happen. The effects spring's own duration,
+      // eased the way the rest of the app eases.
+      themeAnimationDuration: const Duration(milliseconds: 350),
+      themeAnimationCurve: Curves.easeOutCubic,
       // The status bar has to follow the theme, and the theme is only known
       // below `MaterialApp` — `themeMode: system` resolves here, not in
       // `main()`. An annotated region re-derives the overlay style on every
@@ -66,11 +72,10 @@ class _PlaneAppState extends ConsumerState<PlaneApp> {
           ? const Scaffold(body: Center(child: M3ELoadingIndicator(size: 44)))
           : _configured
               ? HomeScreen(onLogout: () => setState(() => _configured = false))
-              : SetupScreen(
-                  onConfigured: () {
-                    PushNotificationService.initialize();
-                    setState(() => _configured = true);
-                  }),
+              : SetupScreen(onConfigured: () {
+                  PushNotificationService.initialize();
+                  setState(() => _configured = true);
+                }),
     );
   }
 }
