@@ -6,7 +6,7 @@ import 'package:sqflite/sqflite.dart';
 /// Tables: projects, issues, issue_states, labels, members, inbox_items, sync_meta.
 class AppDatabase {
   static Database? _db;
-  static const _version = 2;
+  static const _version = 3;
 
   static Future<Database> get instance async {
     if (_db != null) return _db!;
@@ -152,20 +152,37 @@ class AppDatabase {
     await db.execute('''
       CREATE TABLE IF NOT EXISTS inbox_items (
         id TEXT PRIMARY KEY,
+        kind TEXT NOT NULL DEFAULT 'activity',
         title TEXT,
+        description TEXT,
         project_id TEXT,
         project_identifier TEXT,
         issue_id TEXT,
         sequence_id INTEGER,
         state_group TEXT,
         priority TEXT,
-        activity_field TEXT,
-        activity_verb TEXT,
-        activity_new_value TEXT,
-        actor_name TEXT,
         read_at TEXT,
         workspace_slug TEXT NOT NULL,
         created_at TEXT
+      )
+    ''');
+
+    // Read and dismissed marks for feed rows that have nowhere to keep them on
+    // the server.
+    //
+    // Only activity rows land here. A notification's read and archived state
+    // are columns on Plane's own `Notification`, so writing them locally would
+    // create a second answer that drifts from the first. What this replaces
+    // was one JSON file on the shim holding every user's marks, rewritten
+    // whole on every request — a lost update whenever two writes overlapped,
+    // and one file's corruption away from taking out the whole instance.
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS inbox_local_state (
+        workspace_slug TEXT NOT NULL,
+        entry_id TEXT NOT NULL,
+        is_read INTEGER NOT NULL DEFAULT 0,
+        is_dismissed INTEGER NOT NULL DEFAULT 0,
+        PRIMARY KEY (workspace_slug, entry_id)
       )
     ''');
 
@@ -213,23 +230,37 @@ class AppDatabase {
         'CREATE INDEX IF NOT EXISTS idx_wq_status ON write_queue(status)');
   }
 
+  /// Every table here is a cache of something the server holds, so a schema
+  /// change drops and refetches rather than migrating.
+  ///
+  /// Two are not caches and must survive. `write_queue` holds edits made
+  /// offline that the server has never seen — dropping it discards the user's
+  /// work with no trace, which is what this used to do. `inbox_local_state`
+  /// holds read and dismissed marks for activity rows, which exist nowhere
+  /// else; dropping it makes a cleared inbox refill itself on upgrade.
+  static const _cacheTables = [
+    'projects',
+    'issues',
+    'issue_states',
+    'labels',
+    'members',
+    'cycles',
+    'modules',
+    'pages',
+    'inbox_items',
+    'sync_meta',
+  ];
+
   static Future<void> _onUpgrade(Database db, int oldV, int newV) async {
-    // For now, drop and recreate on schema change.
-    // In production you'd run incremental migrations.
-    if (oldV < newV) {
-      await db.execute('DROP TABLE IF EXISTS projects');
-      await db.execute('DROP TABLE IF EXISTS issues');
-      await db.execute('DROP TABLE IF EXISTS issue_states');
-      await db.execute('DROP TABLE IF EXISTS labels');
-      await db.execute('DROP TABLE IF EXISTS members');
-      await db.execute('DROP TABLE IF EXISTS cycles');
-      await db.execute('DROP TABLE IF EXISTS modules');
-      await db.execute('DROP TABLE IF EXISTS pages');
-      await db.execute('DROP TABLE IF EXISTS inbox_items');
-      await db.execute('DROP TABLE IF EXISTS write_queue');
-      await db.execute('DROP TABLE IF EXISTS sync_meta');
-      await _onCreate(db, newV);
+    if (oldV >= newV) return;
+
+    for (final table in _cacheTables) {
+      await db.execute('DROP TABLE IF EXISTS $table');
     }
+
+    // _onCreate is CREATE TABLE IF NOT EXISTS throughout, so the preserved
+    // tables keep their rows and any table added since is created.
+    await _onCreate(db, newV);
   }
 
   /// Delete the entire database (used on logout).
@@ -537,7 +568,70 @@ class AppDatabase {
     final enriched =
         rows.map((r) => {...r, 'workspace_slug': ws}).toList();
     await upsertAll('inbox_items', enriched);
+    final freshIds = rows.map((r) => r['id'] as String).toSet();
+    await deleteStale('inbox_items', freshIds, workspaceSlug: ws);
     await setLastSyncedAt('inbox:$ws');
+  }
+
+  /// The read and dismissed marks this device holds for one workspace's
+  /// activity rows.
+  static Future<InboxLocalState> getInboxLocalState(String ws) async {
+    final db = await instance;
+    final rows = await db.query('inbox_local_state',
+        where: 'workspace_slug = ?', whereArgs: [ws]);
+    final read = <String>{};
+    final dismissed = <String>{};
+    for (final r in rows) {
+      final id = r['entry_id'] as String;
+      if ((r['is_read'] as int? ?? 0) == 1) read.add(id);
+      if ((r['is_dismissed'] as int? ?? 0) == 1) dismissed.add(id);
+    }
+    return InboxLocalState(read: read, dismissed: dismissed);
+  }
+
+  static Future<void> setInboxRead(String ws, String id, bool value) =>
+      setInboxReadBulk(ws, [id], value);
+
+  static Future<void> setInboxReadBulk(
+      String ws, List<String> ids, bool value) async {
+    await _markInbox(ws, ids, column: 'is_read', value: value);
+  }
+
+  static Future<void> setInboxDismissed(String ws, String id, bool value) =>
+      setInboxDismissedBulk(ws, [id], value);
+
+  static Future<void> setInboxDismissedBulk(
+      String ws, List<String> ids, bool value) async {
+    await _markInbox(ws, ids, column: 'is_dismissed', value: value);
+  }
+
+  /// One transaction for the whole set, so "mark all read" over a screenful is
+  /// a single write rather than one per row.
+  static Future<void> _markInbox(
+    String ws,
+    List<String> ids, {
+    required String column,
+    required bool value,
+  }) async {
+    if (ids.isEmpty) return;
+    final db = await instance;
+    await db.transaction((txn) async {
+      for (final id in ids) {
+        // INSERT then UPDATE, because the row may not exist yet and the two
+        // marks are independent — an upsert of the whole row would clear the
+        // other one.
+        await txn.rawInsert(
+          'INSERT OR IGNORE INTO inbox_local_state '
+          '(workspace_slug, entry_id, is_read, is_dismissed) VALUES (?, ?, 0, 0)',
+          [ws, id],
+        );
+        await txn.rawUpdate(
+          'UPDATE inbox_local_state SET $column = ? '
+          'WHERE workspace_slug = ? AND entry_id = ?',
+          [value ? 1 : 0, ws, id],
+        );
+      }
+    });
   }
 
   // ---------------------------------------------------------------------------
@@ -555,7 +649,18 @@ class AppDatabase {
     await db.delete('modules');
     await db.delete('pages');
     await db.delete('inbox_items');
+    await db.delete('inbox_local_state');
     await db.delete('write_queue');
     await db.delete('sync_meta');
   }
+}
+
+/// The inbox marks this device holds, split by what they mean.
+class InboxLocalState {
+  final Set<String> read;
+  final Set<String> dismissed;
+
+  const InboxLocalState({required this.read, required this.dismissed});
+
+  static const empty = InboxLocalState(read: {}, dismissed: {});
 }

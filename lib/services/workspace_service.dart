@@ -1,4 +1,3 @@
-import 'package:dio/dio.dart';
 import '../config/api_client.dart';
 import '../config/secure_storage.dart';
 import '../models/workspace.dart';
@@ -10,26 +9,25 @@ import '../models/member.dart';
 /// Routes are the internal API's, declared in `plane/app/urls/workspace.py`
 /// and reached through the proxy in [ApiClient].
 class WorkspaceService {
+  /// Every workspace the caller belongs to.
+  ///
+  /// `users/me/workspaces/` needs no slug, which is why this works during
+  /// setup, before one has been chosen. It replaces a hand-written join in the
+  /// mobile shim; `UserWorkSpacesEndpoint` filters on the caller's own
+  /// membership rows and annotates `total_members` the same way.
   static Future<List<Workspace>> getWorkspaces() async {
-    // Use proxy endpoint
     try {
-      final baseUrl = await SecureStorage.getBaseUrl() ?? '';
-      final apiKey = await SecureStorage.getApiKey() ?? '';
-      final dio = Dio(BaseOptions(
-        baseUrl: baseUrl,
-        headers: {'X-Api-Key': apiKey},
-        connectTimeout: const Duration(seconds: 5),
-        receiveTimeout: const Duration(seconds: 10),
-      ));
-      final response = await dio.get('/auth/mobile/workspaces/');
-      if (response.data is List) {
-        return (response.data as List)
-            .map((e) => Workspace.fromJson(e))
-            .toList();
-      }
+      final dio = await ApiClient.getInstance();
+      final response = await dio.get('/users/me/workspaces/');
+      final data = response.data;
+      final list = data is Map && data.containsKey('results')
+          ? data['results'] as List
+          : (data is List ? data : const []);
+      return list.map((e) => Workspace.fromJson(e)).toList();
     } catch (_) {}
 
-    // Fallback: return current workspace
+    // Fallback: the workspace already chosen, so a failed list does not strand
+    // a signed-in user on an empty switcher.
     final slug = await SecureStorage.getWorkspaceSlug() ?? '';
     if (slug.isNotEmpty) {
       return [
@@ -38,7 +36,6 @@ class WorkspaceService {
             name: slug,
             slug: slug,
             totalMembers: 0,
-            totalProjects: 0,
             createdAt: DateTime.now())
       ];
     }

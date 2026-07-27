@@ -44,6 +44,7 @@ import 'package:plane_mobile/config/m3e/motion.dart';
 import 'package:plane_mobile/config/secure_storage.dart';
 import 'package:plane_mobile/main.dart' as app;
 import 'package:plane_mobile/screens/setup/setup_screen.dart';
+import 'package:plane_mobile/services/project_service.dart';
 import 'package:plane_mobile/services/workspace_service.dart';
 import 'package:plane_mobile/widgets/app_navbar.dart';
 import 'package:plane_mobile/widgets/m3e/app_bar.dart';
@@ -159,9 +160,17 @@ void main() {
       expect(workspaces, isNotEmpty,
           reason: 'the API key resolved no workspaces at $_baseUrl');
       // Prefer one that actually holds projects, so the project group has
-      // something to open instead of skipping itself.
-      final populated = workspaces.where((w) => w.totalProjects > 0);
-      final chosen = populated.isNotEmpty ? populated.first : workspaces.first;
+      // something to open instead of skipping itself. `users/me/workspaces/`
+      // carries no project count, so ask the project list per workspace and
+      // stop at the first that answers with rows.
+      var chosen = workspaces.first;
+      for (final w in workspaces) {
+        final projects = await ProjectService.getProjects(w.slug);
+        if (projects.isNotEmpty) {
+          chosen = w;
+          break;
+        }
+      }
       await SecureStorage.saveWorkspaceSlug(chosen.slug);
       ApiClient.reset();
     }

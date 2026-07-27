@@ -116,8 +116,6 @@ class _IssueDetailScreenState extends ConsumerState<IssueDetailScreen> {
   /// Name of the file currently uploading, or null. Drives both the row in the
   /// attachments list and the disabled state of the attach button.
   String? _uploadingAttachment;
-  String? _moduleName;
-  String? _cycleName;
   List<IssueLink> _links = [];
 
   /// Reactions on the work item itself. Comment reactions ride along on the
@@ -312,24 +310,6 @@ class _IssueDetailScreenState extends ConsumerState<IssueDetailScreen> {
     _modules =
         await _tryLoad(() => ModuleService.getModules(ws, pid), <Module>[]);
     if (mounted) setState(() {});
-
-    // Module + cycle name via proxy (single SQL query, no N+1)
-    try {
-      final baseUrl = await SecureStorage.getBaseUrl() ?? '';
-      final apiKey = await SecureStorage.getApiKey() ?? '';
-      final dio = Dio(BaseOptions(
-        baseUrl: baseUrl,
-        headers: {'X-Api-Key': apiKey},
-        connectTimeout: const Duration(seconds: 5),
-        receiveTimeout: const Duration(seconds: 5),
-      ));
-      final resp = await dio.get('/auth/mobile/issue-info/$pid/$iid');
-      if (resp.data != null) {
-        _moduleName = resp.data['module_name'];
-        _cycleName = resp.data['cycle_name'];
-      }
-    } catch (_) {}
-    if (mounted) setState(() {});
   }
 
   /// The estimate's display value, or null when nothing is set.
@@ -344,26 +324,26 @@ class _IssueDetailScreenState extends ConsumerState<IssueDetailScreen> {
 
   /// The cycle's name.
   ///
-  /// Falls back to the name the bespoke `issue-info` proxy endpoint returns,
-  /// which is the only source when the cycle list could not be loaded.
+  /// `cycleId` rides along on the work item itself — `IssueViewSet` annotates
+  /// it and `IssueSerializer` sends it — so the name is a lookup in the cycle
+  /// list, not a second request.
   String? _cycleLabel(Issue issue) {
     final id = issue.cycleId;
-    if (id != null) {
-      for (final c in _cycles) {
-        if (c.id == id) return c.name;
-      }
+    if (id == null) return null;
+    for (final c in _cycles) {
+      if (c.id == id) return c.name;
     }
-    return _cycleName;
+    return null;
   }
 
   /// Module names, or a count once there is more than one — several module
   /// names side by side push every other chip off the row.
   String? _moduleLabel(Issue issue) {
     final ids = issue.moduleIds;
-    if (ids.isEmpty) return _moduleName;
+    if (ids.isEmpty) return null;
     final names =
         _modules.where((m) => ids.contains(m.id)).map((m) => m.name).toList();
-    if (names.isEmpty) return _moduleName ?? '${ids.length}';
+    if (names.isEmpty) return '${ids.length}';
     if (names.length == 1) return names.first;
     return '${names.length} modules';
   }

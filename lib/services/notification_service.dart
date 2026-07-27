@@ -61,6 +61,17 @@ class NotificationService {
     await dio.post('${await _base()}/$notificationId/read/');
   }
 
+  /// Puts a notification back in the unread pile.
+  ///
+  /// Same path as [markAsRead], distinguished by method —
+  /// `NotificationViewSet.as_view({"post": "mark_read", "delete":
+  /// "mark_unread"})` — which is the same shape [unarchive] uses and reads
+  /// just as wrongly: this is not a delete of the notification.
+  static Future<void> markAsUnread(String notificationId) async {
+    final dio = await _client();
+    await dio.delete('${await _base()}/$notificationId/read/');
+  }
+
   static Future<void> archive(String notificationId) async {
     final dio = await _client();
     await dio.post('${await _base()}/$notificationId/archive/');

@@ -8,6 +8,7 @@ import '../models/member.dart';
 import '../models/cycle.dart';
 import '../models/module.dart';
 import '../models/page.dart';
+import '../models/inbox_entry.dart';
 
 /// Reads model objects from SQLite.
 /// Converts between SQLite row maps and domain model objects.
@@ -333,31 +334,18 @@ class SyncService {
   //  Inbox
   // ---------------------------------------------------------------------------
 
-  static Future<List<Map<String, dynamic>>?> readInboxItems(String ws) async {
+  /// The last feed this workspace showed, so the screen has rows before the
+  /// network answers. Null rather than empty when nothing is cached, because
+  /// "not fetched yet" and "caught up" must not look the same.
+  static Future<List<InboxEntry>?> readInboxItems(String ws) async {
     final rows = await AppDatabase.getInboxItems(ws);
     if (rows.isEmpty) return null;
-    // Return raw maps — InboxTab consumes raw maps directly.
-    return rows.map((r) => Map<String, dynamic>.from(r)).toList();
+    return rows.map(InboxEntry.fromCache).toList();
   }
 
   static Future<void> writeInboxItems(
-      String ws, List<Map<String, dynamic>> items) async {
-    final rows = items.map((n) => <String, dynamic>{
-      'id': n['id'] ?? '',
-      'title': n['title'],
-      'project_id': n['project'],
-      'project_identifier': n['project_identifier'],
-      'issue_id': n['issue_id'],
-      'sequence_id': n['sequence_id'],
-      'state_group': n['state_group'],
-      'priority': n['priority'],
-      'activity_field': n['activity_field'],
-      'activity_verb': n['activity_verb'],
-      'activity_new_value': n['activity_new_value'],
-      'actor_name': n['actor_name'],
-      'read_at': n['read_at'],
-      'created_at': n['created_at'],
-    }).toList();
-    await AppDatabase.saveInboxItems(ws, rows);
+      String ws, List<InboxEntry> entries) async {
+    await AppDatabase.saveInboxItems(
+        ws, entries.map((e) => e.toCache()).toList());
   }
 }

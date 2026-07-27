@@ -4,7 +4,6 @@ class Workspace {
   final String slug;
   final String? logo;
   final int totalMembers;
-  final int totalProjects;
   final DateTime createdAt;
 
   Workspace({
@@ -13,7 +12,6 @@ class Workspace {
     required this.slug,
     this.logo,
     required this.totalMembers,
-    required this.totalProjects,
     required this.createdAt,
   });
 
@@ -21,9 +19,10 @@ class Workspace {
         id: json['id'] ?? '',
         name: json['name'] ?? '',
         slug: json['slug'] ?? '',
-        logo: json['logo'] as String?,
+        // `logo` is the stored key; `logo_url` is the resolved one the
+        // serializer adds. Prefer the resolved form when it is there.
+        logo: (json['logo_url'] ?? json['logo']) as String?,
         totalMembers: json['total_members'] ?? 0,
-        totalProjects: json['total_projects'] ?? 0,
         createdAt:
             DateTime.tryParse(json['created_at'] ?? '') ?? DateTime.now(),
       );

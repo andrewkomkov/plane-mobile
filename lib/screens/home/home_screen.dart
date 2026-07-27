@@ -89,7 +89,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         key: ValueKey(_rebuildKey),
         index: _currentTab,
         children: [
-          InboxTab(workspaceSlug: _workspaceSlug),
+          InboxTab(workspaceSlug: _workspaceSlug, userId: _user?.id),
           MyIssuesTab(workspaceSlug: _workspaceSlug, currentUserId: _user?.id),
           ProjectsTab(workspaceSlug: _workspaceSlug),
           MenuTab(
