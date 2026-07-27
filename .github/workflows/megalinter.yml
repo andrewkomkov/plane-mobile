@@ -34,7 +34,7 @@ jobs:
       # The linter images are large and change rarely. Caching what MegaLinter
       # writes between runs keeps a repeat run to the analysis itself.
       - name: Cache MegaLinter
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: |
             ~/.cache/megalinter
