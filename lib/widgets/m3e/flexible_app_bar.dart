@@ -74,7 +74,26 @@ class _M3EFlexibleHeaderScaffoldState extends State<M3EFlexibleHeaderScaffold> {
 
     // Title travels from its own large row into the toolbar line.
     final titleSize = lerpDouble(24, 17, t);
-    final largeRowHeight = lerpDouble(44, 0, t);
+
+    // The large title row is as tall as the title actually is, not 44.
+    //
+    // 44 is what a 24px headline needs at a text scale of 1.0, and the row
+    // clips. At the 2.0 the system font slider goes to, the same line measures
+    // about 58 and the title was cut in half by the ClipRect below, with the
+    // filter chips of `bottom` appearing to sit on top of it. Measuring is the
+    // only honest answer here: `headlineMedium` carries `height: 1.2` today
+    // and a literal encodes that as well as the scale.
+    final titleStyle =
+        theme.textTheme.headlineMedium?.copyWith(fontSize: titleSize);
+    final titlePainter = TextPainter(
+      text: TextSpan(text: widget.title, style: titleStyle),
+      maxLines: 1,
+      textScaler: MediaQuery.textScalerOf(context),
+      textDirection: Directionality.of(context),
+    )..layout();
+    // 14 is the row's own top padding, below.
+    final expandedRowHeight = titlePainter.height + 14;
+    final largeRowHeight = lerpDouble(expandedRowHeight, 0, t);
     final largeRowOpacity = (1 - t * 1.6).clamp(0.0, 1.0);
     final inlineOpacity = ((t - 0.55) / 0.45).clamp(0.0, 1.0);
 
@@ -155,7 +174,10 @@ class _M3EFlexibleHeaderScaffoldState extends State<M3EFlexibleHeaderScaffold> {
               child: OverflowBox(
                 alignment: Alignment.topLeft,
                 minHeight: 0,
-                maxHeight: 60,
+                // The row shrinks to zero as it collapses, and the title has to
+                // keep its full height while it slides out from under the clip
+                // — so the child is allowed to be as tall as it is at rest.
+                maxHeight: expandedRowHeight,
                 child: Opacity(
                   opacity: largeRowOpacity,
                   child: Padding(
@@ -164,8 +186,7 @@ class _M3EFlexibleHeaderScaffoldState extends State<M3EFlexibleHeaderScaffold> {
                       widget.title,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: theme.textTheme.headlineMedium
-                          ?.copyWith(fontSize: titleSize),
+                      style: titleStyle,
                     ),
                   ),
                 ),

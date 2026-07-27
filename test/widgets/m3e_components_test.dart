@@ -331,6 +331,55 @@ void main() {
       // Collapsed: the brand has handed the toolbar over to the inline title.
       expect(brandOpacity(), lessThan(0.05));
     });
+
+    testWidgets('the large title is not clipped at a 2x text scale',
+        (tester) async {
+      // The row used to be a literal 44dp, which is what a 24px headline needs
+      // at a scale of 1.0. At the 2.0 the Android font slider goes to, the
+      // same line measures about 58 and the title was cut in half — with the
+      // `bottom` row appearing to sit on top of what was left of it.
+      // Two nodes say "My issues": the collapsed title in the toolbar and the
+      // large one below it. Only the second is the row under test, and it is
+      // the one at headlineMedium's 24.
+      final largeTitle = find.byWidgetPredicate(
+          (w) => w is Text && w.data == 'My issues' && w.style?.fontSize == 24);
+
+      Future<double> titleHeightAt(double scale) async {
+        await tester.pumpWidget(MaterialApp(
+          theme: PlaneTheme.dark(),
+          home: MediaQuery(
+            data: MediaQueryData(textScaler: TextScaler.linear(scale)),
+            child: Scaffold(
+              body: M3EFlexibleHeaderScaffold(
+                title: 'My issues',
+                bottom: const Text('filters'),
+                body: ListView(children: const [SizedBox(height: 600)]),
+              ),
+            ),
+          ),
+        ));
+        return tester.getSize(largeTitle).height;
+      }
+
+      double rowHeight() => tester
+          .getSize(find.ancestor(of: largeTitle, matching: find.byType(ClipRect))
+              .first)
+          .height;
+
+      final normal = await titleHeightAt(1.0);
+      expect(rowHeight(), greaterThanOrEqualTo(normal),
+          reason: 'the row already fits its title at 1.0');
+
+      final large = await titleHeightAt(2.0);
+      expect(large, greaterThan(normal),
+          reason: 'the title really did grow with the setting');
+      expect(rowHeight(), greaterThanOrEqualTo(large),
+          reason: 'and the row grew with it rather than cutting it off');
+
+      // And the row below the title still starts under it, not over it.
+      expect(tester.getTopLeft(find.text('filters')).dy,
+          greaterThanOrEqualTo(tester.getBottomLeft(largeTitle).dy));
+    });
   });
 
   group('M3EAppBar', () {

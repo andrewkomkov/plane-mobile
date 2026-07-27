@@ -46,10 +46,27 @@ in the audit below:
   action on the project screen's app bar, and the Features section was
   photographed on the device reading the real flags.
 
-**Not done, and deliberately:** `main.dart` still installs no `textScaler`
-clamp. Screens that clipped at large text scales were fixed individually
-instead. A global clamp overrides a user's accessibility setting, which is a
-product decision rather than a refactor.
+**Settled, with the device to settle it:** `main.dart` still installs no
+`textScaler` clamp, and now that is a decision rather than an omission. A
+global clamp overrides the accessibility setting the user deliberately
+changed, and WCAG 1.4.4 asks for 200%; the Android slider goes to exactly
+2.0. So the app was driven at 2.0 on the S20 FE to find out what a clamp would
+have been hiding.
+
+Almost nothing. Lists, cards, empty states, sheets and dialogs all survive it —
+the nav bar already grows its own height for the label, and two screens already
+compute against the scaler. One real defect: `M3EFlexibleHeaderScaffold` sized
+its large title row at a literal 44, which is what a 24px headline needs at a
+scale of 1.0. At 2.0 the same line measures about 58, so the title was cut in
+half and the filter chips below appeared to sit on top of it. The row measures
+its own title now, and a test pins it at both scales.
+
+What remains at 2.0 is the nav bar's labels ellipsising — "My Ta…", "Proje…".
+That is kept on purpose: "Projects" at 20sp cannot fit a fifth of a 393dp
+screen at any word break, the icon carries the destination's identity, the
+full name is on the semantics node for a screen reader, and Material's own
+`NavigationBar` truncates identically. The alternatives are hiding the labels
+or shrinking the very text the user asked to enlarge, and both say less.
 
 **Raised by the fixers, since done:** the four requests against the shared
 widgets. `confirm_dialog` gained `confirmAction`, the non-destructive variant,
