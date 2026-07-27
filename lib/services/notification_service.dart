@@ -66,6 +66,18 @@ class NotificationService {
     await dio.post('${await _base()}/$notificationId/archive/');
   }
 
+  /// Puts an archived notification back in the feed.
+  ///
+  /// Plane routes both directions through the same path and distinguishes them
+  /// by method — `NotificationViewSet.as_view({"post": "archive", "delete":
+  /// "unarchive"})` — so this is a DELETE on the archive endpoint and not, as
+  /// it reads, a delete of the notification. That is the whole reason the
+  /// swipe in the feed can offer an undo.
+  static Future<void> unarchive(String notificationId) async {
+    final dio = await _client();
+    await dio.delete('${await _base()}/$notificationId/archive/');
+  }
+
   static Future<void> markAllAsRead() async {
     final dio = await _client();
     await dio.post('${await _base()}/mark-all-read/');

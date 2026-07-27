@@ -164,7 +164,23 @@ class _ModuleDetailScreenState extends ConsumerState<ModuleDetailScreen> {
     }
   }
 
+  /// Takes an issue out of the module, and leaves the door open.
+  ///
+  /// Removal was one tap on a button that sits in every row, with no
+  /// confirmation and no way back: the request went out, the list reloaded,
+  /// and an issue a user did not mean to touch was simply gone from the
+  /// module. Material's answer to a reversible destructive action is not a
+  /// dialog in front of it but an undo behind it, which is what [sayUndo]
+  /// offers here.
+  ///
+  /// The row leaves before the request does. Undo only means anything if the
+  /// user is not left watching a spinner to learn whether the mistake
+  /// happened; a failure puts the row back at the index it left from and says
+  /// why.
   Future<void> _removeIssue(Issue issue) async {
+    final index = _issues.indexWhere((i) => i.id == issue.id);
+    if (index < 0) return;
+    setState(() => _issues.removeAt(index));
     try {
       await ModuleService.removeIssueFromModule(
         widget.workspaceSlug,
@@ -172,12 +188,41 @@ class _ModuleDetailScreenState extends ConsumerState<ModuleDetailScreen> {
         widget.module.id,
         issue.id,
       );
-      _load();
+      if (!mounted) return;
+      sayUndo(
+        context,
+        'Removed ${issue.name} from this module',
+        () => _restoreIssue(issue, index),
+      );
     } catch (e) {
-      if (mounted) {
-        sayError(
-            context, describeApiError(e, fallback: 'Failed to remove issue'));
-      }
+      if (!mounted) return;
+      setState(() => _issues.insert(index.clamp(0, _issues.length), issue));
+      sayError(
+          context, describeApiError(e, fallback: 'Failed to remove issue'));
+    }
+  }
+
+  /// Undo: puts the issue back, in the same place and by the same rules.
+  ///
+  /// The list is not reloaded on the way — a full `_load()` would blank the
+  /// screen to a spinner, which is the opposite of what an undo should feel
+  /// like. [index] can be past the end by now if the user removed other rows
+  /// in the seconds the snackbar was up, so it is clamped rather than trusted.
+  Future<void> _restoreIssue(Issue issue, int index) async {
+    if (_issues.any((i) => i.id == issue.id)) return;
+    setState(() => _issues.insert(index.clamp(0, _issues.length), issue));
+    try {
+      await ModuleService.addIssuesToModule(
+        widget.workspaceSlug,
+        widget.projectId,
+        widget.module.id,
+        [issue.id],
+      );
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _issues.removeWhere((i) => i.id == issue.id));
+      sayError(
+          context, describeApiError(e, fallback: 'Failed to restore issue'));
     }
   }
 
@@ -512,10 +557,14 @@ class _ModuleDetailScreenState extends ConsumerState<ModuleDetailScreen> {
                                   color: theme.colorScheme.error,
                                   size: PlaneTheme.iconLarge),
                             ),
-                            confirmDismiss: (_) async {
-                              await _removeIssue(issue);
-                              return false;
-                            },
+                            // The swipe removes the row and the removal takes
+                            // it out of the list, so this is `onDismissed`
+                            // rather than a `confirmDismiss` that awaits the
+                            // request and answers `false`: that older shape
+                            // left the `Dismissible` animating itself back in
+                            // while the list was already rebuilding without
+                            // it.
+                            onDismissed: (_) => _removeIssue(issue),
                             // Removing an issue used to be the swipe and
                             // nothing else: no button, no long-press, no
                             // custom action. A swipe produces no semantics
@@ -524,46 +573,37 @@ class _ModuleDetailScreenState extends ConsumerState<ModuleDetailScreen> {
                             // `adb_drive.py check` to report as missing. The
                             // swipe stays as the accelerator.
                             //
-                            // The button sits beside the row rather than in
-                            // it because `IssueRow` has no trailing slot to
-                            // pass through to `PlaneRow.trailing`; if it
-                            // gains one, this Row collapses into it.
-                            child: Row(
-                              children: [
-                                Expanded(
-                                  child: IssueRow(
-                                    issue: issue,
-                                    state: _states[issue.state],
-                                    showPriority: true,
-                                    showState: true,
-                                    onTap: () async {
-                                      await Navigator.push(
-                                        context,
-                                        MaterialPageRoute(
-                                          builder: (_) => IssueDetailScreen(
-                                            workspaceSlug: widget.workspaceSlug,
-                                            projectId: widget.projectId,
-                                            issueId: issue.id,
-                                            states: _states,
-                                          ),
-                                        ),
-                                      );
-                                      _load();
-                                    },
+                            // The button rides in the row's own trailing slot,
+                            // which is the one part of the card outside its
+                            // semantics node and so the one place a real
+                            // button survives.
+                            child: IssueRow(
+                              issue: issue,
+                              state: _states[issue.state],
+                              showPriority: true,
+                              showState: true,
+                              trailing: M3EIconButton(
+                                icon: Icons.remove_circle_outline,
+                                tooltip:
+                                    'Remove ${issue.name} from this module',
+                                size: M3EIconButtonSize.small,
+                                color: theme.colorScheme.onSurfaceVariant,
+                                onPressed: () => _removeIssue(issue),
+                              ),
+                              onTap: () async {
+                                await Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) => IssueDetailScreen(
+                                      workspaceSlug: widget.workspaceSlug,
+                                      projectId: widget.projectId,
+                                      issueId: issue.id,
+                                      states: _states,
+                                    ),
                                   ),
-                                ),
-                                Padding(
-                                  padding: const EdgeInsets.only(right: 8),
-                                  child: M3EIconButton(
-                                    icon: Icons.remove_circle_outline,
-                                    tooltip:
-                                        'Remove ${issue.name} from this module',
-                                    size: M3EIconButtonSize.small,
-                                    color: theme.colorScheme.onSurfaceVariant,
-                                    onPressed: () => _removeIssue(issue),
-                                  ),
-                                ),
-                              ],
+                                );
+                                _load();
+                              },
                             ),
                           )),
                       const SizedBox(height: 80),

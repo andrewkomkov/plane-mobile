@@ -71,15 +71,52 @@ class _NotificationScreenState extends ConsumerState<NotificationScreen> {
     }
   }
 
+  /// Archives a notification, and offers the way back.
+  ///
+  /// A single swipe took a row out of the feed and reloaded the list, with
+  /// nothing to say it had happened and nothing to undo it — and the feed has
+  /// no archived view, so a notification archived by accident was gone as far
+  /// as this app was concerned. Plane's archive is reversible
+  /// ([NotificationService.unarchive]), so the swipe gets a snackbar with the
+  /// reverse behind it.
+  ///
+  /// The row is dropped locally rather than by reloading: `_load()` refetches
+  /// the whole feed and flashes the skeleton, which is a heavy answer to one
+  /// row leaving and would fight the undo it is offering.
   Future<void> _archive(PlaneNotification notification) async {
+    final index = _notifications.indexWhere((n) => n.id == notification.id);
+    if (index < 0) return;
+    setState(() => _notifications.removeAt(index));
     try {
       await NotificationService.archive(notification.id);
-      _load();
+      if (!mounted) return;
+      sayUndo(
+        context,
+        'Notification archived',
+        () => _unarchive(notification, index),
+      );
     } catch (e) {
-      if (mounted) {
-        sayError(context,
-            describeApiError(e, fallback: 'Could not reach notifications'));
-      }
+      if (!mounted) return;
+      setState(() => _notifications.insert(
+          index.clamp(0, _notifications.length), notification));
+      sayError(context,
+          describeApiError(e, fallback: 'Could not reach notifications'));
+    }
+  }
+
+  /// Undo: puts an archived notification back where it was in the feed.
+  Future<void> _unarchive(PlaneNotification notification, int index) async {
+    if (_notifications.any((n) => n.id == notification.id)) return;
+    setState(() => _notifications.insert(
+        index.clamp(0, _notifications.length), notification));
+    try {
+      await NotificationService.unarchive(notification.id);
+    } catch (e) {
+      if (!mounted) return;
+      setState(
+          () => _notifications.removeWhere((n) => n.id == notification.id));
+      sayError(context,
+          describeApiError(e, fallback: 'Could not restore the notification'));
     }
   }
 

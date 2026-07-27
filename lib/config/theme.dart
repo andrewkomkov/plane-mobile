@@ -515,6 +515,11 @@ class PlaneTheme {
       snackBarTheme: SnackBarThemeData(
         backgroundColor: scheme.surfaceContainerHighest,
         contentTextStyle: textTheme.bodyMedium,
+        // The snackbar sits on the app's own surface ramp rather than
+        // Material's inverse one, so the action label cannot keep its default
+        // `inversePrimary` — that colour is picked to read on `inverseSurface`
+        // and lands nearly invisible here.
+        actionTextColor: scheme.primary,
         behavior: SnackBarBehavior.floating,
         elevation: 0,
         shape: RoundedRectangleBorder(

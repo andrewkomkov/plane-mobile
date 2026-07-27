@@ -24,6 +24,29 @@ void say(BuildContext context, String message) {
     ..showSnackBar(SnackBar(content: Text(message)));
 }
 
+/// Tells the user something was taken away, and offers to put it back.
+///
+/// Material's answer to a destructive action that can be reversed is this, not
+/// a confirmation dialog: let the tap through, say what happened, and keep the
+/// way back open for a few seconds. A dialog asks every user to pay for the
+/// mistake the few make; an undo charges only the ones who made it.
+///
+/// The window is longer than the default four seconds because the user this
+/// exists for is the one who did not mean to tap and has to notice the
+/// snackbar, read it and reach it — [SnackBarAction] extends nothing on its
+/// own.
+void sayUndo(BuildContext context, String message, VoidCallback onUndo) {
+  final messenger = ScaffoldMessenger.maybeOf(context);
+  if (messenger == null) return;
+  messenger
+    ..hideCurrentSnackBar()
+    ..showSnackBar(SnackBar(
+      content: Text(message),
+      duration: const Duration(seconds: 6),
+      action: SnackBarAction(label: 'Undo', onPressed: onUndo),
+    ));
+}
+
 /// Tells the user something went wrong.
 ///
 /// The colour is not the only channel — the icon carries it too, because the

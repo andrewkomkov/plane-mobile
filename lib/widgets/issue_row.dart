@@ -71,6 +71,18 @@ class IssueRow extends StatelessWidget {
   final List<Label> allLabels;
   final List<Member> allMembers;
 
+  /// A control at the right edge of the row, inside the card — the cycle and
+  /// module screens put "remove from this cycle" here.
+  ///
+  /// Both screens used to hang that button in a `Row` *beside* the card,
+  /// because this pass-through did not exist; the icon then floated in the
+  /// gutter, outside the surface it acted on, and the card was narrower than
+  /// every other list's. [PlaneRow.trailing] is the slot that was already
+  /// built for it, and the one place in the row that keeps its own semantics
+  /// node, so the button stays reachable from a screen reader and from
+  /// `adb_drive.py`.
+  final Widget? trailing;
+
   const IssueRow({
     super.key,
     required this.issue,
@@ -95,6 +107,7 @@ class IssueRow extends StatelessWidget {
     this.onLongPress,
     this.allLabels = const [],
     this.allMembers = const [],
+    this.trailing,
   });
 
   bool get _showId => showId ?? (identifier != null);
@@ -190,6 +203,7 @@ class IssueRow extends StatelessWidget {
           for (final member in issueMembers)
             PlaneAvatar(name: member.displayName, imageUrl: member.avatar),
       ],
+      trailing: trailing,
       highlighted: unread || highlighted,
       semanticLabel: _semanticLabel(issueMembers, issueLabels),
       onTap: onTap,
