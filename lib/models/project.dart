@@ -52,6 +52,13 @@ class Project {
   final bool viewsEnabled;
   final bool pagesEnabled;
 
+  /// When the project was archived, or null while it is live.
+  ///
+  /// Archiving is not a feature flag: it takes the project out of every list
+  /// at once, and deletes every favourite pointing at it on the way — those do
+  /// not come back on unarchive, for anyone.
+  final DateTime? archivedAt;
+
   Project({
     required this.id,
     required this.name,
@@ -70,7 +77,10 @@ class Project {
     this.modulesEnabled = true,
     this.viewsEnabled = true,
     this.pagesEnabled = true,
+    this.archivedAt,
   });
+
+  bool get isArchived => archivedAt != null;
 
   factory Project.fromJson(Map<String, dynamic> json) => Project(
         id: json['id'] ?? '',
@@ -92,5 +102,6 @@ class Project {
         modulesEnabled: json['module_view'] as bool? ?? true,
         viewsEnabled: json['issue_views_view'] as bool? ?? true,
         pagesEnabled: json['page_view'] as bool? ?? true,
+        archivedAt: DateTime.tryParse(json['archived_at']?.toString() ?? ''),
       );
 }

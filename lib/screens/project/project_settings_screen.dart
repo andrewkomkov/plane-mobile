@@ -16,6 +16,7 @@ import '../../models/label.dart';
 import '../../models/member.dart';
 import '../../models/member_permissions.dart';
 import '../../services/project_service.dart';
+import '../../services/estimate_service.dart';
 import '../../services/issue_service.dart';
 import '../../services/label_service.dart';
 import '../../services/member_service.dart';
@@ -62,6 +63,9 @@ class _ProjectSettingsScreenState extends ConsumerState<ProjectSettingsScreen> {
   /// Starts empty, which denies everything: the two role lookups are async and
   /// until they land the screen must offer nothing rather than everything.
   MemberPermissions _permissions = const MemberPermissions();
+
+  /// The project's estimate scales.
+  List<Estimate> _estimates = [];
 
   @override
   void initState() {
@@ -123,6 +127,9 @@ class _ProjectSettingsScreenState extends ConsumerState<ProjectSettingsScreen> {
         );
         _loading = false;
       });
+      // After the frame, not with it: a project with estimates switched off
+      // answers 404 here, and that must not take the whole screen down.
+      await _loadEstimates();
     } catch (e) {
       if (mounted) setState(() => _loading = false);
     }
@@ -822,10 +829,174 @@ class _ProjectSettingsScreenState extends ConsumerState<ProjectSettingsScreen> {
                 _featureRow('Intake', Icons.inbox_outlined,
                     widget.project.intakeEnabled),
 
+                const SectionHeader(label: 'Estimates'),
+                ..._estimateRows(),
+
+                // Archiving is not a feature flag and does not belong with
+                // them: it takes the whole project out of every list rather
+                // than turning one section off.
+                const SectionHeader(label: 'Danger zone'),
+                PlaneRow(
+                  icon: widget.project.isArchived
+                      ? Icons.unarchive_outlined
+                      : Icons.archive_outlined,
+                  title: widget.project.isArchived
+                      ? 'Restore from archive'
+                      : 'Archive project',
+                  subtitle: widget.project.isArchived
+                      ? 'Put it back in the project list'
+                      : 'Hides it from every list. Favourites pointing at it '
+                          'are deleted and do not come back.',
+                  semanticLabel: widget.project.isArchived
+                      ? 'Restore this project from the archive'
+                      : 'Archive this project',
+                  onTap: _toggleArchive,
+                ),
+
                 const SizedBox(height: 40),
               ],
             ),
     );
+  }
+
+  /// The project's estimate scales, and the way to make one.
+  ///
+  /// The app could already put a point on a work item but not create the scale
+  /// those points come from, so a project never set up on the web had no
+  /// estimates and no way to gain them.
+  List<Widget> _estimateRows() => [
+        for (final estimate in _estimates)
+          PlaneRow(
+            icon: Icons.straighten,
+            title: estimate.name,
+            subtitle: estimate.points.isEmpty
+                ? 'No points'
+                : estimate.points.map((p) => p.value).join(', '),
+            semanticLabel: 'Estimate scale ${estimate.name}',
+            trailing: IconButton(
+              icon: const Icon(Icons.delete_outline),
+              tooltip: 'Delete ${estimate.name}',
+              onPressed: () => _deleteEstimate(estimate),
+            ),
+          ),
+        if (_estimates.isEmpty)
+          PlaneRow(
+            icon: Icons.add,
+            title: 'Add an estimate scale',
+            subtitle: 'Sizes to put on work items',
+            semanticLabel: 'Add an estimate scale',
+            onTap: _addEstimate,
+          ),
+      ];
+
+  Future<void> _addEstimate() async {
+    final controller = TextEditingController(text: '1, 2, 3, 5, 8');
+    final nameController = TextEditingController(text: 'Points');
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('New estimate scale'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            M3ETextField(label: 'Name', controller: nameController),
+            const SizedBox(height: 12),
+            M3ETextField(
+              label: 'Points, comma separated',
+              controller: controller,
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Cancel')),
+          FilledButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              child: const Text('Create')),
+        ],
+      ),
+    );
+    final values = controller.text
+        .split(',')
+        .map((v) => v.trim())
+        .where((v) => v.isNotEmpty)
+        .toList();
+    final name = nameController.text.trim();
+    controller.dispose();
+    nameController.dispose();
+    if (ok != true || values.isEmpty || name.isEmpty) return;
+
+    try {
+      await EstimateService.createEstimate(
+        widget.workspaceSlug,
+        widget.project.id,
+        name: name,
+        type: 'points',
+        values: values,
+      );
+      await _loadEstimates();
+    } catch (e) {
+      _report(describeApiError(e, fallback: 'Could not create the scale'));
+    }
+  }
+
+  Future<void> _deleteEstimate(Estimate estimate) async {
+    final ok = await confirmDestructive(
+      context,
+      title: 'Delete ${estimate.name}?',
+      message: 'Work items sized with it lose their estimate.',
+      confirmLabel: 'Delete',
+    );
+    if (!ok) return;
+    try {
+      await EstimateService.deleteEstimate(
+          widget.workspaceSlug, widget.project.id, estimate.id);
+      await _loadEstimates();
+    } catch (e) {
+      _report(describeApiError(e, fallback: 'Could not delete the scale'));
+    }
+  }
+
+  Future<void> _loadEstimates() async {
+    try {
+      final estimates = await EstimateService.getEstimates(
+          widget.workspaceSlug, widget.project.id);
+      if (mounted) setState(() => _estimates = estimates);
+    } catch (_) {
+      // A project with estimates switched off answers 404, which is the same
+      // thing as having none.
+      if (mounted) setState(() => _estimates = []);
+    }
+  }
+
+  Future<void> _toggleArchive() async {
+    final archived = widget.project.isArchived;
+    final ok = await confirmDestructive(
+      context,
+      title: archived ? 'Restore this project?' : 'Archive this project?',
+      message: archived
+          ? 'It goes back into the project list.'
+          : 'It disappears from every list until it is restored. Favourites '
+              'pointing at it are deleted and do not come back.',
+      confirmLabel: archived ? 'Restore' : 'Archive',
+    );
+    if (!ok) return;
+    try {
+      if (archived) {
+        await ProjectService.unarchiveProject(
+            widget.workspaceSlug, widget.project.id);
+      } else {
+        await ProjectService.archiveProject(
+            widget.workspaceSlug, widget.project.id);
+      }
+      if (!mounted) return;
+      // The screen is showing a project that is no longer in the list it was
+      // opened from, so it closes rather than redrawing stale rows.
+      Navigator.of(context).pop(true);
+    } catch (e) {
+      _report(describeApiError(e, fallback: 'Could not change the archive'));
+    }
   }
 
   /// One feature and whether this project has it switched on.

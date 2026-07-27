@@ -37,7 +37,7 @@ import 'intake_status.dart';
 ///   closed. The status column would take another value, but accepting
 ///   something already declined does not undo what the decline did to the work
 ///   item, so the app does not pretend it is an undo.
-enum IntakeAction { accept, decline, snooze, unsnooze, duplicate }
+enum IntakeAction { accept, decline, snooze, unsnooze, duplicate, delete }
 
 /// Runs [action] against [entry], asking for whatever the action needs first.
 ///
@@ -109,6 +109,11 @@ Future<bool> runIntakeAction(
       if (candidate == null) return false;
       status = IntakeStatus.duplicate;
       duplicateTo = candidate.id;
+
+    case IntakeAction.delete:
+      // Deleting is not a triage status, so it leaves this function before the
+      // shared write below.
+      return _deleteEntry(context, workspaceSlug, projectId, entry, label);
   }
 
   try {
@@ -148,6 +153,49 @@ Future<bool> runIntakeAction(
   }
 }
 
+/// Remove an entry from the queue entirely.
+///
+/// Plane's `destroy` checks the status first: for pending, declined, snoozed
+/// or duplicate it deletes the **work item** before the intake row, so the
+/// submission stops existing rather than being recorded as refused. Only an
+/// entry that was already accepted leaves its work item behind. The
+/// confirmation says which of the two will happen.
+Future<bool> _deleteEntry(
+  BuildContext context,
+  String workspaceSlug,
+  String projectId,
+  IntakeIssue entry,
+  String label,
+) async {
+  final keepsWorkItem = entry.status == IntakeStatus.accepted;
+  final ok = await confirmDestructive(
+    context,
+    title: 'Delete $label?',
+    message: keepsWorkItem
+        ? 'It leaves the queue. The work item it became stays in the project.'
+        : 'The submission and its work item are both deleted. There is no way '
+            'to take this back.',
+    confirmLabel: 'Delete',
+  );
+  if (!ok) return false;
+
+  try {
+    await IntakeService.deleteIntakeIssue(
+      workspaceSlug,
+      projectId,
+      // The work item id, like every other write here.
+      entry.issueId,
+    );
+    if (context.mounted) _say(context, '$label deleted');
+    return true;
+  } catch (e) {
+    if (!context.mounted) return false;
+    _say(context, describeApiError(e, fallback: 'Could not delete $label'),
+        error: true);
+    return false;
+  }
+}
+
 String _pastTense(IntakeAction action) {
   switch (action) {
     case IntakeAction.accept:
@@ -160,6 +208,10 @@ String _pastTense(IntakeAction action) {
       return 'back in the queue';
     case IntakeAction.duplicate:
       return 'marked duplicate';
+    // Not reached: deleting leaves runIntakeAction before this is consulted,
+    // and says so itself. Listed because the switch is exhaustive.
+    case IntakeAction.delete:
+      return 'deleted';
   }
 }
 
@@ -243,6 +295,18 @@ Future<bool> showIntakeActionSheet(
         label: 'Decline',
         subtitle: 'Reject it. This cannot be undone',
         icon: Icons.cancel_outlined,
+        destructive: true,
+      ),
+      // Deleting is not declining. Plane's `destroy` checks the status and,
+      // for anything not yet accepted, deletes the *work item* along with the
+      // intake row — so the submission stops existing rather than being
+      // recorded as refused. Nothing in the route says so, which is why this
+      // row does.
+      const BottomSheetPickerItem(
+        value: IntakeAction.delete,
+        label: 'Delete',
+        subtitle: 'Removes the submission and its work item entirely',
+        icon: Icons.delete_outline,
         destructive: true,
       ),
     ],

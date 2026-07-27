@@ -55,18 +55,9 @@ class ProjectService {
     await dio.delete('/workspaces/$workspaceSlug/projects/$projectId/archive/');
   }
 
-  /// Leave a project.
-  ///
-  /// Plane refuses when the caller is the project's only admin, with a message
-  /// saying to appoint another or delete the project. That refusal is a 400
-  /// with an `error` string, which is worth surfacing verbatim: it is the one
-  /// case where the reason is not guessable from the screen.
-  static Future<void> leaveProject(
-      String workspaceSlug, String projectId) async {
-    final dio = await ApiClient.getInstance();
-    await dio
-        .post('/workspaces/$workspaceSlug/projects/$projectId/members/leave/');
-  }
+  // Leaving a project is not here: it is a write against the membership
+  // collection, and MemberService.leave already owns it alongside the role
+  // changes and removals it belongs with.
 
   /// Join a public project in the workspace.
   ///

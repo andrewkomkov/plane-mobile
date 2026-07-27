@@ -4,11 +4,13 @@ import '../../config/theme.dart';
 import '../../models/intake_issue.dart';
 import '../../services/intake_service.dart';
 import '../../utils/api_error.dart';
+import '../../utils/say.dart';
 import '../../utils/time_ago.dart';
 import '../../widgets/loading_state.dart';
 import '../../widgets/m3e/app_bar.dart';
 import '../../widgets/m3e/chip.dart';
 import '../../widgets/m3e/icon_button.dart';
+import '../../widgets/m3e/text_field.dart';
 import '../../widgets/plane_row.dart';
 import 'intake_actions.dart';
 import 'intake_detail_screen.dart';
@@ -130,6 +132,92 @@ class _IntakeScreenState extends State<IntakeScreen> {
     if (changed == true && mounted) _load();
   }
 
+  /// Put something into the queue.
+  ///
+  /// Deliberately a small form rather than the full compose screen: an intake
+  /// submission is a request, not a work item. Plane agrees — the state is not
+  /// the submitter's to choose, and the view overwrites whatever is sent with
+  /// the project's triage state.
+  Future<void> _submit() async {
+    final nameController = TextEditingController();
+    final descController = TextEditingController();
+    var priority = 'none';
+
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setLocal) => AlertDialog(
+          title: const Text('Submit to intake'),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                M3ETextField(
+                  label: 'Title',
+                  controller: nameController,
+                  autofocus: true,
+                ),
+                const SizedBox(height: 12),
+                M3ETextField(
+                  label: 'What happened',
+                  controller: descController,
+                  maxLines: 4,
+                ),
+                const SizedBox(height: 12),
+                DropdownButtonFormField<String>(
+                  initialValue: priority,
+                  decoration: const InputDecoration(labelText: 'Priority'),
+                  items: const [
+                    DropdownMenuItem(value: 'urgent', child: Text('Urgent')),
+                    DropdownMenuItem(value: 'high', child: Text('High')),
+                    DropdownMenuItem(value: 'medium', child: Text('Medium')),
+                    DropdownMenuItem(value: 'low', child: Text('Low')),
+                    DropdownMenuItem(value: 'none', child: Text('None')),
+                  ],
+                  onChanged: (v) => setLocal(() => priority = v ?? 'none'),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+                onPressed: () => Navigator.pop(ctx, false),
+                child: const Text('Cancel')),
+            FilledButton(
+                onPressed: () => Navigator.pop(ctx, true),
+                child: const Text('Submit')),
+          ],
+        ),
+      ),
+    );
+
+    final name = nameController.text.trim();
+    final description = descController.text.trim();
+    nameController.dispose();
+    descController.dispose();
+    if (ok != true || !mounted) return;
+    if (name.isEmpty) {
+      say(context, 'A submission needs a title');
+      return;
+    }
+
+    try {
+      await IntakeService.createIntakeIssue(
+        widget.workspaceSlug,
+        widget.projectId,
+        name: name,
+        priority: priority,
+        descriptionHtml: description.isEmpty ? null : '<p>$description</p>',
+      );
+      if (mounted) say(context, 'Submitted for triage');
+      await _load();
+    } catch (e) {
+      if (mounted) {
+        say(context, describeApiError(e, fallback: 'Could not submit it'));
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -139,6 +227,11 @@ class _IntakeScreenState extends State<IntakeScreen> {
             ? 'Triage queue'
             : '${widget.projectIdentifier} triage queue',
         actions: [
+          M3EAppBarAction(
+            icon: Icons.add,
+            tooltip: 'Submit into the triage queue',
+            onPressed: _submit,
+          ),
           M3EAppBarAction(
             icon: Icons.refresh,
             tooltip: 'Reload the intake queue',

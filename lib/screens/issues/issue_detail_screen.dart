@@ -48,6 +48,7 @@ import '../../widgets/sheet_header.dart';
 import '../../widgets/loading_state.dart';
 import '../../widgets/reaction_bar.dart';
 import '../../widgets/skeleton_loader.dart';
+import 'description_history_screen.dart';
 import 'issue_create_screen.dart';
 
 /// One vertical rhythm for the whole screen.
@@ -1941,6 +1942,12 @@ class _IssueDetailScreenState extends ConsumerState<IssueDetailScreen> {
                 : 'Only completed or cancelled work items can be archived',
           ),
         const BottomSheetPickerItem(
+          value: 'history',
+          label: 'Description history',
+          subtitle: 'What the description used to say',
+          icon: Icons.history,
+        ),
+        const BottomSheetPickerItem(
           value: 'delete',
           label: 'Delete issue',
           icon: Icons.delete_outline,
@@ -1953,9 +1960,34 @@ class _IssueDetailScreenState extends ConsumerState<IssueDetailScreen> {
         await _unarchiveIssue();
       case 'archive':
         await _archiveIssue();
+      case 'history':
+        await _showDescriptionHistory();
       case 'delete':
         await _confirmDelete();
     }
+  }
+
+  /// The description as it used to be.
+  ///
+  /// The activity feed records that it changed and never what it said, so this
+  /// is the only route back to a body that was overwritten — which matters
+  /// here, where the editor is one plain-text field that flattens whatever it
+  /// opens.
+  Future<void> _showDescriptionHistory() async {
+    final restored = await Navigator.push<bool>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => DescriptionHistoryScreen(
+          workspaceSlug: widget.workspaceSlug,
+          projectId: widget.projectId,
+          issueId: widget.issueId,
+          // Restoring goes through the same update path every other edit uses,
+          // so it becomes the newest version in turn and nothing is lost.
+          onRestore: (html) => _updateField({'description_html': html}),
+        ),
+      ),
+    );
+    if (restored == true && mounted) say(context, 'Description restored');
   }
 
   Future<void> _confirmDelete() async {
