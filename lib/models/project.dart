@@ -34,6 +34,24 @@ class Project {
   /// in fact nobody has looked.
   final int? pendingIntakeCount;
 
+  /// The four features a project can switch off, beside Intake.
+  ///
+  /// The columns are `cycle_view`, `module_view`, `issue_views_view` and
+  /// `page_view`; both `ProjectSerializer` and `ProjectListSerializer` declare
+  /// `fields = "__all__"`, so every project that arrives from the server
+  /// carries all four.
+  ///
+  /// **Absent means on, not off.** A project rebuilt from the SQLite cache or
+  /// from a search hit has none of these columns, and defaulting those to
+  /// false would report every feature disabled for a project nobody has
+  /// re-fetched. The settings screen showed a hardcoded "Enabled" for all four
+  /// before this existed; the failure mode worth avoiding is the opposite one,
+  /// where the app claims a feature is off because it did not ask.
+  final bool cyclesEnabled;
+  final bool modulesEnabled;
+  final bool viewsEnabled;
+  final bool pagesEnabled;
+
   Project({
     required this.id,
     required this.name,
@@ -48,6 +66,10 @@ class Project {
     required this.createdAt,
     this.intakeEnabled = false,
     this.pendingIntakeCount,
+    this.cyclesEnabled = true,
+    this.modulesEnabled = true,
+    this.viewsEnabled = true,
+    this.pagesEnabled = true,
   });
 
   factory Project.fromJson(Map<String, dynamic> json) => Project(
@@ -61,9 +83,14 @@ class Project {
         totalMembers: json['total_members'] ?? 0,
         totalIssues: json['total_issues'] ?? 0,
         isMember: json['is_member'] ?? false,
-        createdAt: DateTime.tryParse(json['created_at'] ?? '') ?? DateTime.now(),
+        createdAt:
+            DateTime.tryParse(json['created_at'] ?? '') ?? DateTime.now(),
         intakeEnabled: json['inbox_view'] ?? json['intake_view'] ?? false,
         pendingIntakeCount:
             json['intake_count'] is int ? json['intake_count'] as int : null,
+        cyclesEnabled: json['cycle_view'] as bool? ?? true,
+        modulesEnabled: json['module_view'] as bool? ?? true,
+        viewsEnabled: json['issue_views_view'] as bool? ?? true,
+        pagesEnabled: json['page_view'] as bool? ?? true,
       );
 }

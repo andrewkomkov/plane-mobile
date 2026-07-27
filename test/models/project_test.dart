@@ -58,4 +58,35 @@ void main() {
       expect(project.emoji, isNull);
     });
   });
+
+  group('feature flags', () {
+    test('reads the four columns the server sends', () {
+      final project = Project.fromJson({
+        'cycle_view': false,
+        'module_view': true,
+        'issue_views_view': false,
+        'page_view': true,
+      });
+
+      expect(project.cyclesEnabled, isFalse);
+      expect(project.modulesEnabled, isTrue);
+      expect(project.viewsEnabled, isFalse);
+      expect(project.pagesEnabled, isTrue);
+    });
+
+    test('a project with no flags at all reports them on, not off', () {
+      // A project rebuilt from the SQLite cache or from a search hit carries
+      // none of these columns. Defaulting to false would tell a user their
+      // cycles are switched off because the app did not ask.
+      final project = Project.fromJson(<String, dynamic>{});
+
+      expect(project.cyclesEnabled, isTrue);
+      expect(project.modulesEnabled, isTrue);
+      expect(project.viewsEnabled, isTrue);
+      expect(project.pagesEnabled, isTrue);
+      // Intake is the exception, and stays as it was: it has a second source
+      // of truth in the intake endpoint, and its own reason to fail closed.
+      expect(project.intakeEnabled, isFalse);
+    });
+  });
 }

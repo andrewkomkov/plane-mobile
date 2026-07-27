@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'project_settings_screen.dart';
 import '../../config/m3e/shapes.dart';
 import '../../config/m3e/typography.dart';
 import '../../config/theme.dart';
@@ -19,14 +20,6 @@ import '../modules/module_list_screen.dart';
 import '../cycles/cycle_list_screen.dart';
 import '../views/view_list_screen.dart';
 import '../search/search_screen.dart';
-
-/// Room under the floating nav bar, for the lists this screen stacks.
-///
-/// [ProjectScreen] sets `extendBody: true`, so its lists run beneath the glass
-/// bar and the last row of each was sitting under it. One number, declared
-/// where the bar is, rather than the four different guesses the four lists were
-/// making — and it matches what the home tabs already pad by for the same bar.
-const double kProjectListBottomInset = 100;
 
 class ProjectScreen extends ConsumerStatefulWidget {
   final String workspaceSlug;
@@ -253,6 +246,24 @@ class _ProjectScreenState extends ConsumerState<ProjectScreen> {
               pendingCount: _intake.pendingCount,
               onPressed: _openIntake,
             ),
+          // `ProjectSettingsScreen` had no call site anywhere in the app: the
+          // whole screen — general, members, states, labels, integrations and
+          // the Features section — was written, compiled and unreachable. The
+          // analyzer does not report that for a public class, which is exactly
+          // how the four create flows stayed dead as well.
+          M3EAppBarAction(
+            icon: Icons.settings_outlined,
+            tooltip: 'Project settings',
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => ProjectSettingsScreen(
+                  workspaceSlug: widget.workspaceSlug,
+                  project: widget.project,
+                ),
+              ),
+            ),
+          ),
           // The one primary action on this screen, so it takes the emphasized
           // tonal treatment rather than being another grey glyph. The tooltip
           // is the accessible name and it names what will be created, so the
