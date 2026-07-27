@@ -8,10 +8,19 @@ import '../../widgets/m3e/loading_indicator.dart';
 import '../../widgets/m3e/text_field.dart';
 import '../../widgets/bottom_sheet_picker.dart';
 import '../../widgets/confirm_dialog.dart';
+import '../../widgets/label_pill.dart';
 import '../../config/theme.dart';
+import '../../models/cycle.dart';
 import '../../models/draft_issue.dart';
+import '../../models/label.dart';
+import '../../models/member.dart';
+import '../../models/module.dart';
+import '../../services/cycle_service.dart';
 import '../../services/draft_issue_service.dart';
 import '../../services/issue_service.dart';
+import '../../services/label_service.dart';
+import '../../services/member_service.dart';
+import '../../services/module_service.dart';
 import '../../models/state.dart';
 
 /// What the screen did before it closed, so the list underneath knows which of
@@ -72,6 +81,26 @@ class _IssueCreateScreenState extends State<IssueCreateScreen> {
   String _selectedPriority = 'medium';
   _Busy? _busy;
 
+  // The rest of what a work item has. The form carried title, description,
+  // status and priority and nothing else, which meant a draft written on the
+  // web could show its assignees and labels here and lose them on save — the
+  // fields were read but never sent back.
+  final Set<String> _assignees = {};
+  final Set<String> _labels = {};
+  DateTime? _startDate;
+  DateTime? _targetDate;
+  String? _cycleId;
+  final Set<String> _moduleIds = {};
+
+  /// What the pickers choose from. Loaded after the first frame so the form is
+  /// usable immediately; a picker with nothing in it says so rather than
+  /// opening empty.
+  List<Member> _members = [];
+  List<Label> _projectLabels = [];
+  List<Cycle> _cycles = [];
+  List<Module> _modules = [];
+  bool _loadingOptions = true;
+
   DraftIssue? get _draft => widget.draft;
   bool get _isEditingDraft => _draft != null;
   bool get _saving => _busy != null;
@@ -96,13 +125,60 @@ class _IssueCreateScreenState extends State<IssueCreateScreen> {
           widget.states.containsKey(draft.issue.state)) {
         _selectedState = draft.issue.state;
       }
+      _assignees.addAll(draft.issue.assignees);
+      _labels.addAll(draft.issue.labels);
+      _startDate = _parseDate(draft.issue.startDate);
+      _targetDate = _parseDate(draft.issue.targetDate);
+      _cycleId = draft.issue.cycleId;
+      _moduleIds.addAll(draft.issue.moduleIds);
     }
     _selectedState ??= widget.states.values
             .where((s) => s.group == 'unstarted')
             .firstOrNull
             ?.id ??
         widget.states.values.firstOrNull?.id;
+    _loadOptions();
   }
+
+  /// Fetch what the new pickers offer.
+  ///
+  /// Each is tolerated failing on its own: a project with no cycles, or a
+  /// guest who may not list members, should cost one greyed-out field rather
+  /// than a form that will not open.
+  Future<void> _loadOptions() async {
+    final ws = widget.workspaceSlug;
+    final pid = widget.projectId;
+    final results = await Future.wait([
+      _tryLoad(() => MemberService.getMembers(ws, pid), <Member>[]),
+      _tryLoad(() => LabelService.getLabels(ws, pid), <Label>[]),
+      _tryLoad(() => CycleService.getCycles(ws, pid), <Cycle>[]),
+      _tryLoad(() => ModuleService.getModules(ws, pid), <Module>[]),
+    ]);
+    if (!mounted) return;
+    setState(() {
+      _members = results[0] as List<Member>;
+      _projectLabels = results[1] as List<Label>;
+      _cycles = results[2] as List<Cycle>;
+      _modules = results[3] as List<Module>;
+      _loadingOptions = false;
+    });
+  }
+
+  static Future<T> _tryLoad<T>(Future<T> Function() fn, T fallback) async {
+    try {
+      return await fn();
+    } catch (_) {
+      return fallback;
+    }
+  }
+
+  static DateTime? _parseDate(String? value) =>
+      value == null || value.isEmpty ? null : DateTime.tryParse(value);
+
+  static String _isoDate(DateTime value) =>
+      '${value.year.toString().padLeft(4, '0')}-'
+      '${value.month.toString().padLeft(2, '0')}-'
+      '${value.day.toString().padLeft(2, '0')}';
 
   @override
   void dispose() {
@@ -169,7 +245,53 @@ class _IssueCreateScreenState extends State<IssueCreateScreen> {
         if (_selectedState != null) 'state': _selectedState,
         'priority': _selectedPriority,
         if (widget.parentIssueId != null) 'parent': widget.parentIssueId,
+        // Always sent, empty included: an omitted key leaves the previous
+        // value standing, so clearing the assignees on a draft would silently
+        // do nothing.
+        'assignees': _assignees.toList(),
+        'labels': _labels.toList(),
+        'start_date': _startDate == null ? null : _isoDate(_startDate!),
+        'target_date': _targetDate == null ? null : _isoDate(_targetDate!),
       };
+
+  /// The draft-only half of the form.
+  ///
+  /// A draft keeps its cycle and modules on the row, so both ride along in the
+  /// write. A work item does not: `IssueCreateSerializer` has no cycle or
+  /// module field at all, and both are separate collections that can only be
+  /// written once the work item has an id — see [_attachCycleAndModules].
+  Map<String, dynamic> _draftOnlyFields() => {
+        // `cycle_id` is read out of `request.data` by the view and put into
+        // the serializer context, so it has to be in the body under this exact
+        // name — the usual `cycle` rename would be dropped in silence.
+        'cycle_id': _cycleId,
+        'module_ids': _moduleIds.toList(),
+      };
+
+  /// Put a newly created work item into the chosen cycle and modules.
+  ///
+  /// Failing here does not fail the create: the work item exists, and losing
+  /// the screen's contents to re-pick a module would be the worse outcome.
+  Future<void> _attachCycleAndModules(String issueId) async {
+    final cycle = _cycleId;
+    try {
+      if (cycle != null) {
+        await IssueService.addIssueToCycle(
+            widget.workspaceSlug, widget.projectId, cycle, issueId);
+      }
+      if (_moduleIds.isNotEmpty) {
+        await IssueService.setIssueModules(
+          widget.workspaceSlug,
+          widget.projectId,
+          issueId,
+          added: _moduleIds.toList(),
+          removed: const [],
+        );
+      }
+    } catch (_) {
+      _report('The work item was created, but not filed under all of it');
+    }
+  }
 
   void _report(String message) {
     if (!mounted) return;
@@ -199,11 +321,12 @@ class _IssueCreateScreenState extends State<IssueCreateScreen> {
     final draft = _draft;
     if (draft == null) {
       await _run(_Busy.creating, () async {
-        await IssueService.createIssue(
+        final created = await IssueService.createIssue(
           widget.workspaceSlug,
           widget.projectId,
           _formFields(),
         );
+        await _attachCycleAndModules(created.id);
         return IssueCreateOutcome.issueCreated;
       });
       return;
@@ -218,11 +341,16 @@ class _IssueCreateScreenState extends State<IssueCreateScreen> {
       // Unsaved edits ride along as overrides rather than being PATCHed first:
       // promotion deletes the draft, so a separate save would be a write to a
       // row that is about to stop existing.
-      await DraftIssueService.promoteDraft(
+      final promoted = await DraftIssueService.promoteDraft(
         widget.workspaceSlug,
         draft,
-        overrides: _formFields(),
+        overrides: {..._formFields(), ..._draftOnlyFields()},
       );
+      // `create_draft_to_issue` does handle cycle_id itself, but only from
+      // `request.data` and only for the cycle — the modules do not follow the
+      // draft across. Attaching here covers both and is idempotent for the
+      // cycle.
+      await _attachCycleAndModules(promoted.id);
       return IssueCreateOutcome.issueCreated;
     });
   }
@@ -237,7 +365,7 @@ class _IssueCreateScreenState extends State<IssueCreateScreen> {
         await DraftIssueService.createDraft(
           widget.workspaceSlug,
           widget.projectId,
-          _formFields(),
+          {..._formFields(), ..._draftOnlyFields()},
         );
         return IssueCreateOutcome.draftSaved;
       });
@@ -251,7 +379,7 @@ class _IssueCreateScreenState extends State<IssueCreateScreen> {
         // because the list that opens this filters by project, but the field
         // the serialiser validates against should come from the row.
         draft.issue.project ?? widget.projectId,
-        _formFields(),
+        {..._formFields(), ..._draftOnlyFields()},
       );
       return IssueCreateOutcome.draftSaved;
     });
@@ -400,6 +528,106 @@ class _IssueCreateScreenState extends State<IssueCreateScreen> {
                 ),
               ],
             ),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Expanded(
+                  child: _PickerField(
+                    label: 'ASSIGNEES',
+                    isSet: _assignees.isNotEmpty,
+                    leading: Icon(Icons.person_outline,
+                        size: PlaneTheme.iconMedium,
+                        color: scheme.onSurfaceVariant),
+                    value: _assigneeSummary,
+                    semanticLabel: 'Assignees: $_assigneeSummary. Change',
+                    onTap: _loadingOptions ? null : _showAssigneePicker,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: _PickerField(
+                    label: 'LABELS',
+                    isSet: _labels.isNotEmpty,
+                    leading: Icon(Icons.sell_outlined,
+                        size: PlaneTheme.iconMedium,
+                        color: scheme.onSurfaceVariant),
+                    value: _labelSummary,
+                    semanticLabel: 'Labels: $_labelSummary. Change',
+                    onTap: _loadingOptions ? null : _showLabelPicker,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Expanded(
+                  child: _PickerField(
+                    label: 'START',
+                    isSet: _startDate != null,
+                    leading: Icon(Icons.play_arrow_outlined,
+                        size: PlaneTheme.iconMedium,
+                        color: scheme.onSurfaceVariant),
+                    value: _dateLabel(_startDate),
+                    semanticLabel:
+                        'Start date: ${_dateLabel(_startDate)}. Change',
+                    onTap: () => _pickDate(isStart: true),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: _PickerField(
+                    label: 'DUE',
+                    isSet: _targetDate != null,
+                    leading: Icon(Icons.event_outlined,
+                        size: PlaneTheme.iconMedium,
+                        color: scheme.onSurfaceVariant),
+                    value: _dateLabel(_targetDate),
+                    semanticLabel:
+                        'Due date: ${_dateLabel(_targetDate)}. Change',
+                    onTap: () => _pickDate(isStart: false),
+                  ),
+                ),
+              ],
+            ),
+            // Offered only where the project has them. Plane's per-project
+            // feature flags can turn either off, and a picker with nothing
+            // behind it is a control that answers a tap with an empty sheet.
+            if (_cycles.isNotEmpty || _modules.isNotEmpty) ...[
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  if (_cycles.isNotEmpty)
+                    Expanded(
+                      child: _PickerField(
+                        label: 'CYCLE',
+                        isSet: _cycleId != null,
+                        leading: Icon(Icons.refresh,
+                            size: PlaneTheme.iconMedium,
+                            color: scheme.onSurfaceVariant),
+                        value: _cycleSummary,
+                        semanticLabel: 'Cycle: $_cycleSummary. Change',
+                        onTap: _showCyclePicker,
+                      ),
+                    ),
+                  if (_cycles.isNotEmpty && _modules.isNotEmpty)
+                    const SizedBox(width: 12),
+                  if (_modules.isNotEmpty)
+                    Expanded(
+                      child: _PickerField(
+                        label: 'MODULES',
+                        isSet: _moduleIds.isNotEmpty,
+                        leading: Icon(Icons.view_module_outlined,
+                            size: PlaneTheme.iconMedium,
+                            color: scheme.onSurfaceVariant),
+                        value: _moduleSummary,
+                        semanticLabel: 'Modules: $_moduleSummary. Change',
+                        onTap: _showModulePicker,
+                      ),
+                    ),
+                ],
+              ),
+            ],
             // Discarding sits at the far end of the form rather than in the
             // app bar: it is irreversible, and it has no business being a
             // thumb's width from the two buttons that save.
@@ -431,6 +659,175 @@ class _IssueCreateScreenState extends State<IssueCreateScreen> {
           .toList(),
     );
     if (chosen != null && mounted) setState(() => _selectedState = chosen);
+  }
+
+  // --- Summaries -----------------------------------------------------------
+  //
+  // A count once there is more than one. Two or three names side by side wrap
+  // the field to three lines and push everything under it off the fold.
+
+  String _nameOf(String id) =>
+      _members.where((m) => m.id == id).firstOrNull?.displayName ?? '1 person';
+
+  String get _assigneeSummary {
+    if (_assignees.isEmpty) return 'Unassigned';
+    if (_assignees.length == 1) return _nameOf(_assignees.first);
+    return '${_assignees.length} people';
+  }
+
+  String get _labelSummary {
+    if (_labels.isEmpty) return 'None';
+    if (_labels.length == 1) {
+      return _projectLabels
+              .where((l) => l.id == _labels.first)
+              .firstOrNull
+              ?.name ??
+          '1 label';
+    }
+    return '${_labels.length} labels';
+  }
+
+  String get _cycleSummary =>
+      _cycles.where((c) => c.id == _cycleId).firstOrNull?.name ?? 'None';
+
+  String get _moduleSummary {
+    if (_moduleIds.isEmpty) return 'None';
+    if (_moduleIds.length == 1) {
+      return _modules
+              .where((m) => m.id == _moduleIds.first)
+              .firstOrNull
+              ?.name ??
+          '1 module';
+    }
+    return '${_moduleIds.length} modules';
+  }
+
+  static String _dateLabel(DateTime? date) =>
+      date == null ? 'None' : '${date.day}/${date.month}/${date.year}';
+
+  // --- Pickers -------------------------------------------------------------
+
+  Future<void> _showAssigneePicker() async {
+    if (_members.isEmpty) {
+      _report('No members to assign to');
+      return;
+    }
+    final chosen = await MultiSelectSheet.show<String>(
+      context: context,
+      title: 'Assignees',
+      selected: _assignees,
+      items: _members
+          .map((m) => BottomSheetPickerItem(
+                value: m.id,
+                label: m.displayName,
+                subtitle: m.email.isEmpty ? null : m.email,
+                icon: Icons.person_outline,
+              ))
+          .toList(),
+    );
+    if (chosen == null || !mounted) return;
+    setState(() {
+      _assignees
+        ..clear()
+        ..addAll(chosen);
+    });
+  }
+
+  Future<void> _showLabelPicker() async {
+    if (_projectLabels.isEmpty) {
+      _report('This project has no labels yet');
+      return;
+    }
+    final chosen = await MultiSelectSheet.show<String>(
+      context: context,
+      title: 'Labels',
+      selected: _labels,
+      items: _projectLabels
+          .map((l) => BottomSheetPickerItem(
+                value: l.id,
+                label: l.name,
+                icon: Icons.sell_outlined,
+                iconColor: parseHexColor(l.color,
+                    fallback: Theme.of(context).colorScheme.outline),
+              ))
+          .toList(),
+    );
+    if (chosen == null || !mounted) return;
+    setState(() {
+      _labels
+        ..clear()
+        ..addAll(chosen);
+    });
+  }
+
+  Future<void> _showCyclePicker() async {
+    final chosen = await BottomSheetPicker.show<String>(
+      context: context,
+      title: 'Cycle',
+      selectedValue: _cycleId,
+      items: [
+        const BottomSheetPickerItem(
+          value: '',
+          label: 'No cycle',
+          icon: Icons.block_outlined,
+        ),
+        for (final c in _cycles)
+          BottomSheetPickerItem(
+            value: c.id,
+            label: c.name,
+            icon: Icons.refresh,
+          ),
+      ],
+    );
+    if (chosen == null || !mounted) return;
+    setState(() => _cycleId = chosen.isEmpty ? null : chosen);
+  }
+
+  Future<void> _showModulePicker() async {
+    final chosen = await MultiSelectSheet.show<String>(
+      context: context,
+      title: 'Modules',
+      selected: _moduleIds,
+      items: _modules
+          .map((m) => BottomSheetPickerItem(
+                value: m.id,
+                label: m.name,
+                icon: Icons.view_module_outlined,
+              ))
+          .toList(),
+    );
+    if (chosen == null || !mounted) return;
+    setState(() {
+      _moduleIds
+        ..clear()
+        ..addAll(chosen);
+    });
+  }
+
+  Future<void> _pickDate({required bool isStart}) async {
+    final current = isStart ? _startDate : _targetDate;
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: current ?? DateTime.now(),
+      firstDate: DateTime(2000),
+      lastDate: DateTime(2100),
+    );
+    if (picked == null || !mounted) return;
+    setState(() {
+      if (isStart) {
+        _startDate = picked;
+      } else {
+        _targetDate = picked;
+      }
+    });
+    // Plane rejects the pair outright — "Start date cannot exceed target
+    // date" — so say it here rather than on save, when the form is about to
+    // close.
+    final start = _startDate;
+    final target = _targetDate;
+    if (start != null && target != null && start.isAfter(target)) {
+      _report('The start date is after the due date');
+    }
   }
 
   Future<void> _showPriorityPicker() async {
@@ -493,7 +890,11 @@ class _PickerField extends StatelessWidget {
   /// so a chosen value and an unchosen one are not one colour apart.
   final bool isSet;
   final String semanticLabel;
-  final VoidCallback onTap;
+
+  /// Null while the field has nothing to offer yet — the pickers' contents are
+  /// fetched after the first frame, and a sheet that opens empty reads as a
+  /// failure rather than as "not loaded".
+  final VoidCallback? onTap;
 
   const _PickerField({
     required this.label,
@@ -524,6 +925,12 @@ class _PickerField extends StatelessWidget {
           borderRadius: BorderRadius.circular(M3EShape.large),
           border: Border.all(color: scheme.outlineVariant, width: 0.8),
         ),
+        foregroundDecoration: onTap == null
+            ? BoxDecoration(
+                color: scheme.surface.withValues(alpha: 0.4),
+                borderRadius: BorderRadius.circular(M3EShape.large),
+              )
+            : null,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [

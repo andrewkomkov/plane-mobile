@@ -62,6 +62,73 @@ void main() {
     });
   });
 
+  group('the rest of a work item', () {
+    /// A viewport tall enough for the whole form.
+    void tall(WidgetTester tester) {
+      tester.view.physicalSize = const Size(1080, 2400);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.reset);
+    }
+
+    testWidgets('offers assignees, labels and both dates', (tester) async {
+      tall(tester);
+      await tester.pumpWidget(wrap());
+      await tester.pumpAndSettle();
+
+      // The form carried title, description, status and priority and nothing
+      // else, so a draft written on the web showed its assignees here and lost
+      // them on save.
+      expect(find.text('ASSIGNEES'), findsOneWidget);
+      expect(find.text('LABELS'), findsOneWidget);
+      expect(find.text('START'), findsOneWidget);
+      expect(find.text('DUE'), findsOneWidget);
+    });
+
+    testWidgets('says plainly when nothing is chosen', (tester) async {
+      tall(tester);
+      await tester.pumpWidget(wrap());
+      await tester.pumpAndSettle();
+
+      expect(find.text('Unassigned'), findsOneWidget);
+      // Labels, and both dates.
+      expect(find.text('None'), findsNWidgets(3));
+    });
+
+    testWidgets('a draft opens with its assignees, labels and dates',
+        (tester) async {
+      tall(tester);
+      await tester.pumpWidget(wrap(
+        draft: draft({
+          'assignee_ids': ['user-1', 'user-2'],
+          'label_ids': ['label-1'],
+          'start_date': '2026-03-01',
+          'target_date': '2026-03-14',
+        }),
+      ));
+      await tester.pumpAndSettle();
+
+      // Counted rather than named: the member and label lists cannot be
+      // fetched here, and a field that renders a raw id would be worse than
+      // one that renders a count.
+      expect(find.text('2 people'), findsOneWidget);
+      expect(find.text('1 label'), findsOneWidget);
+      expect(find.text('1/3/2026'), findsOneWidget);
+      expect(find.text('14/3/2026'), findsOneWidget);
+    });
+
+    testWidgets('no cycle or module field where the project has neither',
+        (tester) async {
+      tall(tester);
+      await tester.pumpWidget(wrap());
+      await tester.pumpAndSettle();
+
+      // Plane's per-project feature flags can turn both off, and a picker
+      // with nothing behind it answers a tap with an empty sheet.
+      expect(find.text('CYCLE'), findsNothing);
+      expect(find.text('MODULES'), findsNothing);
+    });
+  });
+
   group('editing a draft', () {
     testWidgets('is the same form, prefilled', (tester) async {
       await tester.pumpWidget(wrap(
@@ -143,6 +210,13 @@ void main() {
     });
 
     testWidgets('asks before discarding, and says it is final', (tester) async {
+      // The form carries every field a work item has, which is taller than the
+      // default 800x600 test surface — and a control below the fold cannot be
+      // tapped.
+      tester.view.physicalSize = const Size(1080, 2400);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.reset);
+
       await tester.pumpWidget(wrap(draft: draft({})));
 
       await tester.tap(find.text('Discard draft'));
