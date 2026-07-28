@@ -25,7 +25,7 @@ plugins {
     // Its version must equal the Kotlin version: the plugin is the Compose
     // compiler and ships from the same release.
     id "org.jetbrains.kotlin.plugin.compose" version "2.3.20" apply false
-    id "com.google.gms.google-services" version "4.4.2" apply false
+    id "com.google.gms.google-services" version "4.5.0" apply false
 }
 
 include ":app"
