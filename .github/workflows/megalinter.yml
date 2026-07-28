@@ -6,8 +6,11 @@ on:
   pull_request:
   workflow_dispatch:
 
+# Per-commit on main, per-ref on a pull request — see the same block in
+# ci.yml. A shared group cancels whichever run is left pending when the next
+# one arrives, and on main that is a commit nobody linted.
 concurrency:
-  group: megalinter-${{ github.ref }}
+  group: megalinter-${{ github.event_name == 'pull_request' && github.ref || github.sha }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 permissions:
