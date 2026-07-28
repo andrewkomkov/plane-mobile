@@ -24,6 +24,10 @@ jobs:
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v7
+        with:
+          # SonarQube blames findings on the commit that introduced them, and
+          # a single-commit checkout leaves it nothing to blame.
+          fetch-depth: 0
 
       - uses: subosito/flutter-action@v2
         with:
@@ -62,6 +66,19 @@ jobs:
           name: coverage
           path: coverage/lcov.info
           if-no-files-found: warn
+
+      # Here rather than in a workflow of its own: the scan wants the LCOV
+      # report the test step above just wrote, and a separate workflow would
+      # have to run the whole suite again to produce it.
+      #
+      # A pull request from a fork cannot see SONAR_TOKEN, so the scan would
+      # fail rather than be skipped. Contributors do not get a red build for
+      # a secret they were never going to have.
+      - name: SonarQube Scan
+        if: github.event.pull_request.head.repo.fork != true
+        uses: SonarSource/sonarqube-scan-action@v8
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
 
   android:
     name: Build Android
