@@ -45,6 +45,23 @@ class _SetupScreenState extends State<SetupScreen> {
 
   String _normalizeUrl(String url) => url.trim().replaceAll(RegExp(r'/$'), '');
 
+  // Play services reports an unregistered signing certificate as an ordinary
+  // cancellation — "[16] Account reauth failed" — and keeps the part that
+  // actually names the problem (UNREGISTERED_ON_API_CONSOLE) in logcat, where
+  // nobody holding a phone will look. Every build signed with a key whose
+  // SHA-1 has no Android OAuth client behind it fails this way, so say so
+  // instead of relaying a cancellation the user did not perform.
+  static String _googleErrorMessage(GoogleSignInException e) {
+    final detail = e.description ?? e.code.name;
+    if (e.code == GoogleSignInExceptionCode.canceled &&
+        (e.description?.contains('reauth') ?? false)) {
+      return 'Google refused the sign-in ($detail). This build\'s signing '
+          'certificate is likely missing an Android OAuth client — see the '
+          'README.';
+    }
+    return 'Google error: $detail';
+  }
+
   // ─── Google Sign In ───
   Future<void> _signInWithGoogle() async {
     final url = _normalizeUrl(_urlController.text);
@@ -69,7 +86,7 @@ class _SetupScreenState extends State<SetupScreen> {
         );
       } on GoogleSignInException catch (e) {
         setState(() {
-          _error = 'Google error: ${e.code} - ${e.description}';
+          _error = _googleErrorMessage(e);
           _loading = false;
         });
         return;
