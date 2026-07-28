@@ -7,8 +7,15 @@ on:
   workflow_dispatch:
 
 # A new push to a pull request cancels the run still going for the old one.
+#
+# Every push to main gets a group to itself, keyed on the commit. Keying them
+# all on the ref instead put them in one group, and `cancel-in-progress: false`
+# does not mean "cancel nothing": a group holds one running run and one pending
+# run, and a third arrival cancels the one that was pending. Merging a few pull
+# requests in a row was enough to lose the middle run on main — the commit that
+# reached the default branch went unverified.
 concurrency:
-  group: ci-${{ github.workflow }}-${{ github.ref }}
+  group: ci-${{ github.workflow }}-${{ github.event_name == 'pull_request' && github.ref || github.sha }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 permissions:
