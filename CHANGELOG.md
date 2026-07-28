@@ -1,5 +1,24 @@
 # Changelog
 
+## [1.1.1](https://github.com/andrewkomkov/plane-mobile/compare/v1.1.0...v1.1.1) (2026-07-28)
+
+
+### Bug fixes
+
+* **setup:** name the likely cause when google refuses the sign-in ([#28](https://github.com/andrewkomkov/plane-mobile/issues/28)) ([adf1da1](https://github.com/andrewkomkov/plane-mobile/commit/adf1da10fe8d97976b0c71005db0059bd74424d9))
+
+
+### Build
+
+* **deps:** bump androidx.compose.ui:ui in /android ([#20](https://github.com/andrewkomkov/plane-mobile/issues/20)) ([345e2ee](https://github.com/andrewkomkov/plane-mobile/commit/345e2eeadddaabf90b968bac5c35aac208f14ecd))
+* **deps:** bump com.google.gms.google-services in /android ([#21](https://github.com/andrewkomkov/plane-mobile/issues/21)) ([87c8a6e](https://github.com/andrewkomkov/plane-mobile/commit/87c8a6e0054fc1c09f0c5b516e1b34fbdf6b6087))
+* **deps:** bump cupertino_icons from 1.0.8 to 1.0.9 ([#24](https://github.com/andrewkomkov/plane-mobile/issues/24)) ([28e397e](https://github.com/andrewkomkov/plane-mobile/commit/28e397e806f29165a5b36710f7cf923eb9bdb85d))
+* **deps:** bump flutter_secure_storage from 10.0.0 to 10.3.1 ([#25](https://github.com/andrewkomkov/plane-mobile/issues/25)) ([a8310e1](https://github.com/andrewkomkov/plane-mobile/commit/a8310e1a42bf304dc3e9b0cd665dc584c5a64c56))
+* **deps:** bump go_router from 17.1.0 to 17.3.0 ([#26](https://github.com/andrewkomkov/plane-mobile/issues/26)) ([9828363](https://github.com/andrewkomkov/plane-mobile/commit/9828363485ec9deabba8df550d9cb7f360a7f8f2))
+* **deps:** bump intl from 0.20.2 to 0.20.3 ([#23](https://github.com/andrewkomkov/plane-mobile/issues/23)) ([431e5b8](https://github.com/andrewkomkov/plane-mobile/commit/431e5b87897e69842628d31dd4fe8bbba4c7213b))
+* **deps:** bump org.jetbrains.kotlin:kotlin-gradle-plugin in /android ([#27](https://github.com/andrewkomkov/plane-mobile/issues/27)) ([7ff5562](https://github.com/andrewkomkov/plane-mobile/commit/7ff55620b86e73f976d3d83eb02c258d7c55f598))
+* **deps:** bump sqflite from 2.4.2 to 2.4.3 ([#22](https://github.com/andrewkomkov/plane-mobile/issues/22)) ([e9a44d1](https://github.com/andrewkomkov/plane-mobile/commit/e9a44d157531aa7d5367115079b70fd3c31deb92))
+
 ## [1.1.0](https://github.com/andrewkomkov/plane-mobile/compare/v1.0.0...v1.1.0) (2026-07-27)
 
 
