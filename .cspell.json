@@ -9,6 +9,7 @@
     "LICENSE"
   ],
   "words": [
+    "androiddebugkey",
     "androidx",
     "appbar",
     "betterleaks",
@@ -28,6 +29,7 @@
     "intake",
     "jscpd",
     "keyguard",
+    "keytool",
     "ktlint",
     "kwargs",
     "lcov",
@@ -52,6 +54,7 @@
     "serialiser",
     "snackbars",
     "sqflite",
+    "storepass",
     "subosito",
     "temurin",
     "timelapse",
