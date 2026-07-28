@@ -1,7 +1,7 @@
 buildscript {
     // Must match the org.jetbrains.kotlin.android version in settings.gradle.
     // Flutter's build validation reads this legacy property and rejects < 2.0.0.
-    ext.kotlin_version = '2.3.20'
+    ext.kotlin_version = '2.4.10'
     repositories {
         google()
         mavenCentral()
