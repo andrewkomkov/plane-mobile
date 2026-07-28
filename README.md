@@ -91,6 +91,35 @@ normally and push is simply inert: the Gradle plugin is applied only when the
 file is present, and `PushNotificationService.initialize` returns quietly when
 Firebase is unavailable.
 
+### Google sign-in (optional)
+
+Signing in with Google needs an OAuth client of type **Android** in the same
+Google Cloud project as the web client ID in `_googleServerClientId`
+(`lib/screens/setup/setup_screen.dart`), which is the one the Plane instance is
+configured with as `GOOGLE_CLIENT_ID`. Play services matches the client on the
+package name together with the SHA-1 of the certificate the APK is signed with,
+so every signing key needs its own fingerprint registered — the debug keystore
+to run from source, the release keystore for anything CI builds:
+
+```sh
+keytool -list -v -keystore ~/.android/debug.keystore -storepass android \
+  -alias androiddebugkey | grep SHA1
+keytool -list -v -keystore android/upload-keystore.jks -alias <alias> | grep SHA1
+```
+
+Add each fingerprint to the Android app in the Firebase console under Project
+settings, then confirm under APIs & Services → Credentials that an Android
+OAuth client actually exists for it. Registering the fingerprint does not
+reliably create the client — when it does not, create it there by hand with the
+package name and the same SHA-1. Either way the change takes from five minutes
+to a few hours to reach devices.
+
+Miss this and sign-in fails as `canceled - [16] Account reauth failed`, which
+names neither the certificate nor the client. The reason it stands for,
+`UNREGISTERED_ON_API_CONSOLE`, is only ever visible in
+`adb logcat -s Auth.Api.Credentials`. Email/password and API key sign-in do not
+depend on any of this.
+
 ## Development
 
 ```sh
