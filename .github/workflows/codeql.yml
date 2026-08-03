@@ -40,7 +40,7 @@ jobs:
 
       # CodeQL has no Dart support, so this covers the Android sources only —
       # the platform views, the update installer and the install receiver.
-      - uses: github/codeql-action/init@v4
+      - uses: github/codeql-action/init@v4.37.4
         with:
           languages: java-kotlin
           build-mode: manual
@@ -49,6 +49,6 @@ jobs:
           flutter pub get
           flutter build apk --debug
 
-      - uses: github/codeql-action/analyze@v4
+      - uses: github/codeql-action/analyze@v4.37.4
         with:
           category: /language:java-kotlin
