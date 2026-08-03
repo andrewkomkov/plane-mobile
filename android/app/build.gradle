@@ -129,5 +129,5 @@ dependencies {
     // Tooling for the platform-view host; the ComposeView needs a lifecycle
     // owner, which FlutterFragmentActivity provides.
     implementation "androidx.lifecycle:lifecycle-runtime-ktx:2.11.0"
-    implementation "androidx.savedstate:savedstate-ktx:1.2.1"
+    implementation "androidx.savedstate:savedstate-ktx:1.5.0"
 }
