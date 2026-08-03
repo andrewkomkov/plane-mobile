@@ -124,7 +124,7 @@ dependencies {
     // consumed the only way Flutter can consume Compose: the components below
     // are rendered inside a ComposeView hosted in an Android platform view.
     // See android/app/src/main/kotlin/.../M3ExpressiveViews.kt.
-    implementation "androidx.compose.material3:material3:1.5.0-alpha24"
+    implementation "androidx.compose.material3:material3:1.5.0-alpha25"
     implementation "androidx.compose.ui:ui:1.12.0-beta02"
     // Tooling for the platform-view host; the ComposeView needs a lifecycle
     // owner, which FlutterFragmentActivity provides.
