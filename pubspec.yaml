@@ -51,7 +51,7 @@ dependencies:
   sqflite: ^2.4.3
   path: ^1.9.1
   firebase_core: ^4.6.0
-  firebase_messaging: ^16.1.3
+  firebase_messaging: ^16.5.0
   # Prerelease on purpose: the stable line still pins win32 ^5, which cannot
   # resolve against package_info_plus 10. 12.0.0-beta.4 is also where the
   # Kotlin Gradle Plugin stopped being applied under AGP 9.
