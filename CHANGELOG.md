@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.1.2](https://github.com/andrewkomkov/plane-mobile/compare/v1.1.1...v1.1.2) (2026-08-21)
+
+
+### Documentation
+
+* say that the released apk needs the firebase secret too ([#46](https://github.com/andrewkomkov/plane-mobile/issues/46)) ([d2a4d8e](https://github.com/andrewkomkov/plane-mobile/commit/d2a4d8ec39941e5b9ff233fa5004162c35b6062e))
+
 ## [1.1.1](https://github.com/andrewkomkov/plane-mobile/compare/v1.1.0...v1.1.1) (2026-07-28)
 
 
