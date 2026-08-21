@@ -91,6 +91,20 @@ normally and push is simply inert: the Gradle plugin is applied only when the
 file is present, and `PushNotificationService.initialize` returns quietly when
 Firebase is unavailable.
 
+That applies to the released APK too, and it is easy to miss. `release.yml`
+writes the file from the `GOOGLE_SERVICES_JSON` repository secret, so if the
+secret is unset every published APK is built without Firebase and cannot receive
+push — the app still installs and runs, and nothing in the build output says
+otherwise. Set the secret to the contents of `google-services.json`, verbatim
+rather than base64, before cutting a release you expect push to work in.
+
+To check an APK afterwards, look for the app id the Gradle plugin compiles into
+the resources; a build without Firebase has no such string anywhere:
+
+```sh
+unzip -p plane-mobile-<version>.apk resources.arsc | strings | grep ':android:'
+```
+
 ### Google sign-in (optional)
 
 Signing in with Google needs an OAuth client of type **Android** in the same
